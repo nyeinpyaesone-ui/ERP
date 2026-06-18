@@ -147,10 +147,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## 🆘 Support
 
-- GitHub Issues: [github.com/nyeinpyaesone-ui/ERP/issues](https://github.com/nyeinpyaesone-ui/ERP/issues)
-- API Docs: `http://localhost:8000/docs` (when running)
-- Status: `./scripts/gh-manager.sh status`
-
----
-
-Built with ❤️ by the ERP SOLUTION Team
+- **Email:** nyeinpyaesone273@gmail.com
+- **LinkedIn:** [linkedin.com/in/nyein-pyae-sone-3250501ba](https://linkedin.com/in/nyein-pyae-sone-3250501ba)
+- **GitHub:** [github.com/nyeinpyaesone-ui/ERP](https://github.com/nyeinpyaesone-ui/ERP)
+- **Phone:** +959699795380
+- **Issues:** https://github.com/nyeinpyaesone-ui/ERP/issues
+- **Documentation:** See `docs/` directory
+- **API Docs:** `http://localhost:8000/docs` (when running)
