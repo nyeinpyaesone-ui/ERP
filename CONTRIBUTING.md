@@ -51,3 +51,11 @@ Example: `feat: add inventory forecasting module`
 - Python: PEP 8, type hints, docstrings
 - TypeScript: Strict mode, functional components
 - Tests: 80%+ coverage target
+
+
+## Contact
+
+- Email: nyeinpyaesone273@gmail.com
+- LinkedIn: https://linkedin.com/in/nyein-pyae-sone-3250501ba
+- GitHub: https://github.com/nyeinpyaesone-ui/ERP
+- Phone: +959699795380

@@ -70,3 +70,11 @@ Yes, licensed under MIT. You can use, modify, and distribute freely.
 
 ### Can I use it commercially?
 Yes, MIT license permits commercial use.
+
+
+## Contact
+
+- Email: nyeinpyaesone273@gmail.com
+- LinkedIn: https://linkedin.com/in/nyein-pyae-sone-3250501ba
+- GitHub: https://github.com/nyeinpyaesone-ui/ERP
+- Phone: +959699795380
