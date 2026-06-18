@@ -1,4 +1,4 @@
-# Contributing to AI-ERP Platform
+# Contributing to ERP SOLUTION
 
 ## Getting Started
 

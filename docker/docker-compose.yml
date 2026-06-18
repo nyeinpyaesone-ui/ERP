@@ -11,8 +11,8 @@ services:
       - NODE_ENV=development
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=ai_erp_development
-      - DB_USER=ai_erp_user
+      - DB_NAME=erp_solution_development
+      - DB_USER=erp_solution_user
       - DB_PASSWORD=dev_password
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -26,7 +26,7 @@ services:
     volumes:
       - ../uploads:/app/uploads
     networks:
-      - ai-erp-network
+      - erp_solution-network
 
   web:
     build:
@@ -37,7 +37,7 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
     networks:
-      - ai-erp-network
+      - erp_solution-network
 
   worker:
     build:
@@ -47,8 +47,8 @@ services:
       - NODE_ENV=development
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=ai_erp_development
-      - DB_USER=ai_erp_user
+      - DB_NAME=erp_solution_development
+      - DB_USER=erp_solution_user
       - DB_PASSWORD=dev_password
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -59,27 +59,27 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - ai-erp-network
+      - erp_solution-network
 
   postgres:
     image: postgres:15-alpine
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=ai_erp_user
+      - POSTGRES_USER=erp_solution_user
       - POSTGRES_PASSWORD=dev_password
-      - POSTGRES_DB=ai_erp_development
+      - POSTGRES_DB=erp_solution_development
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./base/postgres.yaml:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ai_erp_user -d ai_erp_development"]
+      test: ["CMD-SHELL", "pg_isready -U erp_solution_user -d erp_solution_development"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - ai-erp-network
+      - erp_solution-network
 
   redis:
     image: redis:7-alpine
@@ -94,7 +94,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ai-erp-network
+      - erp_solution-network
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -106,7 +106,7 @@ services:
     depends_on:
       - postgres
     networks:
-      - ai-erp-network
+      - erp_solution-network
 
   redisinsight:
     image: redis/redisinsight:latest
@@ -115,13 +115,13 @@ services:
     depends_on:
       - redis
     networks:
-      - ai-erp-network
+      - erp_solution-network
 
 volumes:
   postgres_data:
   redis_data:
 
 networks:
-  ai-erp-network:
+  erp_solution-network:
     driver: bridge
 

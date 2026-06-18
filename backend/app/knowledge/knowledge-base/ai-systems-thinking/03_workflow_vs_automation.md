@@ -26,7 +26,7 @@ Human   Human+AI     Human approves    AI executes    AI decides
 all
 ```
 
-## Where AI-ERP Sits
+## Where ERP SOLUTION Sits
 
 | Feature | Level | Human Role |
 |---------|-------|------------|

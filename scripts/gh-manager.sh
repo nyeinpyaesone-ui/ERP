@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# AI-ERP Platform — GitHub Repository Manager
+# ERP SOLUTION — GitHub Repository Manager
 # Usage: ./scripts/gh-manager.sh [command]
 ###############################################################################
 
@@ -17,7 +17,7 @@ warn()  { echo -e "${Y}[!]${NC} $1"; }
 err()   { echo -e "${R}[✗]${NC} $1"; }
 
 cmd_help() {
-    echo "AI-ERP GitHub Manager"
+    echo "ERP SOLUTION GitHub Manager"
     echo ""
     echo "Commands:"
     echo "  status      Show repository status"

@@ -42,7 +42,7 @@ Every piece of data must be traceable:
 - **Timestamp** — When did each step happen?
 - **Confidence** — How certain was the AI at each step?
 
-## Implementation in AI-ERP
+## Implementation in ERP SOLUTION
 
 1. **Source Layer** — PostgreSQL tables (contacts, invoices, townships, tax_rates)
 2. **Ingestion Layer** — FastAPI endpoints validate and normalize inputs

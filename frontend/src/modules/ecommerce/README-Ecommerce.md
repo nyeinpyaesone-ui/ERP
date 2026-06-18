@@ -1,4 +1,4 @@
-# AI-ERP E-commerce Storefront Module (v3.0)
+# ERP SOLUTION E-commerce Storefront Module (v3.0)
 
 ## Overview
 Complete B2C e-commerce storefront integrated with your ERP inventory, pricing, and order management. Supports both customer-facing shopping and admin dashboard.

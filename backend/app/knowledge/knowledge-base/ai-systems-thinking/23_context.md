@@ -81,7 +81,7 @@ def load_context(user_query, user_id, tenant_id):
 - **Invalidation**: Clear cached context when underlying data changes
 - **Streaming**: Push context updates to active sessions
 
-## Context in AI-ERP
+## Context in ERP SOLUTION
 
 | Context Type | Source | How Loaded | TTL |
 |--------------|--------|------------|-----|
@@ -96,7 +96,7 @@ def load_context(user_query, user_id, tenant_id):
 
 ## The Context Window Problem
 
-LLMs have limited context. In AI-ERP:
+LLMs have limited context. In ERP SOLUTION:
 - **GPT-4**: 8K-128K tokens
 - **Claude 3**: 200K tokens
 - **Local LLM**: 4K-8K tokens

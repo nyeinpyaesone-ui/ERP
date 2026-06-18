@@ -4,11 +4,11 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: erp-postgres
+    container_name: erp_solution-postgres
     environment:
       POSTGRES_USER: erp
       POSTGRES_PASSWORD: erp_secret
-      POSTGRES_DB: ai_erp
+      POSTGRES_DB: erp_solution
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -22,7 +22,7 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: erp-redis
+    container_name: erp_solution-redis
     ports:
       - "6379:6379"
     volumes:
@@ -34,9 +34,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: erp-backend
+    container_name: erp_solution-backend
     environment:
-      DATABASE_URL: postgresql://erp:erp_secret@postgres:5432/ai_erp
+      DATABASE_URL: postgresql://erp:erp_secret@postgres:5432/erp_solution
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: your-secret-key-change-in-production
       ENVIRONMENT: development
@@ -67,7 +67,7 @@ services:
   # Ollama AI Service
   ollama:
     image: ollama/ollama:latest
-    container_name: erp-ollama
+    container_name: erp_solution-ollama
     ports:
       - "11434:11434"
     volumes:

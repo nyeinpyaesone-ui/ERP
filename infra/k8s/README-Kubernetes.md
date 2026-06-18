@@ -1,7 +1,7 @@
-# AI-ERP Kubernetes Deployment (v3.1)
+# ERP SOLUTION Kubernetes Deployment (v3.1)
 
 ## Overview
-Production-ready Kubernetes deployment for AI-ERP with auto-scaling, rolling updates, monitoring, and disaster recovery.
+Production-ready Kubernetes deployment for ERP SOLUTION with auto-scaling, rolling updates, monitoring, and disaster recovery.
 
 ## Architecture
 
@@ -96,12 +96,12 @@ docker-compose up -d
 kubectl apply -k overlays/development/
 
 # Verify deployment
-kubectl get pods -n ai-erp-dev
-kubectl get svc -n ai-erp-dev
-kubectl get ingress -n ai-erp-dev
+kubectl get pods -n erp_solution-dev
+kubectl get svc -n erp_solution-dev
+kubectl get ingress -n erp_solution-dev
 
 # View logs
-kubectl logs -f deployment/dev-ai-erp-api -n ai-erp-dev
+kubectl logs -f deployment/dev-erp_solution-api -n erp_solution-dev
 ```
 
 ### 3. Staging Environment
@@ -111,7 +111,7 @@ kubectl logs -f deployment/dev-ai-erp-api -n ai-erp-dev
 ./scripts/deploy.sh staging v3.0.0-rc1
 
 # Verify
-kubectl get pods -n ai-erp-staging
+kubectl get pods -n erp_solution-staging
 ```
 
 ### 4. Production Environment
@@ -121,9 +121,9 @@ kubectl get pods -n ai-erp-staging
 ./scripts/deploy.sh production v3.0.0
 
 # Monitor rollout
-kubectl rollout status deployment/ai-erp-api -n ai-erp
-kubectl rollout status deployment/ai-erp-web -n ai-erp
-kubectl rollout status deployment/ai-erp-worker -n ai-erp
+kubectl rollout status deployment/erp_solution-api -n erp_solution
+kubectl rollout status deployment/erp_solution-web -n erp_solution
+kubectl rollout status deployment/erp_solution-worker -n erp_solution
 ```
 
 ## Configuration
@@ -137,7 +137,7 @@ Before deploying, fill in the secrets:
 vim base/secrets.yaml
 
 # Or use kubectl to create secrets
-kubectl create secret generic ai-erp-secrets   --from-literal=DB_PASSWORD=$(openssl rand -base64 32)   --from-literal=JWT_SECRET=$(openssl rand -base64 64)   --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32)   --from-literal=AWS_ACCESS_KEY_ID=YOUR_KEY   --from-literal=AWS_SECRET_ACCESS_KEY=YOUR_SECRET   -n ai-erp
+kubectl create secret generic erp_solution-secrets   --from-literal=DB_PASSWORD=$(openssl rand -base64 32)   --from-literal=JWT_SECRET=$(openssl rand -base64 64)   --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32)   --from-literal=AWS_ACCESS_KEY_ID=YOUR_KEY   --from-literal=AWS_SECRET_ACCESS_KEY=YOUR_SECRET   -n erp_solution
 ```
 
 ### TLS Certificates
@@ -173,13 +173,13 @@ EOF
 
 ```bash
 # View current HPA status
-kubectl get hpa -n ai-erp
+kubectl get hpa -n erp_solution
 
 # Manually scale API pods
-kubectl scale deployment ai-erp-api --replicas=10 -n ai-erp
+kubectl scale deployment erp_solution-api --replicas=10 -n erp_solution
 
 # View metrics
-kubectl top pods -n ai-erp
+kubectl top pods -n erp_solution
 ```
 
 ### Database Scaling
@@ -190,18 +190,18 @@ kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: ai-erp-postgres-replica
-  namespace: ai-erp
+  name: erp_solution-postgres-replica
+  namespace: erp_solution
 spec:
-  serviceName: ai-erp-postgres-replica
+  serviceName: erp_solution-postgres-replica
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: ai-erp-postgres-replica
+      app.kubernetes.io/name: erp_solution-postgres-replica
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ai-erp-postgres-replica
+        app.kubernetes.io/name: erp_solution-postgres-replica
     spec:
       containers:
       - name: postgres
@@ -210,17 +210,17 @@ spec:
         - name: POSTGRES_DB
           valueFrom:
             configMapKeyRef:
-              name: ai-erp-config
+              name: erp_solution-config
               key: DB_NAME
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: ai-erp-secrets
+              name: erp_solution-secrets
               key: DB_USER
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: ai-erp-secrets
+              name: erp_solution-secrets
               key: DB_PASSWORD
         - name: PGDATA
           value: "/var/lib/postgresql/data/pgdata"
@@ -229,9 +229,9 @@ spec:
         - -c
         - |
           rm -rf /var/lib/postgresql/data/pgdata/*
-          pg_basebackup -h ai-erp-postgres -D /var/lib/postgresql/data/pgdata -U $(POSTGRES_USER) -v -P -W
+          pg_basebackup -h erp_solution-postgres -D /var/lib/postgresql/data/pgdata -U $(POSTGRES_USER) -v -P -W
           echo "standby_mode = 'on'" >> /var/lib/postgresql/data/pgdata/recovery.conf
-          echo "primary_conninfo = 'host=ai-erp-postgres port=5432 user=$(POSTGRES_USER) password=$(POSTGRES_PASSWORD)'" >> /var/lib/postgresql/data/pgdata/recovery.conf
+          echo "primary_conninfo = 'host=erp_solution-postgres port=5432 user=$(POSTGRES_USER) password=$(POSTGRES_PASSWORD)'" >> /var/lib/postgresql/data/pgdata/recovery.conf
           postgres -D /var/lib/postgresql/data/pgdata
 EOF
 ```
@@ -250,20 +250,20 @@ Backups run automatically via CronJob:
 
 ```bash
 # Database backup
-kubectl create job manual-db-backup --from=cronjob/ai-erp-db-backup -n ai-erp
+kubectl create job manual-db-backup --from=cronjob/erp_solution-db-backup -n erp_solution
 
 # Redis backup
-kubectl create job manual-redis-backup --from=cronjob/ai-erp-redis-backup -n ai-erp
+kubectl create job manual-redis-backup --from=cronjob/erp_solution-redis-backup -n erp_solution
 ```
 
 ### Restore from Backup
 
 ```bash
 # Restore database
-kubectl exec -it ai-erp-postgres-0 -n ai-erp -- bash
-aws s3 cp s3://ai-erp-production/backups/database/ai-erp-20240101-020000.sql.gz /tmp/
-gunzip /tmp/ai-erp-20240101-020000.sql.gz
-psql -U ai_erp_user -d ai_erp_production < /tmp/ai-erp-20240101-020000.sql
+kubectl exec -it erp_solution-postgres-0 -n erp_solution -- bash
+aws s3 cp s3://erp_solution-production/backups/database/erp_solution-20240101-020000.sql.gz /tmp/
+gunzip /tmp/erp_solution-20240101-020000.sql.gz
+psql -U erp_solution_user -d erp_solution_production < /tmp/erp_solution-20240101-020000.sql
 ```
 
 ## Monitoring
@@ -272,7 +272,7 @@ psql -U ai_erp_user -d ai_erp_production < /tmp/ai-erp-20240101-020000.sql
 
 ```bash
 # Install Prometheus
-helm install prometheus prometheus-community/kube-prometheus-stack   --namespace ai-erp-monitoring   --create-namespace
+helm install prometheus prometheus-community/kube-prometheus-stack   --namespace erp_solution-monitoring   --create-namespace
 
 # Apply ServiceMonitor
 kubectl apply -f monitoring/prometheus.yaml
@@ -282,7 +282,7 @@ kubectl apply -f monitoring/prometheus.yaml
 
 ```bash
 # Import dashboard
-kubectl create configmap ai-erp-dashboard   --from-file=monitoring/grafana-dashboard.json   -n ai-erp-monitoring   --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap erp_solution-dashboard   --from-file=monitoring/grafana-dashboard.json   -n erp_solution-monitoring   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 ### Alerts
@@ -327,22 +327,22 @@ Minimal permissions:
 
 ```bash
 # Pod not starting
-kubectl describe pod <pod-name> -n ai-erp
-kubectl logs <pod-name> -n ai-erp --previous
+kubectl describe pod <pod-name> -n erp_solution
+kubectl logs <pod-name> -n erp_solution --previous
 
 # High memory usage
-kubectl top pods -n ai-erp
-kubectl exec -it <pod-name> -n ai-erp -- sh -c "ps aux --sort=-%mem | head"
+kubectl top pods -n erp_solution
+kubectl exec -it <pod-name> -n erp_solution -- sh -c "ps aux --sort=-%mem | head"
 
 # Database connection issues
-kubectl exec -it ai-erp-postgres-0 -n ai-erp -- psql -U ai_erp_user -d ai_erp_production -c "SELECT count(*) FROM pg_stat_activity;"
+kubectl exec -it erp_solution-postgres-0 -n erp_solution -- psql -U erp_solution_user -d erp_solution_production -c "SELECT count(*) FROM pg_stat_activity;"
 
 # Redis issues
-kubectl exec -it ai-erp-redis-0 -n ai-erp -- redis-cli info
+kubectl exec -it erp_solution-redis-0 -n erp_solution -- redis-cli info
 
 # Ingress issues
-kubectl get ingress -n ai-erp
-kubectl describe ingress ai-erp-ingress -n ai-erp
+kubectl get ingress -n erp_solution
+kubectl describe ingress erp_solution-ingress -n erp_solution
 kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
 ```
 
@@ -353,9 +353,9 @@ kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
 ./scripts/rollback.sh production
 
 # Or manual rollback
-kubectl rollout undo deployment/ai-erp-api -n ai-erp
-kubectl rollout undo deployment/ai-erp-web -n ai-erp
-kubectl rollout undo deployment/ai-erp-worker -n ai-erp
+kubectl rollout undo deployment/erp_solution-api -n erp_solution
+kubectl rollout undo deployment/erp_solution-web -n erp_solution
+kubectl rollout undo deployment/erp_solution-worker -n erp_solution
 ```
 
 ## Cost Optimization

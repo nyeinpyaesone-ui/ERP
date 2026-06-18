@@ -31,12 +31,12 @@ jobs:
           context: ./backend
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/ai-erp-backend:${{ github.ref_name }}
-            ${{ secrets.DOCKER_USERNAME }}/ai-erp-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/erp_solution-backend:${{ github.ref_name }}
+            ${{ secrets.DOCKER_USERNAME }}/erp_solution-backend:latest
       - uses: docker/build-push-action@v5
         with:
           context: ./frontend
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/ai-erp-frontend:${{ github.ref_name }}
-            ${{ secrets.DOCKER_USERNAME }}/ai-erp-frontend:latest
+            ${{ secrets.DOCKER_USERNAME }}/erp_solution-frontend:${{ github.ref_name }}
+            ${{ secrets.DOCKER_USERNAME }}/erp_solution-frontend:latest

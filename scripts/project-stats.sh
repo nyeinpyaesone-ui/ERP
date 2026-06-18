@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 ###############################################################################
-# AI-ERP Platform — Project Statistics Generator
+# ERP SOLUTION — Project Statistics Generator
 # Usage: ./scripts/project-stats.sh
 ###############################################################################
 
 set -e
 
 echo "=========================================="
-echo "  AI-ERP Platform — Project Statistics"
+echo "  ERP SOLUTION — Project Statistics"
 echo "=========================================="
 echo ""
 

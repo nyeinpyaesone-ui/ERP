@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# AI-ERP Platform — Environment Setup
+# ERP SOLUTION — Environment Setup
 # Run this after cloning the repository
 ###############################################################################
 
@@ -13,7 +13,7 @@ ok()    { echo -e "${G}[✓]${NC} $1"; }
 warn()  { echo -e "${Y}[!]${NC} $1"; }
 
 echo "=========================================="
-echo "  AI-ERP Platform Environment Setup"
+echo "  ERP SOLUTION Environment Setup"
 echo "=========================================="
 echo ""
 
@@ -81,7 +81,7 @@ info "Creating environment files..."
 
 if [ ! -f "backend/.env" ]; then
     cat > backend/.env << EOF
-DATABASE_URL=postgresql://erp:erp_secret@localhost:5432/ai_erp
+DATABASE_URL=postgresql://erp:erp_secret@localhost:5432/erp_solution
 REDIS_URL=redis://localhost:6379/0
 SECRET_KEY=change-this-in-production-$(openssl rand -hex 16)
 ENVIRONMENT=development

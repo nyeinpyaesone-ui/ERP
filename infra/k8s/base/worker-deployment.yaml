@@ -1,12 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ai-erp-worker
-  namespace: ai-erp
+  name: erp_solution-worker
+  namespace: erp_solution
   labels:
-    app.kubernetes.io/name: ai-erp-worker
+    app.kubernetes.io/name: erp_solution-worker
     app.kubernetes.io/component: worker
-    app.kubernetes.io/part-of: ai-erp
+    app.kubernetes.io/part-of: erp_solution
 spec:
   replicas: 2
   strategy:
@@ -16,21 +16,21 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app.kubernetes.io/name: ai-erp-worker
+      app.kubernetes.io/name: erp_solution-worker
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ai-erp-worker
+        app.kubernetes.io/name: erp_solution-worker
         app.kubernetes.io/component: worker
-        app.kubernetes.io/part-of: ai-erp
+        app.kubernetes.io/part-of: erp_solution
     spec:
-      serviceAccountName: ai-erp
+      serviceAccountName: erp_solution
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
       containers:
       - name: worker
-        image: ghcr.io/nyeinpyaesone-ui/ai-erp-worker:latest
+        image: ghcr.io/nyeinpyaesone-ui/erp_solution-worker:latest
         imagePullPolicy: Always
         env:
         - name: NODE_ENV
@@ -39,9 +39,9 @@ spec:
           value: "5"
         envFrom:
         - configMapRef:
-            name: ai-erp-config
+            name: erp_solution-config
         - secretRef:
-            name: ai-erp-secrets
+            name: erp_solution-secrets
         resources:
           requests:
             memory: "256Mi"
@@ -67,19 +67,19 @@ spec:
                 - key: app.kubernetes.io/name
                   operator: In
                   values:
-                  - ai-erp-worker
+                  - erp_solution-worker
               topologyKey: kubernetes.io/hostname
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: ai-erp-worker-hpa
-  namespace: ai-erp
+  name: erp_solution-worker-hpa
+  namespace: erp_solution
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: ai-erp-worker
+    name: erp_solution-worker
   minReplicas: 2
   maxReplicas: 10
   metrics:

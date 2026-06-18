@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# AI-ERP Platform — Backup Script
+# ERP SOLUTION — Backup Script
 # Usage: ./scripts/backup.sh [output_dir]
 ###############################################################################
 
@@ -12,7 +12,7 @@ BACKUP_NAME="erp_backup_${TIMESTAMP}"
 BACKUP_PATH="${OUTPUT_DIR}/${BACKUP_NAME}"
 
 echo "=========================================="
-echo "  AI-ERP Platform Backup"
+echo "  ERP SOLUTION Backup"
 echo "=========================================="
 echo "  Destination: ${BACKUP_PATH}"
 echo ""
@@ -27,7 +27,7 @@ echo "  ✓ Source code backed up"
 # Backup database (if running)
 echo "[2/4] Backing up database..."
 if docker-compose ps postgres &>/dev/null; then
-    docker-compose exec -T postgres pg_dump -U erp ai_erp > "${BACKUP_PATH}/database.sql"
+    docker-compose exec -T postgres pg_dump -U erp erp_solution > "${BACKUP_PATH}/database.sql"
     echo "  ✓ Database backed up"
 else
     echo "  ! PostgreSQL not running, skipping database backup"
@@ -46,7 +46,7 @@ echo "  ✓ Environment files backed up"
 # Create backup manifest
 echo "[4/4] Creating backup manifest..."
 cat > "${BACKUP_PATH}/manifest.txt" << EOF
-AI-ERP Platform Backup
+ERP SOLUTION Backup
 ======================
 Date: $(date)
 Version: $(git describe --tags --always 2>/dev/null || echo "unknown")

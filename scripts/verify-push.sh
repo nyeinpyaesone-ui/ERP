@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "=== AI-ERP Platform Verification ==="
+echo "=== ERP SOLUTION Verification ==="
 echo "Repository: https://github.com/nyeinpyaesone-ui/ERP"
 echo "Branch: $(git branch --show-current)"
 echo "Commits: $(git rev-list --count HEAD)"

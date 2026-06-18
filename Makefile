@@ -1,7 +1,7 @@
 .PHONY: help install dev build test clean docker-up docker-down push
 
 help:
-	@echo "AI-ERP Platform — Available Commands"
+	@echo "ERP SOLUTION — Available Commands"
 	@echo ""
 	@echo "  make install      Install all dependencies"
 	@echo "  make dev          Start development environment"

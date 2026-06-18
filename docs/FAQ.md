@@ -2,7 +2,7 @@
 
 ## General
 
-### What is AI-ERP Platform?
+### What is ERP SOLUTION?
 An enterprise-grade AI-powered ERP system with 12 modules covering inventory, orders, customers, manufacturing, POS, e-commerce, and AI features.
 
 ### Is it production-ready?

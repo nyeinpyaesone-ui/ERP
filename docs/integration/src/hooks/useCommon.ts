@@ -251,7 +251,7 @@ export const useBiometric = () => {
     setIsLoading(true);
     try {
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Authenticate to access AI-ERP',
+        promptMessage: 'Authenticate to access ERP SOLUTION',
         fallbackLabel: 'Use passcode',
       });
       return result.success;

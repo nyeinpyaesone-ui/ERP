@@ -16,7 +16,7 @@
 4. **Confidence Calibration** — Measure accuracy against known outcomes
 5. **Human Review** — Let humans approve AI behavior patterns before automation
 
-## Simulation Modes in AI-ERP
+## Simulation Modes in ERP SOLUTION
 
 | Mode | Data | Actions | Output |
 |------|------|---------|--------|

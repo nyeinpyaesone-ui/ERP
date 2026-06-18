@@ -1,4 +1,4 @@
-# AI-ERP System v2.1
+# ERP SOLUTION System v2.1
 
 Enterprise Resource Planning with AI-powered features, PWA support, Stripe payments, workflow automation, and predictive analytics.
 
@@ -20,7 +20,7 @@ Enterprise Resource Planning with AI-powered features, PWA support, Stripe payme
 ## Architecture
 
 ```
-ai-erp-system/
+erp_solution-system/
 в”њв”Ђв”Ђ backend/                 # FastAPI + SQLAlchemy + PostgreSQL
 в”‚   в”њв”Ђв”Ђ app/
 в”‚   в”‚   в”њв”Ђв”Ђ main.py           # FastAPI app with 16 routers

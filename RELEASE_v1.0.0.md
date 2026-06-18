@@ -1,4 +1,4 @@
-# Release v1.0.0 — AI-ERP Platform
+# Release v1.0.0 — ERP SOLUTION
 
 **Release Date:** 2026-06-19
 **Status:** Production Ready

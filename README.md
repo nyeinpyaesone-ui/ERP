@@ -1,4 +1,4 @@
-# AI-ERP Platform
+# ERP SOLUTION SOLUTION
 
 [![GitHub Actions](https://github.com/nyeinpyaesone-ui/ERP/actions/workflows/ci.yml/badge.svg)](https://github.com/nyeinpyaesone-ui/ERP/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -143,7 +143,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## 📄 License
 
-[MIT License](LICENSE) — AI-ERP Platform Contributors
+[MIT License](LICENSE) — ERP SOLUTION Contributors
 
 ## 🆘 Support
 
@@ -153,4 +153,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
 
-Built with ❤️ by the AI-ERP Team
+Built with ❤️ by the ERP SOLUTION Team

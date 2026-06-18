@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# AI-ERP Platform — Health Check Dashboard
+# ERP SOLUTION — Health Check Dashboard
 # Usage: ./scripts/health-check.sh
 ###############################################################################
 
@@ -15,7 +15,7 @@ err()   { echo -e "${R}[FAIL]${NC} $1"; }
 
 echo ""
 echo -e "${C}══════════════════════════════════════════════════════════════════${NC}"
-echo -e "${BD}${C}  AI-ERP Platform — Health Check Dashboard${NC}"
+echo -e "${BD}${C}  ERP SOLUTION — Health Check Dashboard${NC}"
 echo -e "${C}══════════════════════════════════════════════════════════════════${NC}"
 echo ""
 

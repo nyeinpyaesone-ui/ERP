@@ -34,7 +34,7 @@ They struggle with:
                     └──────────────────┘
 ```
 
-## Structured Information Types in AI-ERP
+## Structured Information Types in ERP SOLUTION
 
 ### 1. Relational Data (PostgreSQL)
 - Contacts, companies, invoices, products

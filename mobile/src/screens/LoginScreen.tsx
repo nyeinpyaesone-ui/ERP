@@ -29,7 +29,7 @@ export default function LoginScreen() {
             labelStyle={{ color: '#fff', fontSize: 32, fontWeight: '700' }}
           />
           <Text variant="headlineMedium" style={{ fontWeight: '700', marginTop: 16 }}>
-            AI-ERP
+            ERP SOLUTION
           </Text>
           <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}>
             Mobile v2.5

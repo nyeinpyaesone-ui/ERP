@@ -1,6 +1,6 @@
 # Developer Onboarding Guide
 
-Welcome to the AI-ERP Platform! This guide will get you productive in under 30 minutes.
+Welcome to the ERP SOLUTION! This guide will get you productive in under 30 minutes.
 
 ## Day 1: Setup (15 minutes)
 

@@ -1,11 +1,11 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ai-erp-ingress
-  namespace: ai-erp
+  name: erp_solution-ingress
+  namespace: erp_solution
   labels:
-    app.kubernetes.io/name: ai-erp-ingress
-    app.kubernetes.io/part-of: ai-erp
+    app.kubernetes.io/name: erp_solution-ingress
+    app.kubernetes.io/part-of: erp_solution
   annotations:
     kubernetes.io/ingress.class: "nginx"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
@@ -28,7 +28,7 @@ spec:
     - admin.erp-domain.com
     - store.erp-domain.com
     - erp-domain.com
-    secretName: ai-erp-tls
+    secretName: erp_solution-tls
   rules:
   - host: api.erp-domain.com
     http:
@@ -37,7 +37,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: ai-erp-api
+            name: erp_solution-api
             port:
               number: 3000
   - host: admin.erp-domain.com
@@ -47,7 +47,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: ai-erp-web
+            name: erp_solution-web
             port:
               number: 80
   - host: store.erp-domain.com
@@ -57,7 +57,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: ai-erp-web
+            name: erp_solution-web
             port:
               number: 80
   - host: erp-domain.com
@@ -67,7 +67,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: ai-erp-web
+            name: erp_solution-web
             port:
               number: 80
 
