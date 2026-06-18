@@ -1,6 +1,4 @@
 #!/bin/bash
-# AI-ERP Platform — Push Verification Script
-
 echo "=== AI-ERP Platform Verification ==="
 echo "Repository: https://github.com/nyeinpyaesone-ui/ERP"
 echo "Branch: $(git branch --show-current)"
