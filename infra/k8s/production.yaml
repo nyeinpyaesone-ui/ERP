@@ -1,0 +1,139 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: erp-solution-production
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: erp-config
+  namespace: erp-solution-production
+data:
+  ENVIRONMENT: "production"
+  DATABASE_URL: "postgresql://erp:SECRET@postgres:5432/ai_erp"
+  REDIS_URL: "redis://redis:6379/0"
+  OLLAMA_URL: "http://ollama:11434"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: erp-backend
+  namespace: erp-solution-production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: erp-backend
+  template:
+    metadata:
+      labels:
+        app: erp-backend
+    spec:
+      containers:
+      - name: backend
+        image: powerrangeranikg/erp-solution-backend:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: erp-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: erp-frontend
+  namespace: erp-solution-production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: erp-frontend
+  template:
+    metadata:
+      labels:
+        app: erp-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: powerrangeranikg/erp-solution-frontend:latest
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: erp-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: erp-backend-service
+  namespace: erp-solution-production
+spec:
+  selector:
+    app: erp-backend
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: erp-frontend-service
+  namespace: erp-solution-production
+spec:
+  selector:
+    app: erp-frontend
+  ports:
+  - port: 3000
+    targetPort: 3000
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: erp-ingress
+  namespace: erp-solution-production
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - api.erpsolution.com
+    - app.erpsolution.com
+    secretName: erp-tls
+  rules:
+  - host: api.erpsolution.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: erp-backend-service
+            port:
+              number: 8000
+  - host: app.erpsolution.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: erp-frontend-service
+            port:
+              number: 3000
