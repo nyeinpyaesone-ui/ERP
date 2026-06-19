@@ -7,6 +7,7 @@
 [![React Native](https://img.shields.io/badge/react--native-0.74+-blue.svg)](https://reactnative.dev/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-ready-blue.svg)](https://kubernetes.io/)
+[![Docker](https://img.shields.io/badge/docker-powerrangeranikg-blue)](https://hub.docker.com/u/powerrangeranikg)
 
 > Enterprise-grade AI-powered ERP system with 12 modules, 268+ files, and full CI/CD pipeline.
 
@@ -27,7 +28,7 @@
 | Legacy v2.1 | v2.1 | 31 | ✅ | `backend-v2.1/` |
 | Legacy v1.8 | v1.8 | 29 | ✅ | `backend-v1.8/` |
 
-**Total: 268 files, 2 commits, production-ready**
+**Total: 296 files, 15 commits, production-ready**
 
 ## 🚀 Quick Start
 
@@ -35,6 +36,13 @@
 - Docker & Docker Compose
 - Node.js 20+
 - Python 3.11+
+
+### Docker Hub Images
+```bash
+# Pull pre-built images
+docker pull powerrangeranikg/erp-solution-backend:latest
+docker pull powerrangeranikg/erp-solution-frontend:latest
+```
 
 ### One-Command Setup
 ```bash
