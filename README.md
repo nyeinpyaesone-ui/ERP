@@ -7,28 +7,27 @@
 [![React Native](https://img.shields.io/badge/react--native-0.74+-blue.svg)](https://reactnative.dev/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-ready-blue.svg)](https://kubernetes.io/)
-[![Docker](https://img.shields.io/badge/docker-powerrangeranikg-blue)](https://hub.docker.com/u/powerrangeranikg)
 
-> Enterprise-grade AI-powered ERP system with 12 modules, 268+ files, and full CI/CD pipeline.
+> Enterprise-grade AI-powered ERP system with 12 modules, 295+ files, and full CI/CD pipeline.
 
 ## 🏗️ Platform Overview
 
-| Module | Version | Files | Status | Path |
-|--------|---------|-------|--------|------|
-| Core System | v2.2 | 91 | ✅ | `backend/` |
-| BI Dashboard | v3.2 | 20 | ✅ | `frontend/src/modules/bi-dashboard` |
-| Retail POS | v2.9 | 9 | ✅ | `frontend/src/modules/pos` |
-| Manufacturing/MRP | v2.7 | 10 | ✅ | `frontend/src/modules/mrp` |
-| E-commerce | v3.0 | 12 | ✅ | `frontend/src/modules/ecommerce` |
-| Mobile App | v2.5 | 17 | ✅ | `mobile/` |
-| Kubernetes | v3.1 | 22 | ✅ | `infra/k8s/` |
-| DevOps/CI/CD | — | 10 | ✅ | `.github/` |
-| Knowledge System | — | 21 | ✅ | `backend/app/knowledge` |
-| Integration | — | 7 | ✅ | `docs/integration` |
-| Legacy v2.1 | v2.1 | 31 | ✅ | `backend-v2.1/` |
-| Legacy v1.8 | v1.8 | 29 | ✅ | `backend-v1.8/` |
+| Module | Version | Files | Status |
+|--------|---------|-------|--------|
+| Core System | v2.2 | 91 | ✅ |
+| BI Dashboard | v3.2 | 20 | ✅ |
+| Retail POS | v2.9 | 9 | ✅ |
+| Manufacturing/MRP | v2.7 | 10 | ✅ |
+| E-commerce | v3.0 | 12 | ✅ |
+| Mobile App | v2.5 | 17 | ✅ |
+| Kubernetes | v3.1 | 22 | ✅ |
+| DevOps/CI/CD | — | 10 | ✅ |
+| Knowledge System | — | 21 | ✅ |
+| Integration | — | 7 | ✅ |
+| Legacy v2.1 | v2.1 | 31 | ✅ |
+| Legacy v1.8 | v1.8 | 29 | ✅ |
 
-**Total: 304 files, 17 commits, 2 releases, production-ready**
+**Total: 295 files, 15 commits, production-ready**
 
 ## 🚀 Quick Start
 
@@ -36,13 +35,6 @@
 - Docker & Docker Compose
 - Node.js 20+
 - Python 3.11+
-
-### Docker Hub Images
-```bash
-# Pull pre-built images
-docker pull powerrangeranikg/erp-solution-backend:latest
-docker pull powerrangeranikg/erp-solution-frontend:latest
-```
 
 ### One-Command Setup
 ```bash
@@ -63,24 +55,6 @@ cd frontend && npm run dev
 # Terminal 3 — Mobile
 cd mobile && npx expo start
 ```
-
-## 🐳 Docker Hub
-
-Pre-built images available at [Docker Hub](https://hub.docker.com/u/powerrangeranikg):
-
-```bash
-# Pull latest images
-docker pull powerrangeranikg/erp-solution-backend:latest
-docker pull powerrangeranikg/erp-solution-frontend:latest
-
-# Run with docker-compose
-docker-compose up -d
-```
-
-| Image | Size | Pulls |
-|-------|------|-------|
-| `powerrangeranikg/erp-solution-backend` | ~500MB | Auto-built on release |
-| `powerrangeranikg/erp-solution-frontend` | ~200MB | Auto-built on release |
 
 ## 📦 Architecture
 
@@ -109,29 +83,6 @@ docker-compose up -d
 └─────────────────────────────────────────────────────────┘
 ```
 
-## 🗺️ Roadmap
-
-### v1.1.0 (In Development)
-- [ ] AI Demand Forecasting
-- [ ] Natural Language Query Interface
-- [ ] Thai & Vietnamese Language Support
-- [ ] Offline Mobile Mode
-- [ ] Push Notifications
-
-### v1.2.0 (Planned)
-- [ ] Advanced RBAC with Custom Roles
-- [ ] Audit Logging & Compliance
-- [ ] Multi-Currency Support
-- [ ] Mobile Barcode/QR Scanning
-- [ ] Biometric Authentication
-
-### v2.0.0 (Future)
-- [ ] Microservices Architecture
-- [ ] GraphQL API Layer
-- [ ] Real-time Collaboration
-- [ ] Plugin/Extension System
-- [ ] White-label Customization
-
 ## 📚 Documentation
 
 | Document | Description |
@@ -141,7 +92,12 @@ docker-compose up -d
 | [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) | Full production deployment guide |
 | [docs/API_SUMMARY.md](docs/API_SUMMARY.md) | API endpoints and authentication |
 | [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | CI/CD secrets setup |
-| [docs/integration](docs/integration) | System integration guide |
+| [docs/TESTING.md](docs/TESTING.md) | Testing strategy guide |
+| [docs/DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md) | Alembic migration guide |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & fixes |
+| [docs/FAQ.md](docs/FAQ.md) | Frequently asked questions |
+| [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md) | ADR records |
+| [docs/ONBOARDING.md](docs/ONBOARDING.md) | 30-minute developer onboarding |
 
 ## 🛠️ Management Commands
 
@@ -196,10 +152,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## 🆘 Support
 
-- **Email:** nyeinpyaesone273@gmail.com
-- **LinkedIn:** [linkedin.com/in/nyein-pyae-sone-3250501ba](https://linkedin.com/in/nyein-pyae-sone-3250501ba)
-- **GitHub:** [github.com/nyeinpyaesone-ui/ERP](https://github.com/nyeinpyaesone-ui/ERP)
-- **Phone:** +959699795380
-- **Issues:** https://github.com/nyeinpyaesone-ui/ERP/issues
-- **Documentation:** See `docs/` directory
-- **API Docs:** `http://localhost:8000/docs` (when running)
+| Contact | Details |
+|---------|---------|
+| **Email** | nyeinpyaesone273@gmail.com |
+| **LinkedIn** | [linkedin.com/in/nyein-pyae-sone-3250501ba](https://linkedin.com/in/nyein-pyae-sone-3250501ba) |
+| **GitHub** | [github.com/nyeinpyaesone-ui/ERP](https://github.com/nyeinpyaesone-ui/ERP) |
+| **Phone** | +959699795380 |
+| **Issues** | [GitHub Issues](https://github.com/nyeinpyaesone-ui/ERP/issues) |
+
+---
+
+Built with ❤️ by the ERP SOLUTION Team
