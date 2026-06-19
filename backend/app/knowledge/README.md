@@ -1,4 +1,4 @@
-# AI-ERP Knowledge System v2.3
+# ERP SOLUTION Knowledge System v2.3
 
 **Effective Knowledge Information System** вҖ” Integrating Myanmar domain metadata, operational foundations, AI systems thinking, and agent skill pools into a unified intelligence backbone.
 
@@ -6,7 +6,7 @@
 
 ## What This Is
 
-This is the **operational intelligence layer** that transforms your AI-ERP from a feature-rich demo into a **production-grade knowledge system**:
+This is the **operational intelligence layer** that transforms your ERP SOLUTION from a feature-rich demo into a **production-grade knowledge system**:
 
 - **Immutable Audit Trail** вҖ” Every action logged with SHA-256 hash chains for tamper detection
 - **AI Skill Pool** вҖ” Modular, testable, versioned skills with input/output schemas and confidence thresholds
@@ -187,7 +187,7 @@ This is the **operational intelligence layer** that transforms your AI-ERP from 
 
 ```bash
 # 1. Run the migration
-psql -U ai_user -d ai_erp -f database/migrations/001_knowledge_system.sql
+psql -U ai_user -d erp_solution -f database/migrations/001_knowledge_system.sql
 
 # 2. Install backend dependencies
 pip install fastapi sqlalchemy asyncpg pydantic
@@ -207,7 +207,7 @@ curl http://localhost:8000/api/v1/knowledge/skills
 ## File Structure
 
 ```
-ai-erp-knowledge-system/
+erp_solution-knowledge-system/
 в”ңв”Җв”Җ database/
 в”Ӯ   в””в”Җв”Җ migrations/
 в”Ӯ       в””в”Җв”Җ 001_knowledge_system.sql      # Complete schema + seed data
@@ -235,7 +235,7 @@ ai-erp-knowledge-system/
 
 ---
 
-## Integration with AI-ERP v2.2
+## Integration with ERP SOLUTION v2.2
 
 This knowledge system **plugs into** your existing v2.2 infrastructure:
 

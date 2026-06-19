@@ -107,7 +107,7 @@ export default function ProfileScreen() {
 
       <View style={styles.versionSection}>
         <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
-          AI-ERP Mobile v2.5.0
+          ERP SOLUTION Mobile v2.5.0
         </Text>
         <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
           Built with React Native + Expo
