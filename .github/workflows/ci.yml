@@ -8,7 +8,7 @@ on:
 
 env:
   DOCKER_USERNAME: powerrangeranikg
-  DOCKER_IMAGE: nyeinpyaesone-ui/erp-solution
+  DOCKER_IMAGE: powerrangeranikg/erp-solution
 
 jobs:
   backend-tests:
