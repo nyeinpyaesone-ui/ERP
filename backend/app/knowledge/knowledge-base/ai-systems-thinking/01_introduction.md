@@ -32,7 +32,7 @@ AI Systems Thinking is the discipline of designing, operating, and reasoning abo
 6. What **audit trail** is generated?
 7. What **failure mode** is designed? (graceful degradation, escalation, halt?)
 
-## Application in AI-ERP
+## Application in ERP SOLUTION
 
 In this system, AI Systems Thinking manifests as:
 - **Role-based agents** (Finance Officer, Logistics Coordinator, Compliance Guardian)

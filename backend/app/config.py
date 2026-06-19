@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 class Settings(BaseSettings):
-    APP_NAME: str = "AI-ERP System"
+    APP_NAME: str = "ERP SOLUTION System"
     APP_VERSION: str = "1.8.0"
     DEBUG: bool = False
 
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM: str = "noreply@ai-erp.local"
+    SMTP_FROM: str = "noreply@erp_solution.local"
 
     # AI / Ollama
     OLLAMA_BASE_URL: str = "http://localhost:11434"

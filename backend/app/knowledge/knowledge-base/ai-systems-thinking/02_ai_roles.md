@@ -10,7 +10,7 @@ An AI Role is a **contract** that specifies:
 - When it should act (triggers)
 - When it should ask for help (escalation rules)
 
-## Role Types in AI-ERP
+## Role Types in ERP SOLUTION
 
 | Role Type | Responsibility | Example |
 |-----------|---------------|---------|

@@ -1,6 +1,6 @@
-# AI-ERP Mobile App v2.5
+# ERP SOLUTION Mobile App v2.5
 
-**React Native Mobile App** for AI-ERP System
+**React Native Mobile App** for ERP SOLUTION System
 
 ---
 
@@ -83,7 +83,7 @@ All API endpoints from v2.4 are supported:
 ## File Structure
 
 ```
-ai-erp-mobile-app/
+erp_solution-mobile-app/
 ├── App.tsx                          # Root component
 ├── package.json                     # Dependencies
 ├── tsconfig.json                    # TypeScript config

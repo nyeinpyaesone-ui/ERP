@@ -1,11 +1,11 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: ai-erp-default
-  namespace: ai-erp
+  name: erp_solution-default
+  namespace: erp_solution
   labels:
-    app.kubernetes.io/name: ai-erp
-    app.kubernetes.io/part-of: ai-erp
+    app.kubernetes.io/name: erp_solution
+    app.kubernetes.io/part-of: erp_solution
 spec:
   podSelector: {}
   policyTypes:
@@ -15,13 +15,13 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          name: ai-erp
+          name: erp_solution
     - namespaceSelector:
         matchLabels:
           name: ingress-nginx
     - namespaceSelector:
         matchLabels:
-          name: ai-erp-monitoring
+          name: erp_solution-monitoring
     ports:
     - protocol: TCP
       port: 3000
@@ -35,7 +35,7 @@ spec:
   - to:
     - namespaceSelector:
         matchLabels:
-          name: ai-erp
+          name: erp_solution
     ports:
     - protocol: TCP
       port: 53

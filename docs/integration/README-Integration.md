@@ -1,4 +1,4 @@
-# AI-ERP System Integration Guide (v3.1)
+# ERP SOLUTION System Integration Guide (v3.1)
 
 ## Complete Module Inventory
 
@@ -18,7 +18,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    AI-ERP Mobile App (React Native)          │
+│                    ERP SOLUTION Mobile App (React Native)          │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐         │
 │  │ Dashboard│ │Contacts │ │Invoices │ │Inventory│         │
 │  └─────────┘ └─────────┘ └─────────┘ └─────────┘         │
@@ -200,8 +200,8 @@ interface EnvConfig {
 // app.json
 {
   "expo": {
-    "name": "AI-ERP",
-    "slug": "ai-erp",
+    "name": "ERP SOLUTION",
+    "slug": "erp_solution",
     "version": "3.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -405,7 +405,7 @@ npx react-native-bundle-visualizer
 - Admin: https://admin.erp-domain.com
 - Store: https://store.erp-domain.com
 - Grafana: https://grafana.erp-domain.com
-- Sentry: https://sentry.io/organizations/ai-erp
+- Sentry: https://sentry.io/organizations/erp_solution
 
 ## Next Steps (Future Roadmap)
 
@@ -443,7 +443,7 @@ npx react-native-bundle-visualizer
 
 ---
 
-**Congratulations!** Your AI-ERP platform is now complete with all core modules, production-ready infrastructure, and a solid foundation for future growth.
+**Congratulations!** Your ERP SOLUTION platform is now complete with all core modules, production-ready infrastructure, and a solid foundation for future growth.
 
 **Total System Size:** 300+ files, 50,000+ lines of code, 8 integrated modules, 2 languages, Kubernetes-ready.
 

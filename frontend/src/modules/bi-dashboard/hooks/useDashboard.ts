@@ -13,7 +13,7 @@ import {
   InventoryStats,
 } from '../types/dashboard';
 
-const API_BASE = 'https://api.ai-erp.com/v1';
+const API_BASE = 'https://api.erp_solution.com/v1';
 
 const useApi = <T>(endpoint: string, params?: Record<string, string>) => {
   const [data, setData] = useState<T | null>(null);
@@ -241,7 +241,7 @@ export const useLanguage = () => {
 
 # README-i18n (1)-converted.md
 
-# AI-ERP i18n Framework (v2.6 P2)
+# ERP SOLUTION i18n Framework (v2.6 P2)
 
 ## Installation
 
@@ -352,7 +352,7 @@ Add to package.json:
 
 {
   "common": {
-    "appName": "AI-ERP",
+    "appName": "ERP SOLUTION",
     "loading": "ဖွင့်နေသည်...",
     "retry": "ပြန်လည်ကြိုးစားမည်",
     "cancel": "ပယ်ဖျက်မည်",
@@ -385,7 +385,7 @@ Add to package.json:
   },
   "auth": {
     "loginTitle": "ကြိုဆိုပါသည်",
-    "loginSubtitle": "AI-ERP အကောင့်သို့ ဝင်ရောက်ပါ",
+    "loginSubtitle": "ERP SOLUTION အကောင့်သို့ ဝင်ရောက်ပါ",
     "email": "အီးမေးလ်",
     "emailPlaceholder": "အီးမေးလ်ထည့်ပါ",
     "password": "စကားဝှက်",
@@ -583,7 +583,7 @@ Add to package.json:
       "darkMode": "အမှောင်မုဒ်",
       "notifications": "အကြောင်းကြားချက်များ",
       "biometric": "ဇီဝမှတ်တမ်းဖြင့် ဝင်ရောက်ခြင်း",
-      "about": "AI-ERP အကြောင်း",
+      "about": "ERP SOLUTION အကြောင်း",
       "version": "ဗားရှင်း {{version}}"
     },
     "languageOptions": {
@@ -599,7 +599,7 @@ Add to package.json:
 
 {
   "common": {
-    "appName": "AI-ERP",
+    "appName": "ERP SOLUTION",
     "loading": "ဖွင့်နေသည်...",
     "retry": "ပြန်လည်ကြိုးစားမည်",
     "cancel": "ပယ်ဖျက်မည်",
@@ -632,7 +632,7 @@ Add to package.json:
   },
   "auth": {
     "loginTitle": "ကြိုဆိုပါသည်",
-    "loginSubtitle": "AI-ERP အကောင့်သို့ ဝင်ရောက်ပါ",
+    "loginSubtitle": "ERP SOLUTION အကောင့်သို့ ဝင်ရောက်ပါ",
     "email": "အီးမေးလ်",
     "emailPlaceholder": "အီးမေးလ်ထည့်ပါ",
     "password": "စကားဝှက်",
@@ -830,7 +830,7 @@ Add to package.json:
       "darkMode": "အမှောင်မုဒ်",
       "notifications": "အကြောင်းကြားချက်များ",
       "biometric": "ဇီဝမှတ်တမ်းဖြင့် ဝင်ရောက်ခြင်း",
-      "about": "AI-ERP အကြောင်း",
+      "about": "ERP SOLUTION အကြောင်း",
       "version": "ဗားရှင်း {{version}}"
     },
     "languageOptions": {

@@ -2,7 +2,7 @@
 
 ## What is Business Process Mapping?
 
-Business Process Mapping is the visual representation of how work flows through an organization. In AI-ERP, it shows:
+Business Process Mapping is the visual representation of how work flows through an organization. In ERP SOLUTION, it shows:
 - **Who** does what (human, AI agent, system)
 - **What** happens at each step (actions, decisions, checks)
 - **When** things happen (triggers, sequences, dependencies)
@@ -99,7 +99,7 @@ Once mapped, measure:
 - **Cost** — Human hours + AI tokens + system resources
 - **Throughput** — How many orders per hour
 
-## AI-ERP Process Library
+## ERP SOLUTION Process Library
 
 Common processes to map:
 1. **Lead-to-Customer** (marketing → sales → onboarding)
