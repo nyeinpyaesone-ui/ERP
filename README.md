@@ -28,7 +28,7 @@
 | Legacy v2.1 | v2.1 | 31 | ✅ | `backend-v2.1/` |
 | Legacy v1.8 | v1.8 | 29 | ✅ | `backend-v1.8/` |
 
-**Total: 296 files, 15 commits, production-ready**
+**Total: 304 files, 17 commits, 2 releases, production-ready**
 
 ## 🚀 Quick Start
 
@@ -64,6 +64,24 @@ cd frontend && npm run dev
 cd mobile && npx expo start
 ```
 
+## 🐳 Docker Hub
+
+Pre-built images available at [Docker Hub](https://hub.docker.com/u/powerrangeranikg):
+
+```bash
+# Pull latest images
+docker pull powerrangeranikg/erp-solution-backend:latest
+docker pull powerrangeranikg/erp-solution-frontend:latest
+
+# Run with docker-compose
+docker-compose up -d
+```
+
+| Image | Size | Pulls |
+|-------|------|-------|
+| `powerrangeranikg/erp-solution-backend` | ~500MB | Auto-built on release |
+| `powerrangeranikg/erp-solution-frontend` | ~200MB | Auto-built on release |
+
 ## 📦 Architecture
 
 ```
@@ -90,6 +108,29 @@ cd mobile && npx expo start
 │  PostgreSQL │ Redis │ Elasticsearch │ S3/MinIO │ K8s   │
 └─────────────────────────────────────────────────────────┘
 ```
+
+## 🗺️ Roadmap
+
+### v1.1.0 (In Development)
+- [ ] AI Demand Forecasting
+- [ ] Natural Language Query Interface
+- [ ] Thai & Vietnamese Language Support
+- [ ] Offline Mobile Mode
+- [ ] Push Notifications
+
+### v1.2.0 (Planned)
+- [ ] Advanced RBAC with Custom Roles
+- [ ] Audit Logging & Compliance
+- [ ] Multi-Currency Support
+- [ ] Mobile Barcode/QR Scanning
+- [ ] Biometric Authentication
+
+### v2.0.0 (Future)
+- [ ] Microservices Architecture
+- [ ] GraphQL API Layer
+- [ ] Real-time Collaboration
+- [ ] Plugin/Extension System
+- [ ] White-label Customization
 
 ## 📚 Documentation
 
