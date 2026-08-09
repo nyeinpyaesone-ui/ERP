@@ -23,10 +23,8 @@ commonLabels:
   app.kubernetes.io/managed-by: kustomize
 
 images:
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-api
+  - name: powerrangeranikg/erp-solution-backend
     newTag: latest
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-web
-    newTag: latest
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-worker
+  - name: powerrangeranikg/erp-solution-frontend
     newTag: latest
 

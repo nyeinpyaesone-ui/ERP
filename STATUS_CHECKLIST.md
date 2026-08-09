@@ -37,8 +37,7 @@
 
 ### GitHub Secrets
 - [ ] Add DOCKER_USER = powerrangeranikg
-- [ ] Add DOCKER_PAT_BACKEND = (your backend token)
-- [ ] Add DOCKER_PAT_FRONTEND = (your frontend token)
+- [ ] Add DOCKERHUB_PASSWORD = (your Docker Hub Personal Access Token)
 
 ### Docker Hub
 - [ ] Push backend image (erp-solution-backend)
@@ -56,10 +55,11 @@
 
 ### To Get Images Live (Option 1: GitHub Actions)
 1. Go to https://github.com/nyeinpyaesone-ui/ERP/settings/secrets/actions
-2. Add the 3 secrets (use your actual tokens, not these placeholders)
-3. Push a tag: git tag v1.0.0 && git push origin v1.0.0
-4. Watch build at https://github.com/nyeinpyaesone-ui/ERP/actions
-5. Check Docker Hub after 10 minutes
+2. Add the variable `DOCKER_USER` with value `powerrangeranikg`
+3. Add the secret `DOCKERHUB_PASSWORD` with your Docker Hub Personal Access Token (same token for all operations)
+4. Push a tag: git tag v1.0.0 && git push origin v1.0.0
+5. Watch build at https://github.com/nyeinpyaesone-ui/ERP/actions
+6. Check Docker Hub after 10 minutes
 
 ### To Get Images Live (Option 2: Local Build)
 1. On your computer with Docker:
