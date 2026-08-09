@@ -30,7 +30,7 @@ spec:
         runAsUser: 1000
       containers:
       - name: worker
-        image: ghcr.io/nyeinpyaesone-ui/erp_solution-worker:latest
+        image: powerrangeranikg/erp-solution-backend:latest
         imagePullPolicy: Always
         env:
         - name: NODE_ENV

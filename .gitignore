@@ -1,0 +1,47 @@
+```
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+target/
+.gradle/
+
+# Build artifacts
+dist/
+build/
+coverage/
+htmlcov/
+*.pyc
+*.class
+*.o
+*.obj
+*.out
+
+# Environment files
+.env
+.env.local
+*.env.*
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Logs
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+
+# Docker related (if not already part of source)
+.dockerignore
+```

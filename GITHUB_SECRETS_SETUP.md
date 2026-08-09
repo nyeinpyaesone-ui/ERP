@@ -12,18 +12,21 @@ Go to: https://github.com/nyeinpyaesone-ui/ERP/settings/secrets/actions
 
 ### 2. Add Repository Secrets
 
+**Important:** Use the same token value for all secrets (your Docker Hub password/PAT)
+
 | Name | Value |
 |------|-------|
-| DOCKER_PAT_BACKEND | (Your backend token - starts with dckr_pat_) |
-| DOCKER_PAT_FRONTEND | (Your frontend token - starts with dckr_pat_) |
+| DOCKERHUB_PASSWORD | (Your Docker Hub Personal Access Token - starts with dckr_pat_) |
+
+*Note: The workflows now use a single `DOCKERHUB_PASSWORD` secret for all Docker operations.*
 
 ### 3. How to Add
 
 1. Click "New repository secret"
-2. Enter Name (e.g., DOCKER_PAT_BACKEND)
-3. Enter Value (paste your token)
+2. Enter Name: `DOCKERHUB_PASSWORD`
+3. Enter Value: paste your Docker Hub Personal Access Token
 4. Click "Add secret"
-5. Repeat for all secrets
+5. Add the variable `DOCKER_USER` with value `powerrangeranikg` in the Variables tab
 
 ## After Setup
 

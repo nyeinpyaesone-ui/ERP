@@ -105,11 +105,9 @@ patches:
         value: 20
 
 images:
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-api
+  - name: powerrangeranikg/erp-solution-backend
     newTag: v3.0.0
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-web
-    newTag: v3.0.0
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-worker
+  - name: powerrangeranikg/erp-solution-frontend
     newTag: v3.0.0
 
 ---
