@@ -9,7 +9,13 @@
 # the `language` matrix defined below to confirm you have the correct set of
 # supported CodeQL languages.
 #
-name: "CodeQL Advanced"
+# ******** DISABLED ********
+# This workflow is DISABLED because it conflicts with native GitHub Code Scanning.
+# The native CodeQL analysis (github/codeql-action) is already running successfully
+# via GitHub's security tab. Having both causes duplicate analysis and SARIF conflicts.
+# To re-enable, remove the 'if: false' condition from the analyze job.
+#
+name: "CodeQL Advanced (DISABLED - Use Native Code Scanning)"
 
 on:
   push:
@@ -29,6 +35,7 @@ jobs:
       packages: read
       contents: read
       actions: read
+    if: false  # DISABLED - Native Code Scanning is sufficient
 
     strategy:
       fail-fast: false

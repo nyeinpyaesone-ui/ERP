@@ -60,8 +60,12 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     message.get("channel", client_id)
                 )
     except WebSocketDisconnect:
+        import logging
+        logging.info(f"WebSocket client {client_id} disconnected")
         manager.disconnect(websocket, client_id)
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.error(f"WebSocket error for client {client_id}: {type(e).__name__}")
         manager.disconnect(websocket, client_id)
 
 @router.post("/broadcast")

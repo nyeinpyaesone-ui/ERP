@@ -78,8 +78,10 @@ async def test_webhook(webhook_id: int, db: Session = Depends(get_db), current_u
             delivery.response_body = response.text[:1000]
             delivery.status = "delivered" if response.status_code < 400 else "failed"
     except Exception as e:
+        import logging
+        logging.error(f"Webhook delivery failed: {type(e).__name__}")
         delivery.status = "failed"
-        delivery.response_body = str(e)[:1000]
+        delivery.response_body = "Delivery failed"
 
     db.commit()
     db.refresh(delivery)

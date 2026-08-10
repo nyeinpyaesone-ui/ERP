@@ -142,7 +142,9 @@ async def pull_model(
                 return {"status": "success", "message": f"Model {model_id} pulled successfully"}
             return {"status": "error", "message": f"Failed to pull model: {response.text}"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.error(f"Failed to pull model {model_id}: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail="Failed to pull model")
 
 @router.delete("/models/{model_id}")
 def delete_model(

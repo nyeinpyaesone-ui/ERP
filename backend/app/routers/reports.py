@@ -114,5 +114,8 @@ def revenue_chart(db: Session = Depends(get_db), current_user = Depends(get_curr
 
         return {"chart": f"data:image/png;base64,{img_base64}"}
     except Exception as e:
-        return {"chart": None, "error": str(e)}
+        # Log error internally but don't expose details to client
+        import logging
+        logging.error(f"Revenue chart generation failed: {type(e).__name__}")
+        return {"chart": None, "error": "Failed to generate chart"}
 

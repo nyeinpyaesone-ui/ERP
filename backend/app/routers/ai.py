@@ -38,7 +38,9 @@ async def query_ollama(prompt: str, model: str = None) -> str:
                 return data.get("response", "No response from AI")
             return f"AI service unavailable (status: {response.status_code})"
     except Exception as e:
-        return f"AI service error: {str(e)}"
+        import logging
+        logging.error(f"AI service error: {type(e).__name__}")
+        return "AI service unavailable"
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
