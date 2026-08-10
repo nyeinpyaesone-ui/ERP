@@ -8,9 +8,10 @@ from app.routers import (
     auth, crm, hr, inventory, finance, projects,
     ai, documents, reports, workflows, payments,
     integrations, analytics, admin, websocket,
-    bulk_import_export, migrations
+    llm, search, permissions
 )
 from app.config import settings
+from app.knowledge.routes import router as knowledge_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,8 +48,10 @@ app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["In
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSocket"])
-app.include_router(bulk_import_export.router, prefix="/api/v1/bulk", tags=["Bulk Import/Export"])
-app.include_router(migrations.router, prefix="/api/v1/migrations", tags=["Migrations"])
+app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM"])
+app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
+app.include_router(permissions.router, prefix="/api/v1/permissions", tags=["Permissions"])
+app.include_router(knowledge_router, prefix="/api/v1/knowledge", tags=["Knowledge Base"])
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -61,6 +64,7 @@ async def root():
         "features": [
             "Core ERP (CRM, HR, Inventory, Finance, Projects)",
             "AI Chat & RAG",
+            "LLM Integration",
             "Document Management",
             "Reports & Analytics",
             "Workflow Automation",
@@ -68,8 +72,9 @@ async def root():
             "WebSocket Real-time",
             "PWA with Offline Support",
             "AI Forecasting",
-            "Bulk Import/Export",
-            "Alembic Migrations"
+            "Knowledge Base",
+            "Advanced Search",
+            "Role-Based Access Control",
         ]
     }
 
