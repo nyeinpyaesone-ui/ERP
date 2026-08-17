@@ -7,8 +7,7 @@ from app.database import engine, Base
 from app.routers import (
     auth, crm, hr, inventory, finance, projects,
     ai, documents, reports, workflows, payments,
-    integrations, analytics, admin, websocket,
-    bulk_import_export, migrations
+    integrations, analytics, admin, websocket
 )
 from app.config import settings
 
@@ -47,8 +46,6 @@ app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["In
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSocket"])
-app.include_router(bulk_import_export.router, prefix="/api/v1/bulk", tags=["Bulk Import/Export"])
-app.include_router(migrations.router, prefix="/api/v1/migrations", tags=["Migrations"])
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -67,9 +64,7 @@ async def root():
             "Stripe Payments",
             "WebSocket Real-time",
             "PWA with Offline Support",
-            "AI Forecasting",
-            "Bulk Import/Export",
-            "Alembic Migrations"
+            "AI Forecasting"
         ]
     }
 
