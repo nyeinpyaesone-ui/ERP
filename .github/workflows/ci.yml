@@ -1,20 +1,39 @@
-name: CI
+name: CI & Deploy
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  deployments: write
+  statuses: write
 
 jobs:
   docker-backend:
+    name: Build Backend
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ vars.DOCKER_USER }}/erp-solution-backend
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+            type=sha
+
       - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ vars.DOCKER_USER }}
@@ -27,18 +46,32 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          push: true
-          tags: |
-            ${{ vars.DOCKER_USER }}/erp-solution-backend:latest
-            ${{ vars.DOCKER_USER }}/erp-solution-backend:${{ github.ref_name }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   docker-frontend:
+    name: Build Frontend
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ vars.DOCKER_USER }}/erp-solution-frontend
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+            type=sha
+
       - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ vars.DOCKER_USER }}
@@ -51,7 +84,148 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./backend/frontend-react
-          push: true
-          tags: |
-            ${{ vars.DOCKER_USER }}/erp-solution-frontend:latest
-            ${{ vars.DOCKER_USER }}/erp-solution-frontend:${{ github.ref_name }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [docker-backend, docker-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: docker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Deployment
+        id: deployment
+        uses: chrnorm/deployment-action@releases/v1
+        with:
+          token: ${{ github.token }}
+          target_url: https://staging.yourdomain.com
+          environment: staging
+          description: Deploy ${{ github.sha }} to staging
+          ref: ${{ github.sha }}
+          auto_inactive: true
+
+      - name: Set deployment status to in_progress
+        uses: chrnorm/deployment-status@releases/v1
+        with:
+          token: ${{ github.token }}
+          target_url: https://staging.yourdomain.com
+          state: in_progress
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add SSH known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.STAGING_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy with Blue-Green
+        run: |
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+            set -e
+            cd /opt/erp-solution
+            docker pull ${{ vars.DOCKER_USER }}/erp-solution-backend:latest
+            docker pull ${{ vars.DOCKER_USER }}/erp-solution-frontend:latest
+            ./scripts/deploy-blue-green.sh staging latest
+          EOF
+        env:
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+
+      - name: Set deployment status to success
+        if: success()
+        uses: chrnorm/deployment-status@releases/v1
+        with:
+          token: ${{ github.token }}
+          target_url: https://staging.yourdomain.com
+          state: success
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+
+      - name: Set deployment status to failure
+        if: failure()
+        uses: chrnorm/deployment-status@releases/v1
+        with:
+          token: ${{ github.token }}
+          target_url: https://staging.yourdomain.com
+          state: failure
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+          description: Deployment failed
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [docker-backend, docker-frontend]
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: docker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Deployment
+        id: deployment
+        uses: chrnorm/deployment-action@releases/v1
+        with:
+          token: ${{ github.token }}
+          target_url: https://yourdomain.com
+          environment: production
+          description: Deploy ${{ github.ref_name }} to production
+          ref: ${{ github.sha }}
+          auto_inactive: true
+
+      - name: Set deployment status to in_progress
+        uses: chrnorm/deployment-status@releases/v1
+        with:
+          token: ${{ github.token }}
+          target_url: https://yourdomain.com
+          state: in_progress
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add SSH known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.PRODUCTION_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy with Blue-Green
+        run: |
+          ssh ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOF'
+            set -e
+            cd /opt/erp-solution
+            VERSION=${{ github.ref_name }}
+            docker pull ${{ vars.DOCKER_USER }}/erp-solution-backend:${VERSION}
+            docker pull ${{ vars.DOCKER_USER }}/erp-solution-frontend:${VERSION}
+            ./scripts/deploy-blue-green.sh production ${VERSION}
+          EOF
+        env:
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+
+      - name: Set deployment status to success
+        if: success()
+        uses: chrnorm/deployment-status@releases/v1
+        with:
+          token: ${{ github.token }}
+          target_url: https://yourdomain.com
+          state: success
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+
+      - name: Set deployment status to failure
+        if: failure()
+        uses: chrnorm/deployment-status@releases/v1
+        with:
+          token: ${{ github.token }}
+          target_url: https://yourdomain.com
+          state: failure
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+          description: Deployment failed
