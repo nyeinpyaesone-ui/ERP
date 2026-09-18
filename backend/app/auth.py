@@ -57,3 +57,26 @@ async def get_current_user_optional(token: Optional[str] = Depends(oauth2_scheme
     except Exception:
         return None
 
+
+async def require_superadmin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != "superadmin":
+        raise HTTPException(status_code=403, detail="Superadmin access required")
+    return current_user
+
+
+async def has_permission(current_user: User, permission_name: str, db: Session) -> bool:
+    if current_user.role == "superadmin":
+        return True
+    user_perms = await get_user_permissions(current_user, db)
+    return permission_name in user_perms
+
+
+async def get_user_permissions(user: User, db: Session) -> list:
+    if user.role == "superadmin":
+        return ["*"]
+    permissions = set()
+    for role in user.roles:
+        for perm in role.permissions:
+            permissions.add(f"{perm.resource}:{perm.action}")
+    return list(permissions)
+
