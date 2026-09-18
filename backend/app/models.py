@@ -1,16 +1,177 @@
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, DateTime, Date,
-    Numeric, ForeignKey, Index, Float, LargeBinary
+    Numeric, ForeignKey, Index, Float, LargeBinary, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
+# ============== TENANCY MODELS ==============
+
+class Tenant(Base):
+    __tablename__ = "tenants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    subdomain = Column(String(100), unique=True, nullable=False, index=True)
+    schema_name = Column(String(100), unique=True, nullable=False)
+    
+    # Subscription & Billing
+    plan = Column(String(50), nullable=False, server_default="starter")
+    max_users = Column(Integer, nullable=False, server_default="5")
+    max_storage_gb = Column(Integer, nullable=False, server_default="10")
+    subscription_start = Column(Date, nullable=False)
+    subscription_end = Column(Date, nullable=False)
+    
+    # Configuration
+    timezone = Column(String(50), nullable=False, server_default="UTC")
+    currency = Column(String(3), nullable=False, server_default="USD")
+    locale = Column(String(10), nullable=False, server_default="en_US")
+    
+    # Status
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    users = relationship("User", back_populates="tenant")
+
+
+class Vendor(Base):
+    __tablename__ = "vendors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    contact_email = Column(String(255), nullable=True)
+    contact_phone = Column(String(50), nullable=True)
+    address = Column(Text, nullable=True)
+    tax_id = Column(String(100), nullable=True)
+    payment_terms = Column(String(100), nullable=True)
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    rating = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    purchase_orders = relationship("PurchaseOrder", back_populates="vendor")
+    
+    __table_args__ = (
+        Index('idx_vendor_tenant', 'tenant_id'),
+    )
+
+
+# ============== PURCHASE ORDER MODELS ==============
+
+class PurchaseOrder(Base):
+    __tablename__ = "purchase_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
+    po_number = Column(String(50), unique=True, nullable=False, index=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False)
+    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    approver_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    # Financial
+    subtotal = Column(Numeric(15, 2), nullable=False, server_default="0")
+    tax_amount = Column(Numeric(15, 2), nullable=False, server_default="0")
+    total_amount = Column(Numeric(15, 2), nullable=False, server_default="0")
+    currency = Column(String(3), nullable=False, server_default="USD")
+    
+    # Status & Workflow
+    status = Column(String(50), nullable=False, server_default="draft")
+    approval_level = Column(Integer, nullable=False, server_default="0")
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    ordered_at = Column(DateTime(timezone=True), nullable=True)
+    received_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Delivery
+    expected_delivery_date = Column(Date, nullable=True)
+    actual_delivery_date = Column(Date, nullable=True)
+    shipping_address = Column(Text, nullable=True)
+    
+    # Audit
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    vendor = relationship("Vendor", back_populates="purchase_orders")
+    requester = relationship("User", foreign_keys=[requester_id])
+    approver = relationship("User", foreign_keys=[approver_id])
+    items = relationship("PurchaseOrderItem", back_populates="purchase_order", cascade="all, delete-orphan")
+    approvals = relationship("POApproval", back_populates="purchase_order", cascade="all, delete-orphan")
+    
+    __table_args__ = (
+        Index('idx_po_status', 'status'),
+        Index('idx_po_vendor', 'vendor_id'),
+        Index('idx_po_tenant', 'tenant_id'),
+    )
+
+
+class PurchaseOrderItem(Base):
+    __tablename__ = "purchase_order_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    po_id = Column(Integer, ForeignKey("purchase_orders.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
+    description = Column(Text, nullable=False)
+    quantity = Column(Numeric(10, 2), nullable=False)
+    unit_price = Column(Numeric(15, 2), nullable=False)
+    total_price = Column(Numeric(15, 2), nullable=False)
+    received_quantity = Column(Numeric(10, 2), nullable=False, server_default="0")
+    
+    purchase_order = relationship("PurchaseOrder", back_populates="items")
+    product = relationship("Product")
+
+
+class POApproval(Base):
+    __tablename__ = "po_approvals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    po_id = Column(Integer, ForeignKey("purchase_orders.id", ondelete="CASCADE"), nullable=False)
+    approver_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    level = Column(Integer, nullable=False)
+    status = Column(String(50), nullable=False, server_default="pending")
+    comments = Column(Text, nullable=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    purchase_order = relationship("PurchaseOrder", back_populates="approvals")
+    approver = relationship("User")
+
+
+# ============== TRANSACTION LOG MODEL ==============
+
+class TransactionLog(Base):
+    __tablename__ = "transaction_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    transaction_id = Column(String(100), unique=True, nullable=False, index=True)
+    entity_type = Column(String(50), nullable=False)
+    entity_id = Column(Integer, nullable=False)
+    action = Column(String(50), nullable=False)
+    old_values = Column(JSONB, nullable=True)
+    new_values = Column(JSONB, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True)
+    status = Column(String(50), nullable=False, server_default="completed")
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    __table_args__ = (
+        Index('idx_txn_entity', 'entity_type', 'entity_id'),
+        Index('idx_txn_tenant', 'tenant_id'),
+    )
+
+
+# ============== EXISTING MODELS (updated with tenant_id) ==============
+
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
@@ -21,6 +182,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    tenant = relationship("Tenant", back_populates="users")
     contacts = relationship("Contact", back_populates="assigned_user", foreign_keys="Contact.assigned_to")
     deals = relationship("Deal", back_populates="assigned_user", foreign_keys="Deal.assigned_to")
     projects_managed = relationship("Project", back_populates="manager", foreign_keys="Project.manager_id")

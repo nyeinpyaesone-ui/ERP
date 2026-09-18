@@ -1,0 +1,52 @@
+```
+# Dependencies
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+coverage/
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Alembic
+alembic/versions/alembic_version.*
+
+# Python specific
+*.py[cod]
+*$py.class
+*$pycache$*
+```
