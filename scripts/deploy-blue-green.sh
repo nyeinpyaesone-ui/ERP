@@ -2,6 +2,7 @@
 ###############################################################################
 # ERP SOLUTION — Blue-Green Deployment Script
 # Usage: ./scripts/deploy-blue-green.sh [environment] [version] [--rollback]
+# Works with docker-compose.prod.yml fixed container names and profiles
 ###############################################################################
 
 set -euo pipefail
@@ -12,17 +13,25 @@ COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.prod.yml"
 NGINX_UPSTREAM_DIR_HOST="${PROJECT_ROOT}/nginx"
 NGINX_UPSTREAM_DIR_CONTAINER="/etc/nginx/conf.d"
 SSL_DIR="/opt/erp-solution/ssl"
+ERP_DIR="/opt/erp-solution"
 
 ENVIRONMENT="${1:-production}"
 VERSION="${2:-latest}"
 ROLLBACK="${3:-false}"
 
-BLUE_PROJECT="erp-blue"
-GREEN_PROJECT="erp-green"
 ACTIVE_COLOR_FILE="/opt/erp-solution/.active_color"
 PREVIOUS_VERSION_FILE="/opt/erp-solution/.previous_version"
 
 LOG_FILE="/opt/erp-solution/logs/deploy-$(date +%Y%m%d-%H%M%S).log"
+
+DOCKER_COMPOSE_CMD=""
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+else
+    DOCKER_COMPOSE_CMD="docker-compose"
+fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -71,7 +80,7 @@ validate_environment() {
         exit 1
     fi
     
-    if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+    if [ -z "${DOCKER_COMPOSE_CMD}" ]; then
         error "docker-compose not available"
         exit 1
     fi
@@ -96,43 +105,53 @@ get_inactive_color() {
     fi
 }
 
-get_project_name() {
+get_container_name() {
     local color="$1"
-    echo "${ENVIRONMENT}-${color}"
+    local service="$2"
+    echo "erp-${color}-${service}"
 }
 
 pull_images() {
-    local project_name="$1"
-    info "Pulling images for ${project_name} (version: ${VERSION})"
+    local color="$1"
+    info "Pulling images for ${color} environment (version: ${VERSION})"
     
-    docker-compose -p "${project_name}" -f "${COMPOSE_FILE}" pull backend frontend 2>&1 | tee -a "${LOG_FILE}"
+    # Pull blue images (always)
+    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" pull backend frontend 2>&1 | tee -a "${LOG_FILE}"
+    
+    # Pull green images if using blue-green
+    if [ "${color}" = "green" ]; then
+        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" --profile blue-green pull backend-green frontend-green 2>&1 | tee -a "${LOG_FILE}"
+    fi
     
     success "Images pulled successfully"
 }
 
 start_inactive_environment() {
     local color="$1"
-    local project_name=$(get_project_name "${color}")
     
-    info "Starting ${color} environment (${project_name})"
+    info "Starting ${color} environment"
     
-    # Start only backend and frontend for the inactive color
-    # DB, Redis, Ollama, Nginx are shared
-    docker-compose -p "${project_name}" -f "${COMPOSE_FILE}" up -d backend frontend 2>&1 | tee -a "${LOG_FILE}"
+    if [ "${color}" = "blue" ]; then
+        # Blue is default profile - always running
+        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" up -d backend frontend 2>&1 | tee -a "${LOG_FILE}"
+    else
+        # Green uses blue-green profile
+        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" --profile blue-green up -d backend-green frontend-green 2>&1 | tee -a "${LOG_FILE}"
+    fi
     
     success "${color} environment started"
 }
 
 wait_for_health() {
     local color="$1"
-    local project_name=$(get_project_name "${color}")
+    local backend_container=$(get_container_name "${color}" "backend")
     local max_attempts=30
     local attempt=1
     
     info "Waiting for ${color} environment to become healthy..."
     
     while [ $attempt -le $max_attempts ]; do
-        local health_status=$(docker inspect --format='{{.State.Health.Status}}' "${project_name}-backend-1" 2>/dev/null || echo "unknown")
+        local health_status=$(docker inspect --format='{{.State.Health.Status}}' "${backend_container}" 2>/dev/null || echo "unknown")
         
         if [ "${health_status}" = "healthy" ]; then
             success "${color} environment is healthy"
@@ -141,7 +160,7 @@ wait_for_health() {
         
         if [ "${health_status}" = "unhealthy" ]; then
             error "${color} environment is unhealthy"
-            docker logs "${project_name}-backend-1" --tail 50 | tee -a "${LOG_FILE}"
+            docker logs "${backend_container}" --tail 50 | tee -a "${LOG_FILE}"
             return 1
         fi
         
@@ -151,14 +170,13 @@ wait_for_health() {
     done
     
     error "${color} environment did not become healthy within timeout"
-    docker logs "${project_name}-backend-1" --tail 100 | tee -a "${LOG_FILE}"
+    docker logs "${backend_container}" --tail 100 | tee -a "${LOG_FILE}"
     return 1
 }
 
 run_smoke_tests() {
     local color="$1"
-    local project_name=$(get_project_name "${color}")
-    local backend_container="${project_name}-backend-1"
+    local backend_container=$(get_container_name "${color}" "backend")
     
     info "Running smoke tests against ${color} environment..."
     
@@ -227,11 +245,16 @@ switch_traffic() {
 
 stop_old_environment() {
     local color="$1"
-    local project_name=$(get_project_name "${color}")
     
-    info "Stopping old ${color} environment (${project_name})"
+    info "Stopping old ${color} environment"
     
-    docker-compose -p "${project_name}" -f "${COMPOSE_FILE}" down backend frontend 2>&1 | tee -a "${LOG_FILE}"
+    if [ "${color}" = "blue" ]; then
+        # Blue is default - just stop services
+        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" stop backend frontend 2>&1 | tee -a "${LOG_FILE}"
+    else
+        # Green uses blue-green profile
+        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" --profile blue-green stop backend-green frontend-green 2>&1 | tee -a "${LOG_FILE}"
+    fi
     
     success "Old ${color} environment stopped"
 }
@@ -261,6 +284,18 @@ perform_rollback() {
     success "Rollback completed to ${previous_color} (version: ${previous_version})"
 }
 
+load_env() {
+    local env_file="${ERP_DIR}/.env.production"
+    if [ -f "${env_file}" ]; then
+        info "Loading environment from ${env_file}"
+        set -a
+        source "${env_file}"
+        set +a
+    else
+        warn "Environment file not found: ${env_file}"
+    fi
+}
+
 main() {
     info "=========================================="
     info "ERP SOLUTION — Blue-Green Deployment"
@@ -272,6 +307,7 @@ main() {
     
     mkdir -p "$(dirname "${LOG_FILE}")"
     
+    load_env
     validate_environment
     
     if [ "${ROLLBACK}" = "true" ] || [ "${ROLLBACK}" = "--rollback" ]; then
@@ -281,14 +317,12 @@ main() {
     
     local active_color=$(get_active_color)
     local inactive_color=$(get_inactive_color)
-    local active_project=$(get_project_name "${active_color}")
-    local inactive_project=$(get_project_name "${inactive_color}")
     
-    info "Active color: ${active_color} (${active_project})"
-    info "Inactive color: ${inactive_color} (${inactive_project})"
+    info "Active color: ${active_color}"
+    info "Inactive color: ${inactive_color}"
     
     # Pull images for inactive environment
-    pull_images "${inactive_project}"
+    pull_images "${inactive_color}"
     
     # Start inactive environment
     start_inactive_environment "${inactive_color}"
@@ -296,14 +330,18 @@ main() {
     # Wait for health
     if ! wait_for_health "${inactive_color}"; then
         error "Inactive environment failed health checks"
-        docker-compose -p "${inactive_project}" -f "${COMPOSE_FILE}" down backend frontend
+        if [ "${inactive_color}" = "green" ]; then
+            $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" --profile blue-green stop backend-green frontend-green
+        fi
         exit 1
     fi
     
     # Run smoke tests
     if ! run_smoke_tests "${inactive_color}"; then
         error "Smoke tests failed"
-        docker-compose -p "${inactive_project}" -f "${COMPOSE_FILE}" down backend frontend
+        if [ "${inactive_color}" = "green" ]; then
+            $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" --profile blue-green stop backend-green frontend-green
+        fi
         exit 1
     fi
     
@@ -327,7 +365,7 @@ main() {
     
     success "=========================================="
     success "Deployment completed successfully!"
-    success "Active environment: ${inactive_color} (${inactive_project})"
+    success "Active environment: ${inactive_color}"
     success "Version: ${VERSION}"
     success "=========================================="
 }
