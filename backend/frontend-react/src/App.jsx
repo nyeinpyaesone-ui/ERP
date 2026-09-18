@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -21,23 +22,23 @@ import Permissions from './pages/Permissions';
 import LLMManager from './pages/LLMManager';
 import Search from './pages/Search';
 
-function App() {
-  const [token, setToken] = useState(localStorage.getItem('token'));
+function AppRoutes() {
+  const { user, loading } = useAuth();
 
-  useEffect(() => {
-    const handleStorage = () => {
-      setToken(localStorage.getItem('token'));
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-  if (!token) {
-    return <Login onLogin={(t) => { localStorage.setItem('token', t); setToken(t); }} />;
+  if (!user) {
+    return <Login />;
   }
 
   return (
-    <Layout onLogout={() => { localStorage.removeItem('token'); setToken(null); }}>
+    <Layout onLogout={() => {}}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/crm" element={<CRM />} />
@@ -63,5 +64,10 @@ function App() {
   );
 }
 
-export default App;
-
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
+  );
+}
