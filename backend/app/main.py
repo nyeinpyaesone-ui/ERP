@@ -9,8 +9,9 @@ from app.routers import (
     auth, crm, hr, inventory, finance, projects,
     ai, documents, reports, workflows, payments,
     integrations, analytics, admin, websocket,
-    search, permissions, llm
+    purchase_orders
 )
+from app.middleware.tenancy import TenancyMiddleware
 from app.config import settings
 
 @asynccontextmanager
@@ -24,6 +25,9 @@ app = FastAPI(
     version=settings.APP_VERSION,
     lifespan=lifespan
 )
+
+# Add tenancy middleware for tenant isolation
+app.add_middleware(TenancyMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,9 +52,7 @@ app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["In
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSocket"])
-app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
-app.include_router(permissions.router, prefix="/api/v1/permissions", tags=["Permissions"])
-app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM"])
+app.include_router(purchase_orders.router, tags=["Purchase Orders"])
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -71,7 +73,9 @@ async def root():
             "PWA with Offline Support",
             "AI Forecasting",
             "Bulk Import/Export",
-            "Alembic Migrations"
+            "Alembic Migrations",
+            "Multi-Tenancy Support",
+            "Purchase Order Management"
         ]
     }
 
