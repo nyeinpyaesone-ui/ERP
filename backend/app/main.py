@@ -2,14 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+from sqlalchemy import text
 
-from app.database import engine, Base
+from app.database import engine, Base, SessionLocal
 from app.routers import (
     auth, crm, hr, inventory, finance, projects,
     ai, documents, reports, workflows, payments,
     integrations, analytics, admin, websocket,
     llm, search, permissions
 )
+from app.middleware.tenancy import TenancyMiddleware
 from app.config import settings
 from app.knowledge.routes import router as knowledge_router
 
@@ -24,6 +26,9 @@ app = FastAPI(
     version=settings.APP_VERSION,
     lifespan=lifespan
 )
+
+# Add tenancy middleware for tenant isolation
+app.add_middleware(TenancyMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -81,4 +86,15 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/ready")
+async def readiness_check():
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        return {"status": "ready", "database": "connected"}
+    except Exception as e:
+        return {"status": "not ready", "database": "disconnected", "error": str(e)}
 

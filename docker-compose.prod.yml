@@ -102,6 +102,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/upstream-blue.conf:/etc/nginx/conf.d/upstream-blue.conf:ro
+      - ./nginx/upstream-green.conf:/etc/nginx/conf.d/upstream-green.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
       - ./logs/nginx:/var/log/nginx
     depends_on:
