@@ -54,7 +54,7 @@ services:
   # Frontend Web App
   frontend:
     build:
-      context: ./frontend
+      context: ./backend/frontend-react
       dockerfile: Dockerfile
     container_name: erp-frontend
     ports:

@@ -1,16 +1,177 @@
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, DateTime, Date,
-    Numeric, ForeignKey, Index, Float, LargeBinary
+    Numeric, ForeignKey, Index, Float, LargeBinary, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
+# ============== TENANCY MODELS ==============
+
+class Tenant(Base):
+    __tablename__ = "tenants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    subdomain = Column(String(100), unique=True, nullable=False, index=True)
+    schema_name = Column(String(100), unique=True, nullable=False)
+    
+    # Subscription & Billing
+    plan = Column(String(50), nullable=False, server_default="starter")
+    max_users = Column(Integer, nullable=False, server_default="5")
+    max_storage_gb = Column(Integer, nullable=False, server_default="10")
+    subscription_start = Column(Date, nullable=False)
+    subscription_end = Column(Date, nullable=False)
+    
+    # Configuration
+    timezone = Column(String(50), nullable=False, server_default="UTC")
+    currency = Column(String(3), nullable=False, server_default="USD")
+    locale = Column(String(10), nullable=False, server_default="en_US")
+    
+    # Status
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    users = relationship("User", back_populates="tenant")
+
+
+class Vendor(Base):
+    __tablename__ = "vendors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    contact_email = Column(String(255), nullable=True)
+    contact_phone = Column(String(50), nullable=True)
+    address = Column(Text, nullable=True)
+    tax_id = Column(String(100), nullable=True)
+    payment_terms = Column(String(100), nullable=True)
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    rating = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    purchase_orders = relationship("PurchaseOrder", back_populates="vendor")
+    
+    __table_args__ = (
+        Index('idx_vendor_tenant', 'tenant_id'),
+    )
+
+
+# ============== PURCHASE ORDER MODELS ==============
+
+class PurchaseOrder(Base):
+    __tablename__ = "purchase_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
+    po_number = Column(String(50), unique=True, nullable=False, index=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False)
+    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    approver_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    # Financial
+    subtotal = Column(Numeric(15, 2), nullable=False, server_default="0")
+    tax_amount = Column(Numeric(15, 2), nullable=False, server_default="0")
+    total_amount = Column(Numeric(15, 2), nullable=False, server_default="0")
+    currency = Column(String(3), nullable=False, server_default="USD")
+    
+    # Status & Workflow
+    status = Column(String(50), nullable=False, server_default="draft")
+    approval_level = Column(Integer, nullable=False, server_default="0")
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    ordered_at = Column(DateTime(timezone=True), nullable=True)
+    received_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Delivery
+    expected_delivery_date = Column(Date, nullable=True)
+    actual_delivery_date = Column(Date, nullable=True)
+    shipping_address = Column(Text, nullable=True)
+    
+    # Audit
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    vendor = relationship("Vendor", back_populates="purchase_orders")
+    requester = relationship("User", foreign_keys=[requester_id])
+    approver = relationship("User", foreign_keys=[approver_id])
+    items = relationship("PurchaseOrderItem", back_populates="purchase_order", cascade="all, delete-orphan")
+    approvals = relationship("POApproval", back_populates="purchase_order", cascade="all, delete-orphan")
+    
+    __table_args__ = (
+        Index('idx_po_status', 'status'),
+        Index('idx_po_vendor', 'vendor_id'),
+        Index('idx_po_tenant', 'tenant_id'),
+    )
+
+
+class PurchaseOrderItem(Base):
+    __tablename__ = "purchase_order_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    po_id = Column(Integer, ForeignKey("purchase_orders.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
+    description = Column(Text, nullable=False)
+    quantity = Column(Numeric(10, 2), nullable=False)
+    unit_price = Column(Numeric(15, 2), nullable=False)
+    total_price = Column(Numeric(15, 2), nullable=False)
+    received_quantity = Column(Numeric(10, 2), nullable=False, server_default="0")
+    
+    purchase_order = relationship("PurchaseOrder", back_populates="items")
+    product = relationship("Product")
+
+
+class POApproval(Base):
+    __tablename__ = "po_approvals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    po_id = Column(Integer, ForeignKey("purchase_orders.id", ondelete="CASCADE"), nullable=False)
+    approver_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    level = Column(Integer, nullable=False)
+    status = Column(String(50), nullable=False, server_default="pending")
+    comments = Column(Text, nullable=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    purchase_order = relationship("PurchaseOrder", back_populates="approvals")
+    approver = relationship("User")
+
+
+# ============== TRANSACTION LOG MODEL ==============
+
+class TransactionLog(Base):
+    __tablename__ = "transaction_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    transaction_id = Column(String(100), unique=True, nullable=False, index=True)
+    entity_type = Column(String(50), nullable=False)
+    entity_id = Column(Integer, nullable=False)
+    action = Column(String(50), nullable=False)
+    old_values = Column(JSONB, nullable=True)
+    new_values = Column(JSONB, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True)
+    status = Column(String(50), nullable=False, server_default="completed")
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    __table_args__ = (
+        Index('idx_txn_entity', 'entity_type', 'entity_id'),
+        Index('idx_txn_tenant', 'tenant_id'),
+    )
+
+
+# ============== EXISTING MODELS (updated with tenant_id) ==============
+
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
@@ -21,12 +182,14 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    tenant = relationship("Tenant", back_populates="users")
     contacts = relationship("Contact", back_populates="assigned_user", foreign_keys="Contact.assigned_to")
     deals = relationship("Deal", back_populates="assigned_user", foreign_keys="Deal.assigned_to")
     projects_managed = relationship("Project", back_populates="manager", foreign_keys="Project.manager_id")
     tasks = relationship("Task", back_populates="assigned_user", foreign_keys="Task.assigned_to")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     activity_logs = relationship("ActivityLog", back_populates="user")
+    roles = relationship("Role", secondary="user_roles", back_populates="users")
 
 class Company(Base):
     __tablename__ = "companies"
@@ -451,4 +614,216 @@ class Setting(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    display_name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    is_system = Column(Boolean, nullable=False, server_default="false")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    permissions = relationship("Permission", secondary="role_permissions", back_populates="roles")
+    users = relationship("User", secondary="user_roles", back_populates="roles")
+    field_permissions = relationship("FieldPermission", back_populates="role", cascade="all, delete-orphan")
+    data_policies = relationship("DataPolicy", back_populates="role", cascade="all, delete-orphan")
+
+
+class Permission(Base):
+    __tablename__ = "permissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    resource = Column(String(100), nullable=False, index=True)
+    action = Column(String(50), nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    roles = relationship("Role", secondary="role_permissions", back_populates="permissions")
+
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    permission_id = Column(Integer, ForeignKey("permissions.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    assigned_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    role = relationship("Role", foreign_keys=[role_id])
+    assigned_by_user = relationship("User", foreign_keys=[assigned_by])
+
+
+class FieldPermission(Base):
+    __tablename__ = "field_permissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    resource = Column(String(100), nullable=False, index=True)
+    field_name = Column(String(100), nullable=False)
+    access_level = Column(String(20), nullable=False, server_default="read")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    role = relationship("Role", back_populates="field_permissions")
+
+
+class DataPolicy(Base):
+    __tablename__ = "data_policies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    resource = Column(String(100), nullable=False, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    condition = Column(JSONB, nullable=True)
+    effect = Column(String(10), nullable=False, server_default="allow")
+    priority = Column(Integer, nullable=False, server_default="100")
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    role = relationship("Role", back_populates="data_policies")
+
+
+class SearchIndex(Base):
+    __tablename__ = "search_index"
+
+    id = Column(Integer, primary_key=True, index=True)
+    entity_type = Column(String(50), nullable=False, index=True)
+    entity_id = Column(Integer, nullable=False, index=True)
+    title = Column(String(500), nullable=False)
+    content = Column(Text, nullable=True)
+    meta_data = Column("metadata", JSONB, nullable=True)
+    embedding = Column(LargeBinary, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class SearchQuery(Base):
+    __tablename__ = "search_queries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    query = Column(String(500), nullable=False)
+    entity_types = Column(JSONB, nullable=True)
+    results_count = Column(Integer, nullable=False, server_default="0")
+    execution_time_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    user = relationship("User", foreign_keys=[user_id])
+
+
+class SearchSuggestion(Base):
+    __tablename__ = "search_suggestions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    query = Column(String(500), nullable=False, index=True)
+    entity_type = Column(String(50), nullable=True, index=True)
+    count = Column(Integer, nullable=False, server_default="1")
+    last_used = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class LLMModel(Base):
+    __tablename__ = "llm_models"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    provider = Column(String(50), nullable=False)  # ollama, openai, anthropic
+    model_id = Column(String(100), nullable=False, index=True)
+    display_name = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    parameters = Column(JSONB, nullable=True)
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    is_default = Column(Boolean, nullable=False, server_default="false")
+    supports_streaming = Column(Boolean, nullable=False, server_default="true")
+    supports_tools = Column(Boolean, nullable=False, server_default="false")
+    context_window = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AIConversation(Base):
+    __tablename__ = "ai_conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(500), nullable=True)
+    model_id = Column(String(100), nullable=False)
+    system_prompt = Column(Text, nullable=True)
+    is_archived = Column(Boolean, nullable=False, server_default="false")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", foreign_keys=[user_id])
+    messages = relationship("AIMessage", back_populates="conversation", cascade="all, delete-orphan", order_by="AIMessage.created_at")
+
+
+class AIMessage(Base):
+    __tablename__ = "ai_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("ai_conversations.id", ondelete="CASCADE"), nullable=False)
+    role = Column(String(50), nullable=False)
+    content = Column(Text, nullable=False)
+    model_id = Column(String(100), nullable=True)
+    tokens_used = Column(Integer, nullable=True)
+    latency_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    conversation = relationship("AIConversation", back_populates="messages")
+
+
+class LLMUsage(Base):
+    __tablename__ = "llm_usage"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    model_id = Column(String(100), nullable=False, index=True)
+    conversation_id = Column(Integer, ForeignKey("ai_conversations.id", ondelete="SET NULL"), nullable=True)
+    prompt_tokens = Column(Integer, nullable=False, server_default="0")
+    completion_tokens = Column(Integer, nullable=False, server_default="0")
+    total_tokens = Column(Integer, nullable=False, server_default="0")
+    latency_ms = Column(Integer, nullable=True)
+    endpoint = Column(String(50), nullable=False)
+    success = Column(Boolean, nullable=False, server_default="true")
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    user = relationship("User", foreign_keys=[user_id])
+    conversation = relationship("AIConversation", foreign_keys=[conversation_id])
+
+
+class AIPromptTemplate(Base):
+    __tablename__ = "ai_prompt_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    display_name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    system_prompt = Column(Text, nullable=False)
+    user_prompt_template = Column(Text, nullable=True)
+    variables = Column(JSONB, nullable=True)
+    category = Column(String(50), nullable=False, server_default="general")
+    model_id = Column(String(100), nullable=True)
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    creator = relationship("User", foreign_keys=[created_by])
 
