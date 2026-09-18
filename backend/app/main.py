@@ -9,7 +9,7 @@ from app.routers import (
     auth, crm, hr, inventory, finance, projects,
     ai, documents, reports, workflows, payments,
     integrations, analytics, admin, websocket,
-    llm, search, permissions
+    search, permissions, llm, health, health_root
 )
 from app.middleware.tenancy import TenancyMiddleware
 from app.config import settings
@@ -57,6 +57,8 @@ app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM"])
 app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
 app.include_router(permissions.router, prefix="/api/v1/permissions", tags=["Permissions"])
 app.include_router(knowledge_router, prefix="/api/v1/knowledge", tags=["Knowledge Base"])
+app.include_router(health.router, prefix="/api/v1", tags=["Health"])
+app.include_router(health_root.router, prefix="", tags=["Health"])
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -82,19 +84,3 @@ async def root():
             "Role-Based Access Control",
         ]
     }
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
-
-@app.get("/ready")
-async def readiness_check():
-    try:
-        db = SessionLocal()
-        db.execute(text("SELECT 1"))
-        db.close()
-        return {"status": "ready", "database": "connected"}
-    except Exception as e:
-        return {"status": "not ready", "database": "disconnected", "error": str(e)}
-
