@@ -104,8 +104,8 @@ jobs:
         uses: chrnorm/deployment-action@releases/v1
         with:
           token: ${{ github.token }}
-          target_url: https://staging.yourdomain.com
-          environment: staging
+          target_url: https://${{ vars.STAGING_DOMAIN }}
+          environment: docker
           description: Deploy ${{ github.sha }} to staging
           ref: ${{ github.sha }}
           auto_inactive: true
@@ -114,7 +114,7 @@ jobs:
         uses: chrnorm/deployment-status@releases/v1
         with:
           token: ${{ github.token }}
-          target_url: https://staging.yourdomain.com
+          target_url: https://${{ vars.STAGING_DOMAIN }}
           state: in_progress
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
 
@@ -145,7 +145,7 @@ jobs:
         uses: chrnorm/deployment-status@releases/v1
         with:
           token: ${{ github.token }}
-          target_url: https://staging.yourdomain.com
+          target_url: https://${{ vars.STAGING_DOMAIN }}
           state: success
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
 
@@ -154,7 +154,7 @@ jobs:
         uses: chrnorm/deployment-status@releases/v1
         with:
           token: ${{ github.token }}
-          target_url: https://staging.yourdomain.com
+          target_url: https://${{ vars.STAGING_DOMAIN }}
           state: failure
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
           description: Deployment failed
@@ -174,8 +174,8 @@ jobs:
         uses: chrnorm/deployment-action@releases/v1
         with:
           token: ${{ github.token }}
-          target_url: https://yourdomain.com
-          environment: production
+          target_url: https://${{ vars.PRODUCTION_DOMAIN }}
+          environment: docker
           description: Deploy ${{ github.ref_name }} to production
           ref: ${{ github.sha }}
           auto_inactive: true
@@ -184,7 +184,7 @@ jobs:
         uses: chrnorm/deployment-status@releases/v1
         with:
           token: ${{ github.token }}
-          target_url: https://yourdomain.com
+          target_url: https://${{ vars.PRODUCTION_DOMAIN }}
           state: in_progress
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
 
@@ -216,7 +216,7 @@ jobs:
         uses: chrnorm/deployment-status@releases/v1
         with:
           token: ${{ github.token }}
-          target_url: https://yourdomain.com
+          target_url: https://${{ vars.PRODUCTION_DOMAIN }}
           state: success
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
 
@@ -225,7 +225,7 @@ jobs:
         uses: chrnorm/deployment-status@releases/v1
         with:
           token: ${{ github.token }}
-          target_url: https://yourdomain.com
+          target_url: https://${{ vars.PRODUCTION_DOMAIN }}
           state: failure
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
           description: Deployment failed

@@ -85,19 +85,33 @@ cd mobile && npx expo start
 
 ## 📚 Documentation
 
+### Production Operations
 | Document | Description |
 |----------|-------------|
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Development workflow, commit conventions |
-| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
-| [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) | Full production deployment guide |
+| [docs/END_USER_INSTALL.md](docs/END_USER_INSTALL.md) | **One-command production install** (domain, SSL, deploy) |
+| [docs/BLUE_GREEN_DEPLOYMENT.md](docs/BLUE_GREEN_DEPLOYMENT.md) | Zero-downtime deploy & rollback procedures |
+| [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) | Automated backup, restore, disaster recovery |
+| [docs/SSL_CERTIFICATES.md](docs/SSL_CERTIFICATES.md) | Let's Encrypt cert management & auto-renewal |
+| [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) | Full production deployment guide (Docker/K8s) |
+| [docs/PRODUCTION_SETUP.md](docs/PRODUCTION_SETUP.md) | Server provisioning & configuration |
+
+### Development
+| Document | Description |
+|----------|-------------|
+| [docs/ONBOARDING.md](docs/ONBOARDING.md) | 30-minute developer onboarding |
 | [docs/API_SUMMARY.md](docs/API_SUMMARY.md) | API endpoints and authentication |
-| [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | CI/CD secrets setup |
-| [docs/TESTING.md](docs/TESTING.md) | Testing strategy guide |
 | [docs/DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md) | Alembic migration guide |
+| [docs/TESTING.md](docs/TESTING.md) | Testing strategy guide |
+| [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | CI/CD secrets setup |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & fixes |
 | [docs/FAQ.md](docs/FAQ.md) | Frequently asked questions |
+
+### Architecture & Governance
+| Document | Description |
+|----------|-------------|
 | [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md) | ADR records |
-| [docs/ONBOARDING.md](docs/ONBOARDING.md) | 30-minute developer onboarding |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development workflow, commit conventions |
+| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
 
 ## 🛠️ Management Commands
 
