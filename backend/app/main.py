@@ -2,9 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from sqlalchemy import text
 
-from app.database import engine, Base, SessionLocal
+from app.database import engine, Base
 from app.routers import (
     auth, crm, hr, inventory, finance, projects,
     ai, documents, reports, workflows, payments,
@@ -15,27 +14,27 @@ from app.middleware.tenancy import TenancyMiddleware
 from app.config import settings
 from app.knowledge.routes import router as knowledge_router
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    # Schema changes are owned by Alembic. Do not mutate production schema at startup.
     yield
+
 
 app = FastAPI(
     title=settings.APP_NAME,
     description="Enterprise Resource Planning with AI-powered features",
     version=settings.APP_VERSION,
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
-# Add tenancy middleware for tenant isolation
 app.add_middleware(TenancyMiddleware)
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
 )
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
@@ -62,6 +61,7 @@ app.include_router(health_root.router, prefix="", tags=["Health"])
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
 @app.get("/")
 async def root():
     return {
@@ -70,17 +70,6 @@ async def root():
         "status": "running",
         "features": [
             "Core ERP (CRM, HR, Inventory, Finance, Projects)",
-            "AI Chat & RAG",
-            "LLM Integration",
-            "Document Management",
-            "Reports & Analytics",
-            "Workflow Automation",
-            "Stripe Payments",
-            "WebSocket Real-time",
-            "PWA with Offline Support",
-            "AI Forecasting",
-            "Knowledge Base",
-            "Advanced Search",
             "Role-Based Access Control",
-        ]
+        ],
     }
