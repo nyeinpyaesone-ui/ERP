@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -10,34 +10,34 @@ router = APIRouter(prefix="/api/v1", tags=["Health"])
 
 @router.get("/health")
 async def health_check():
-    """Liveness probe - process is alive"""
+    """Liveness probe: the process is running."""
     return {"status": "healthy"}
 
 
 @router.get("/ready")
 async def readiness_check(db: Session = Depends(get_db)):
-    """Readiness probe - dependencies are available"""
+    """Readiness probe: PostgreSQL and Redis are available."""
     checks = {}
-    
-    # Database check
+
     try:
         db.execute(text("SELECT 1"))
         checks["database"] = "ok"
-    except Exception as e:
-        checks["database"] = f"failed: {str(e)}"
-    
-    # Redis check
+    except Exception as exc:
+        db.rollback()
+        checks["database"] = f"failed: {type(exc).__name__}"
+
     try:
-        r = redis.from_url(settings.REDIS_URL)
-        r.ping()
+        client = redis.from_url(settings.REDIS_URL, socket_connect_timeout=2, socket_timeout=2)
+        client.ping()
+        client.close()
         checks["redis"] = "ok"
-    except Exception as e:
-        checks["redis"] = f"failed: {str(e)}"
-    
-    # Overall status
-    all_ok = all(v == "ok" for v in checks.values())
-    
-    return {
-        "status": "ready" if all_ok else "not_ready",
-        "checks": checks
-    }
+    except Exception as exc:
+        checks["redis"] = f"failed: {type(exc).__name__}"
+
+    if any(value != "ok" for value in checks.values()):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"status": "not_ready", "checks": checks},
+        )
+
+    return {"status": "ready", "checks": checks}

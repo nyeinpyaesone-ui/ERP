@@ -313,22 +313,61 @@ class Product(Base):
 
     movements = relationship("InventoryMovement", back_populates="product", cascade="all, delete-orphan")
     invoice_items = relationship("InvoiceItem", back_populates="product")
+    order_items = relationship("OrderItem", back_populates="product")
 
 class InventoryMovement(Base):
     __tablename__ = "inventory_movements"
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
-    movement_type = Column(String(50), nullable=False)  # in, out, adjustment, transfer
+    movement_type = Column(String(50), nullable=False)
     quantity = Column(Integer, nullable=False)
     unit_cost = Column(Numeric(15, 2), nullable=True)
     reference = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
+    before_quantity = Column(Integer, nullable=True)
+    change_quantity = Column(Integer, nullable=True)
+    after_quantity = Column(Integer, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     product = relationship("Product", back_populates="movements")
     creator = relationship("User", foreign_keys=[created_by])
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("contacts.id", ondelete="SET NULL"), nullable=False)
+    status = Column(String(50), nullable=False, server_default="pending")
+    subtotal = Column(Numeric(15, 2), nullable=False, server_default="0")
+    tax_total = Column(Numeric(15, 2), nullable=False, server_default="0")
+    total = Column(Numeric(15, 2), nullable=False, server_default="0")
+    notes = Column(Text, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    customer = relationship("Contact")
+    creator = relationship("User", foreign_keys=[created_by])
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit_price = Column(Numeric(15, 2), nullable=False)
+    line_total = Column(Numeric(15, 2), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    order = relationship("Order", back_populates="items")
+    product = relationship("Product", back_populates="order_items")
+
 
 class Invoice(Base):
     __tablename__ = "invoices"
@@ -439,7 +478,7 @@ class Document(Base):
     file_path = Column(String(500), nullable=False)
     file_size = Column(Integer, nullable=True)
     mime_type = Column(String(100), nullable=True)
-    entity_type = Column(String(50), nullable=True)  # contact, company, project, etc.
+    entity_type = Column(String(50), nullable=True)
     entity_id = Column(Integer, nullable=True)
     embedding_id = Column(String(255), nullable=True)
     extracted_text = Column(Text, nullable=True)
@@ -454,8 +493,8 @@ class Workflow(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    entity_type = Column(String(50), nullable=False)  # invoice, deal, task, etc.
-    trigger_type = Column(String(50), nullable=False)  # on_create, on_update, scheduled, manual
+    entity_type = Column(String(50), nullable=False)
+    trigger_type = Column(String(50), nullable=False)
     trigger_condition = Column(JSONB, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -471,7 +510,7 @@ class WorkflowStep(Base):
     id = Column(Integer, primary_key=True, index=True)
     workflow_id = Column(Integer, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
-    step_type = Column(String(50), nullable=False)  # approval, condition, action, notification, delay
+    step_type = Column(String(50), nullable=False)
     step_order = Column(Integer, nullable=False)
     config = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -499,7 +538,7 @@ class Webhook(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     url = Column(String(500), nullable=False)
-    events = Column(JSONB, nullable=False)  # ["invoice.created", "deal.won"]
+    events = Column(JSONB, nullable=False)
     secret = Column(String(255), nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
     retry_count = Column(Integer, nullable=False, server_default="3")
@@ -530,7 +569,7 @@ class Integration(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
-    provider = Column(String(100), nullable=False)  # slack, teams, zapier, generic
+    provider = Column(String(100), nullable=False)
     config = Column(JSONB, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
     last_sync = Column(DateTime(timezone=True), nullable=True)
@@ -589,7 +628,7 @@ class Forecast(Base):
     __tablename__ = "forecasts"
 
     id = Column(Integer, primary_key=True, index=True)
-    forecast_type = Column(String(100), nullable=False)  # revenue, inventory, churn
+    forecast_type = Column(String(100), nullable=False)
     entity_id = Column(Integer, nullable=True)
     period_start = Column(Date, nullable=False)
     period_end = Column(Date, nullable=False)
@@ -597,7 +636,7 @@ class Forecast(Base):
     confidence_low = Column(Numeric(15, 2), nullable=True)
     confidence_high = Column(Numeric(15, 2), nullable=True)
     confidence_score = Column(Float, nullable=True)
-    trend = Column(String(50), nullable=True)  # increasing, decreasing, stable
+    trend = Column(String(50), nullable=True)
     growth_rate = Column(Float, nullable=True)
     model_used = Column(String(100), nullable=True)
     insights = Column(Text, nullable=True)
@@ -743,7 +782,7 @@ class LLMModel(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), unique=True, nullable=False, index=True)
-    provider = Column(String(50), nullable=False)  # ollama, openai, anthropic
+    provider = Column(String(50), nullable=False)
     model_id = Column(String(100), nullable=False, index=True)
     display_name = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
