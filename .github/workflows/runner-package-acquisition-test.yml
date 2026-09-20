@@ -1,0 +1,31 @@
+name: Runner Package Acquisition Test
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  acquire:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download official runner
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          version="2.337.0"
+          archive="actions-runner-linux-x64-${version}.tar.gz"
+          url="https://github.com/actions/runner/releases/download/v${version}/${archive}"
+          expected="70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613"
+          curl -fL --retry 3 --retry-all-errors -o "$archive" "$url"
+          printf '%s  %s\n' "$expected" "$archive" | sha256sum -c -
+          tar -tzf "$archive" >/dev/null
+      - name: Upload verified runner package
+        uses: actions/upload-artifact@v4
+        with:
+          name: actions-runner-linux-x64-2.337.0-verified
+          path: actions-runner-linux-x64-2.337.0.tar.gz
+          if-no-files-found: error
