@@ -6,11 +6,11 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   acquire:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Download official runner
         shell: bash
@@ -20,7 +20,8 @@ jobs:
           archive="actions-runner-linux-x64-${version}.tar.gz"
           url="https://github.com/actions/runner/releases/download/v${version}/${archive}"
           expected="70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613"
-          curl -fL --retry 3 --retry-all-errors -o "$archive" "$url"
+          curl -fL --retry 5 --retry-all-errors --connect-timeout 15 --max-time 300 -o "$archive.tmp" "$url"
+          mv "$archive.tmp" "$archive"
           printf '%s  %s\n' "$expected" "$archive" | sha256sum -c -
           tar -tzf "$archive" >/dev/null
       - name: Upload verified runner package
