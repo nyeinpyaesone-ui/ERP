@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from app.database import get_db
 from app.models import Product, InventoryMovement
-from app.auth import get_current_user
+from app.auth import get_current_user, require_admin
 from app.services.activity_log import log_activity
 
 router = APIRouter()
@@ -159,6 +159,9 @@ def update_product(product_id: int, data: ProductUpdate, db: Session = Depends(g
             raise HTTPException(status_code=400, detail="SKU already exists")
         product.sku = update_data["sku"].strip()
 
+    if "quantity_in_stock" in update_data:
+        raise HTTPException(status_code=400, detail="Direct stock mutation is not allowed. Use inventory movements.")
+
     if "unit_price" in update_data:
         update_data["unit_price"] = Decimal(str(update_data["unit_price"]))
     if "cost_price" in update_data and update_data["cost_price"] is not None:
@@ -193,14 +196,26 @@ def delete_product(product_id: int, db: Session = Depends(get_db), current_user 
 
 
 @router.post("/movements")
-def create_movement(data: MovementCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    product = db.query(Product).filter(Product.id == data.product_id).first()
+def create_movement(
+    data: MovementCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    if not data.reference or not data.reference.strip():
+        raise HTTPException(status_code=400, detail="reference is required for inventory movements")
+
+    if data.movement_type == "adjustment":
+        try:
+            require_admin(current_user=current_user, db=db)
+        except HTTPException:
+            raise HTTPException(status_code=403, detail="Authorized adjustment only")
+
+    product = db.query(Product).filter(Product.id == data.product_id).with_for_update().first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
     before_quantity = product.quantity_in_stock
     change_quantity = 0
-    after_quantity = before_quantity
 
     if data.movement_type == "out" and before_quantity < data.quantity:
         raise HTTPException(status_code=400, detail="Insufficient stock")
@@ -216,16 +231,21 @@ def create_movement(data: MovementCreate, db: Session = Depends(get_db), current
     elif data.movement_type == "adjustment":
         change_quantity = data.quantity - before_quantity
         after_quantity = data.quantity
-        product.quantity_in_stock = data.quantity
+        product.quantity_in_stock = after_quantity
+    else:
+        raise HTTPException(status_code=400, detail="unsupported movement type")
 
     movement = InventoryMovement(
         product_id=data.product_id,
         movement_type=data.movement_type,
         quantity=data.quantity,
         unit_cost=Decimal(str(data.unit_cost)) if data.unit_cost is not None else None,
-        reference=data.reference,
+        reference=data.reference.strip(),
         notes=data.notes,
         created_by=current_user.id,
+        before_quantity=before_quantity,
+        change_quantity=change_quantity,
+        after_quantity=after_quantity,
     )
 
     db.add(movement)
