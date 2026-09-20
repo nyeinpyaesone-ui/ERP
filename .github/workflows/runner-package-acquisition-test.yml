@@ -25,7 +25,7 @@ jobs:
           printf '%s  %s\n' "$expected" "$archive" | sha256sum -c -
           tar -tzf "$archive" >/dev/null
       - name: Upload verified runner package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: actions-runner-linux-x64-2.337.0-verified
           path: actions-runner-linux-x64-2.337.0.tar.gz
