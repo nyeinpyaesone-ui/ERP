@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 import stripe
+import asyncio
+from datetime import datetime
 
 from app.database import get_db
 from app.models import Invoice, Payment
@@ -72,7 +74,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         invoice_id = intent["metadata"].get("invoice_id")
 
         if invoice_id:
-            invoice = db.query(Invoice).filter(Invoice.id == int(invoice_id)).first()
+            invoice = await asyncio.to_thread(lambda: db.query(Invoice).filter(Invoice.id == int(invoice_id)).first())
             if invoice:
                 amount = intent["amount_received"] / 100
                 payment = Payment(
@@ -84,13 +86,11 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                     stripe_charge_id=intent["charges"]["data"][0]["id"] if intent.get("charges") else None,
                     status="completed"
                 )
-                db.add(payment)
+                await asyncio.to_thread(db.add, payment)
                 invoice.amount_paid = (invoice.amount_paid or 0) + amount
                 if invoice.amount_paid >= invoice.total:
                     invoice.status = "paid"
-                db.commit()
+                await asyncio.to_thread(db.commit)
 
     return {"status": "success"}
-
-from datetime import datetime
 

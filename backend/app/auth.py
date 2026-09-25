@@ -64,14 +64,14 @@ async def require_superadmin(current_user: User = Depends(get_current_user)) -> 
     return current_user
 
 
-async def has_permission(current_user: User, permission_name: str, db: Session) -> bool:
+def has_permission(current_user: User, permission_name: str, db: Session) -> bool:
     if current_user.role == "superadmin":
         return True
-    user_perms = await get_user_permissions(current_user, db)
+    user_perms = get_user_permissions(current_user, db)
     return permission_name in user_perms
 
 
-async def get_user_permissions(user: User, db: Session) -> list:
+def get_user_permissions(user: User, db: Session) -> list:
     if user.role == "superadmin":
         return ["*"]
     permissions = set()

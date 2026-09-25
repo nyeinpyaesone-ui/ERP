@@ -6,14 +6,8 @@ import httpx
 import hmac
 import hashlib
 import json
-
-from app.database import get_db
-from app.models import Integration, Webhook, WebhookDelivery
-from app.auth import get_current_user
-from app.config import settings
-from app.services.activity_log import log_activity
-
-router = APIRouter()
+import asyncio
+from datetime import datetime
 
 class IntegrationCreate(BaseModel):
     name: str
@@ -52,7 +46,7 @@ def list_webhooks(db: Session = Depends(get_db), current_user = Depends(get_curr
 
 @router.post("/webhooks/{webhook_id}/test")
 async def test_webhook(webhook_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    webhook = db.query(Webhook).filter(Webhook.id == webhook_id).first()
+    webhook = await asyncio.to_thread(lambda: db.query(Webhook).filter(Webhook.id == webhook_id).first())
     if not webhook:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
@@ -69,7 +63,7 @@ async def test_webhook(webhook_id: int, db: Session = Depends(get_db), current_u
         payload=payload,
         attempt=1
     )
-    db.add(delivery)
+    await asyncio.to_thread(db.add, delivery)
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -81,13 +75,11 @@ async def test_webhook(webhook_id: int, db: Session = Depends(get_db), current_u
         delivery.status = "failed"
         delivery.response_body = str(e)[:1000]
 
-    db.commit()
-    db.refresh(delivery)
+    await asyncio.to_thread(db.commit)
+    await asyncio.to_thread(db.refresh, delivery)
     return delivery
 
 @router.get("/webhooks/{webhook_id}/deliveries")
 def get_deliveries(webhook_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     return db.query(WebhookDelivery).filter(WebhookDelivery.webhook_id == webhook_id).order_by(WebhookDelivery.created_at.desc()).all()
-
-from datetime import datetime
 
