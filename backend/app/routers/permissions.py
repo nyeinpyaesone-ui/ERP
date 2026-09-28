@@ -8,7 +8,7 @@ from app.models import User, Role, Permission, RolePermission, UserRole, FieldPe
 from app.auth import get_current_user, require_admin, require_superadmin, has_permission, get_user_permissions
 from app.services.activity_log import log_activity
 
-router = APIRouter(prefix="/api/v1/permissions", tags=["Permissions & RBAC"])
+router = APIRouter(tags=["Permissions & RBAC"])
 
 # Schemas
 class RoleCreate(BaseModel):
