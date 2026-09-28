@@ -5,7 +5,7 @@ from app.database import get_db
 from app.config import settings
 import redis
 
-router = APIRouter(prefix="/api/v1", tags=["Health"])
+router = APIRouter(tags=["Health"])
 
 
 @router.get("/health")

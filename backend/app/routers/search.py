@@ -9,7 +9,7 @@ from app.auth import get_current_user, require_admin
 from app.services.search_service import SearchService
 from app.services.activity_log import log_activity
 
-router = APIRouter(prefix="/api/v1/search", tags=["Advanced Search"])
+router = APIRouter(tags=["Advanced Search"])
 
 # Schemas
 class SearchRequest(BaseModel):

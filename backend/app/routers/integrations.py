@@ -9,6 +9,12 @@ import json
 import asyncio
 from datetime import datetime
 
+from app.database import get_db
+from app.models import Integration, Webhook, WebhookDelivery
+from app.auth import get_current_user
+
+router = APIRouter()
+
 class IntegrationCreate(BaseModel):
     name: str
     provider: str
