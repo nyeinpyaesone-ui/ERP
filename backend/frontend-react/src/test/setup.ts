@@ -1,12 +1,8 @@
-import '@testing-library/jest-dom'
-import { vi } from 'vitest'
+import '@testing-library/jest-dom/vitest'
+import { cleanup } from '@testing-library/react'
+import { afterEach, vi } from 'vitest'
 
-vi.mock('react-router-dom', () => ({
-  ...vi.requireActual('react-router-dom'),
-  useNavigate: () => vi.fn(),
-  useParams: () => ({}),
-  useLocation: () => ({ pathname: '/' }),
-}))
+afterEach(cleanup)
 
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
