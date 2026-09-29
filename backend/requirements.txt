@@ -1,34 +1,49 @@
+# ============================================================
+# ERP Solution — Backend dependencies (Python 3.11–3.12)
+# Pinned and resolver-verified (pip resolution passes cleanly).
+# Removed 2026-09-30: langchain, chromadb, sentence-transformers,
+# tiktoken, openai, anthropic, weasyprint, reportlab, celery, pytz,
+# boto3, openpyxl — none are imported anywhere in app/ or tests/
+# (LLM calls go through httpx; see app/services/llm_service.py).
+# Re-add if a feature needs them.
+# ============================================================
+
+# --- Web framework ---
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# --- Settings / validation ---
+pydantic==2.5.3
+pydantic-settings==2.1.0
+email-validator==2.1.1  # 2.1.0 was yanked (Python 3.7 metadata); 2.1.1 is identical otherwise
+python-dotenv==1.0.0
+
+# --- Database ---
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 alembic==1.13.1
-pydantic==2.5.3
-pydantic-settings==2.1.0
+
+# --- Auth / security ---
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt<5.0.0
-stripe==8.0.0
-matplotlib==3.8.4
-python-multipart==0.0.6
-python-dotenv==1.0.0
+
+# --- HTTP client (LLM proxy, webhooks, health probes) ---
 httpx==0.26.0
+
+# --- Cache ---
 redis==5.0.1
-celery==5.3.6
-pytz==2023.3
-email-validator==2.1.0
-boto3==1.34.0
-openai==1.12.0
-anthropic==0.18.1
-langchain==0.1.0
-chromadb==0.4.22
-sentence-transformers==2.2.2
-tiktoken==0.5.2
-weasyprint==60.0
-reportlab==4.0.8
-openpyxl==3.1.2
+
+# --- Payments ---
+stripe==8.0.0
+
+# --- Reporting (charts used by app/routers/reports.py) ---
+matplotlib==3.8.4
 pandas==2.1.4
 numpy==1.26.2
+
+# --- Testing ---
 pytest==7.4.4
 pytest-asyncio==0.23.3
 pytest-cov==4.1.0

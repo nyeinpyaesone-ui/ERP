@@ -3,9 +3,15 @@ from sqlalchemy import (
     Numeric, ForeignKey, Index, Float, LargeBinary
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import JSON as GenericJSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
+
+# Portable JSON type: renders native JSONB on PostgreSQL (production) and
+# plain JSON on SQLite (local tests/migrations). Do not use raw JSONB in
+# columns — it breaks non-Postgres dialects.
+JSONType = JSONB().with_variant(GenericJSON(), "sqlite")
 
 class User(Base):
     __tablename__ = "users"
@@ -228,9 +234,11 @@ class Payment(Base):
     stripe_charge_id = Column(String(255), nullable=True)
     status = Column(String(50), nullable=False, server_default="completed")
     notes = Column(Text, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     invoice = relationship("Invoice", back_populates="payments")
+    creator = relationship("User", foreign_keys=[created_by])
 
 class Project(Base):
     __tablename__ = "projects"
@@ -301,7 +309,7 @@ class Workflow(Base):
     description = Column(Text, nullable=True)
     entity_type = Column(String(50), nullable=False)  # invoice, deal, task, etc.
     trigger_type = Column(String(50), nullable=False)  # on_create, on_update, scheduled, manual
-    trigger_condition = Column(JSONB, nullable=True)
+    trigger_condition = Column(JSONType, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -318,7 +326,7 @@ class WorkflowStep(Base):
     name = Column(String(255), nullable=False)
     step_type = Column(String(50), nullable=False)  # approval, condition, action, notification, delay
     step_order = Column(Integer, nullable=False)
-    config = Column(JSONB, nullable=True)
+    config = Column(JSONType, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     workflow = relationship("Workflow", back_populates="steps")
@@ -332,7 +340,7 @@ class WorkflowExecution(Base):
     entity_id = Column(Integer, nullable=False)
     status = Column(String(50), nullable=False, server_default="running")
     current_step = Column(Integer, nullable=False, server_default="0")
-    context = Column(JSONB, nullable=True)
+    context = Column(JSONType, nullable=True)
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -344,7 +352,7 @@ class Webhook(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     url = Column(String(500), nullable=False)
-    events = Column(JSONB, nullable=False)  # ["invoice.created", "deal.won"]
+    events = Column(JSONType, nullable=False)  # ["invoice.created", "deal.won"]
     secret = Column(String(255), nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
     retry_count = Column(Integer, nullable=False, server_default="3")
@@ -361,7 +369,7 @@ class WebhookDelivery(Base):
     id = Column(Integer, primary_key=True, index=True)
     webhook_id = Column(Integer, ForeignKey("webhooks.id", ondelete="CASCADE"), nullable=False)
     event = Column(String(100), nullable=False)
-    payload = Column(JSONB, nullable=False)
+    payload = Column(JSONType, nullable=False)
     response_status = Column(Integer, nullable=True)
     response_body = Column(Text, nullable=True)
     attempt = Column(Integer, nullable=False, server_default="1")
@@ -376,7 +384,7 @@ class Integration(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     provider = Column(String(100), nullable=False)  # slack, teams, zapier, generic
-    config = Column(JSONB, nullable=True)
+    config = Column(JSONType, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
     last_sync = Column(DateTime(timezone=True), nullable=True)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -392,7 +400,7 @@ class ActivityLog(Base):
     action = Column(String(100), nullable=False)
     entity_type = Column(String(50), nullable=True)
     entity_id = Column(Integer, nullable=True)
-    details = Column(JSONB, nullable=True)
+    details = Column(JSONType, nullable=True)
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
@@ -421,10 +429,10 @@ class Report(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     report_type = Column(String(100), nullable=False)
-    filters = Column(JSONB, nullable=True)
+    filters = Column(JSONType, nullable=True)
     file_path = Column(String(500), nullable=True)
     file_format = Column(String(20), nullable=True)
-    chart_data = Column(JSONB, nullable=True)
+    chart_data = Column(JSONType, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -541,7 +549,7 @@ class DataPolicy(Base):
     name = Column(String(255), nullable=False)
     resource = Column(String(100), nullable=False, index=True)
     role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
-    condition = Column(JSONB, nullable=True)
+    condition = Column(JSONType, nullable=True)
     effect = Column(String(10), nullable=False, server_default="allow")
     priority = Column(Integer, nullable=False, server_default="100")
     is_active = Column(Boolean, nullable=False, server_default="true")
@@ -559,7 +567,7 @@ class SearchIndex(Base):
     entity_id = Column(Integer, nullable=False, index=True)
     title = Column(String(500), nullable=False)
     content = Column(Text, nullable=True)
-    meta_data = Column("metadata", JSONB, nullable=True)
+    meta_data = Column("metadata", JSONType, nullable=True)
     embedding = Column(LargeBinary, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -571,7 +579,7 @@ class SearchQuery(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     query = Column(String(500), nullable=False)
-    entity_types = Column(JSONB, nullable=True)
+    entity_types = Column(JSONType, nullable=True)
     results_count = Column(Integer, nullable=False, server_default="0")
     execution_time_ms = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
@@ -599,7 +607,7 @@ class LLMModel(Base):
     model_id = Column(String(100), nullable=False, index=True)
     display_name = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
-    parameters = Column(JSONB, nullable=True)
+    parameters = Column(JSONType, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
     is_default = Column(Boolean, nullable=False, server_default="false")
     supports_streaming = Column(Boolean, nullable=False, server_default="true")
@@ -669,7 +677,7 @@ class AIPromptTemplate(Base):
     description = Column(Text, nullable=True)
     system_prompt = Column(Text, nullable=False)
     user_prompt_template = Column(Text, nullable=True)
-    variables = Column(JSONB, nullable=True)
+    variables = Column(JSONType, nullable=True)
     category = Column(String(50), nullable=False, server_default="general")
     model_id = Column(String(100), nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")

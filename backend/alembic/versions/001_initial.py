@@ -10,6 +10,33 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.types import JSON as GenericJSON
+
+# Portable: native JSONB on PostgreSQL, plain JSON on SQLite.
+_OrigJSONB = postgresql.JSONB
+
+def _portable_jsonb(*a, **kw):
+    kw.setdefault('astext_type', sa.Text())
+    t = _OrigJSONB(*a, **kw)
+    # Idempotent: a sibling migration may already have monkey-patched
+    # postgresql.JSONB and returned a variant-aware type. Adding the same
+    # dialect twice raises ArgumentError, so check the mapping instead of
+    # attribute existence (unvarianted JSONB also has an empty mapping).
+    if 'sqlite' in t._variant_mapping:
+        return t
+    return t.with_variant(GenericJSON(), 'sqlite')
+
+postgresql.JSONB = lambda *a, **kw: _portable_jsonb(*a, **kw)
+
+# Portable: now() on PostgreSQL, CURRENT_TIMESTAMP on SQLite (now() is not a
+# SQLite function; CURRENT_TIMESTAMP is standard SQL and works everywhere).
+_orig_text = getattr(sa.text, '_orig_text', sa.text)  # idempotent across migrations
+def _portable_now(text_clause):
+    if isinstance(text_clause, str) and text_clause.strip().lower() == "now()":
+        return sa.func.now()
+    return _orig_text(text_clause)
+_portable_now._orig_text = _orig_text
+sa.text = _portable_now
 
 # revision identifiers, used by Alembic.
 revision: str = '001'

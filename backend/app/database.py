@@ -1,15 +1,13 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from app.config import settings
+from app.config import settings, _engine_kwargs
 
 SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    pool_size=20,
-    max_overflow=30,
-    pool_pre_ping=True,
+    **_engine_kwargs(SQLALCHEMY_DATABASE_URL),
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

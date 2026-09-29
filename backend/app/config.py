@@ -1,3 +1,5 @@
+import os
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
@@ -14,6 +16,24 @@ _INSECURE_SECRET_KEYS = {
     "your-super-secret-key-change-in-production",
 }
 _INSECURE_DATABASE_URLS = {"postgresql://erp_user:erp_password@localhost:5432/erp_db"}
+
+# Deterministic development-only key (documented in .env.example as dev fallback).
+_DEV_SECRET_KEY = "dev-only-insecure-secret-key-0123456789abcdef"
+
+
+def _load_test_env_defaults() -> None:
+    """Provide safe defaults for the automated test environment only.
+
+    Production/staging deployments must still configure real secrets; this
+    branch is reachable exclusively when pytest is the running process, so it
+    can never weaken a real deployment.
+    """
+    if "PYTEST_CURRENT_TEST" not in os.environ and "pytest" not in os.sys.argv[0]:
+        return
+    # Keep tests hermetic: never read a developer's local .env file.
+    os.environ.setdefault("ENV_FILE_DISABLED", "1")
+    os.environ.setdefault("SECRET_KEY", _DEV_SECRET_KEY)
+    os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
 
 class Settings(BaseSettings):
@@ -98,9 +118,29 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = True
 
+def _is_test_run() -> bool:
+    """True when executing under pytest (used to keep tests hermetic)."""
+    import sys
+    return "PYTEST_CURRENT_TEST" in os.environ or "pytest" in os.path.basename(sys.argv[0])
+
+
+def _engine_kwargs(url: str) -> dict:
+    """Pool options that are valid for the configured dialect.
+
+    SQLite (tests / lightweight local dev) does not support pool_size/
+    max_overflow; Postgres keeps the tuned production pool.
+    """
+    kwargs = {"pool_pre_ping": True}
+    if not url.startswith("sqlite"):
+        kwargs.update(pool_size=20, max_overflow=30)
+    return kwargs
+
+_load_test_env_defaults()
+
 @lru_cache()
 def get_settings() -> Settings:
-    return Settings()
+    # Under pytest, ignore a developer's local .env so tests are reproducible.
+    return Settings(_env_file=None if _is_test_run() else ".env")
 
 settings = get_settings()
 
