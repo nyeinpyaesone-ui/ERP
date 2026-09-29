@@ -15,6 +15,7 @@ from app.config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Yield control for the application lifetime without startup or shutdown work."""
     yield
 
 app = FastAPI(

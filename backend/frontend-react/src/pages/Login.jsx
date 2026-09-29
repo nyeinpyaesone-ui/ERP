@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogIn, UserPlus, Loader } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
+/** Render login or registration using AuthContext; the onLogin prop is unused. */
 export default function Login({ onLogin }) {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
@@ -14,6 +15,10 @@ export default function Login({ onLogin }) {
   const { login: authLogin } = useAuth();
   const navigate = useNavigate();
 
+  /**
+   * Submit the selected authentication flow and navigate home on success.
+   * Display caught failures in the form and clear the loading state afterward.
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);

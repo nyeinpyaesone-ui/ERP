@@ -166,6 +166,11 @@ def seed_settings(db: Session):
 
 
 def main():
+    """Seed roles, permissions, role assignments, and settings, then close the session.
+
+    Each seeding step commits separately. On a seeding error, roll back the
+    current transaction and exit with status 1; earlier commits remain.
+    """
     print("==========================================")
     print("ERP SOLUTION — Seeding Default Data")
     print("==========================================")

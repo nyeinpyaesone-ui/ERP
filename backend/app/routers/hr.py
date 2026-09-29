@@ -84,6 +84,7 @@ class EmployeeListResponse(BaseModel):
 
 @router.post("/departments")
 def create_department(data: DepartmentCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("departments", "create"))):
+    """Create, commit, and return a department."""
     dept = Department(**data.model_dump())
     db.add(dept)
     db.commit()
@@ -98,12 +99,17 @@ def list_departments(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("departments", "read"))
 ):
+    """Return departments after ``skip`` records, capping ``limit`` at 100."""
     if limit > 100:
         limit = 100
     return db.query(Department).offset(skip).limit(limit).all()
 
 @router.post("/employees")
 def create_employee(data: EmployeeCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("employees", "create"))):
+    """Create, commit, and return an employee.
+
+    Raise HTTP 400 if the employee code already exists.
+    """
     existing = db.query(Employee).filter(Employee.employee_code == data.employee_code).first()
     if existing:
         raise HTTPException(status_code=400, detail="Employee code already exists")
@@ -124,6 +130,12 @@ def list_employees(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("employees", "read"))
 ):
+    """Return a page of employee work details, capping ``limit`` at 100.
+
+    ``skip`` is a record offset. Truthy status and department filters are
+    matched exactly. Salary, address, phone, birth date, and emergency contact
+    are omitted from each result.
+    """
     if limit > 100:
         limit = 100
     query = db.query(Employee)
@@ -148,6 +160,7 @@ def list_employees(
 
 @router.get("/employees/{employee_id}")
 def get_employee(employee_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("employees", "read"))):
+    """Return the employee, or raise HTTP 404 if it does not exist."""
     emp = db.query(Employee).filter(Employee.id == employee_id).first()
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -156,6 +169,11 @@ def get_employee(employee_id: int, db: Session = Depends(get_db), current_user =
 
 @router.put("/employees/{employee_id}")
 def update_employee(employee_id: int, data: EmployeeUpdate, db: Session = Depends(get_db), current_user = Depends(require_permission("employees", "update"))):
+    """Commit explicitly supplied fields and return the updated employee.
+
+    Omitted fields remain unchanged; explicit nulls are applied. Raise
+    HTTP 404 if the employee does not exist.
+    """
     emp = db.query(Employee).filter(Employee.id == employee_id).first()
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -170,6 +188,10 @@ def update_employee(employee_id: int, data: EmployeeUpdate, db: Session = Depend
 
 @router.delete("/employees/{employee_id}")
 def delete_employee(employee_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("employees", "delete"))):
+    """Delete and commit the employee, then return a confirmation message.
+
+    Raise HTTP 404 if the employee does not exist.
+    """
     emp = db.query(Employee).filter(Employee.id == employee_id).first()
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -179,6 +201,12 @@ def delete_employee(employee_id: int, db: Session = Depends(get_db), current_use
 
 @router.get("/dashboard")
 def hr_dashboard(db: Session = Depends(get_db), current_user = Depends(require_permission("reports", "read"))):
+    """Return employee and department counts with active-employee salary totals.
+
+    ``monthly_payroll`` is the sum of stored salaries for active employees.
+    The average divides that sum by all active employees and is zero if none
+    are active.
+    """
     total_employees = db.query(Employee).count()
     active_employees = db.query(Employee).filter(Employee.status == "active").count()
     total_departments = db.query(Department).count()

@@ -43,6 +43,14 @@ async def upload_document(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("documents", "create"))
 ):
+    """Save an upload, commit its record, and return metadata without the file path.
+
+    ``entity_type`` and ``entity_id`` optionally associate the document with a
+    record. An empty title falls back to the original filename. Raise HTTP 400
+    for a missing filename or disallowed declared MIME type, and HTTP 413
+    above ``MAX_UPLOAD_SIZE`` bytes; equality is allowed. File I/O and database errors propagate, and a saved file is
+    not removed if a later database operation fails.
+    """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
@@ -98,6 +106,10 @@ def list_documents(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("documents", "read"))
 ):
+    """Return documents newest first after ``skip`` records, capping ``limit`` at 100.
+
+    Truthy entity filters are matched exactly; a zero ``entity_id`` is ignored.
+    """
     if limit > 100:
         limit = 100
     query = db.query(Document)
@@ -109,6 +121,10 @@ def list_documents(
 
 @router.get("/documents/{doc_id}")
 def get_document(doc_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("documents", "read"))):
+    """Return document metadata without its file path.
+
+    Raise HTTP 404 if the document does not exist.
+    """
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -127,6 +143,11 @@ def get_document(doc_id: int, db: Session = Depends(get_db), current_user = Depe
 
 @router.delete("/documents/{doc_id}")
 def delete_document(doc_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("documents", "delete"))):
+    """Remove the stored file if present, commit deletion, and return confirmation.
+
+    Raise HTTP 404 for a missing document. File removal and database errors
+    propagate; removing the file is not reversed if the database commit fails.
+    """
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")

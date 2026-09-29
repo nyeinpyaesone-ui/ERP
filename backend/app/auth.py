@@ -65,6 +65,10 @@ async def require_superadmin(current_user: User = Depends(get_current_user)) -> 
 
 
 def has_permission(current_user: User, permission_name: str, db: Session) -> bool:
+    """Return whether a role grants ``permission_name`` in ``resource:action`` form.
+
+    The legacy ``superadmin`` role bypasses the check; ``db`` is unused.
+    """
     if current_user.role == "superadmin":
         return True
     user_perms = get_user_permissions(current_user, db)
@@ -72,6 +76,11 @@ def has_permission(current_user: User, permission_name: str, db: Session) -> boo
 
 
 def get_user_permissions(user: User, db: Session) -> list:
+    """Return unique ``resource:action`` permissions in unspecified order.
+
+    The legacy ``superadmin`` role returns ``["*"]``. Permissions otherwise
+    come from assigned roles; ``db`` is unused.
+    """
     if user.role == "superadmin":
         return ["*"]
     permissions = set()

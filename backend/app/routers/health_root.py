@@ -16,7 +16,11 @@ async def health_check():
 
 @router.get("/ready")
 async def readiness_check(db: Session = Depends(get_db)):
-    """Readiness probe - dependencies are available"""
+    """Return database and Redis check results with ``ready`` or ``not_ready`` status.
+
+    Probe exceptions become failure strings in ``checks``. Either body status
+    is returned with HTTP 200; dependency failures are not raised here.
+    """
     checks = {}
     
     # Database check

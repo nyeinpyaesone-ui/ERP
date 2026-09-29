@@ -74,6 +74,7 @@ class DealUpdate(BaseModel):
 # Companies
 @router.post("/companies")
 def create_company(data: CompanyCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("companies", "create"))):
+    """Create, commit, and return a company."""
     company = Company(**data.model_dump())
     db.add(company)
     db.commit()
@@ -89,6 +90,11 @@ def list_companies(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("companies", "read"))
 ):
+    """Return a page of companies, capping ``limit`` at 100.
+
+    ``skip`` is a record offset. A nonempty ``search`` matches names with a
+    case-insensitive SQL LIKE pattern surrounded by wildcards.
+    """
     if limit > 100:
         limit = 100
     query = db.query(Company)
@@ -98,6 +104,7 @@ def list_companies(
 
 @router.get("/companies/{company_id}")
 def get_company(company_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("companies", "read"))):
+    """Return the company, or raise HTTP 404 if it does not exist."""
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -105,6 +112,11 @@ def get_company(company_id: int, db: Session = Depends(get_db), current_user = D
 
 @router.put("/companies/{company_id}")
 def update_company(company_id: int, data: CompanyUpdate, db: Session = Depends(get_db), current_user = Depends(require_permission("companies", "update"))):
+    """Commit explicitly supplied fields and return the updated company.
+
+    Omitted fields remain unchanged; explicit nulls are applied. Raise
+    HTTP 404 if the company does not exist.
+    """
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -117,6 +129,10 @@ def update_company(company_id: int, data: CompanyUpdate, db: Session = Depends(g
 
 @router.delete("/companies/{company_id}")
 def delete_company(company_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("companies", "delete"))):
+    """Delete and commit the company, then return a confirmation message.
+
+    Raise HTTP 404 if the company does not exist.
+    """
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -127,6 +143,7 @@ def delete_company(company_id: int, db: Session = Depends(get_db), current_user 
 # Contacts
 @router.post("/contacts")
 def create_contact(data: ContactCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("contacts", "create"))):
+    """Create, commit, and return a contact assigned to the current user."""
     contact = Contact(**data.model_dump(), assigned_to=current_user.id)
     db.add(contact)
     db.commit()
@@ -143,6 +160,11 @@ def list_contacts(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("contacts", "read"))
 ):
+    """Return a page of contacts, capping ``limit`` at 100.
+
+    ``skip`` is a record offset. Nonempty filters match status exactly and
+    search full names or emails with a case-insensitive SQL LIKE pattern.
+    """
     if limit > 100:
         limit = 100
     query = db.query(Contact)
@@ -157,6 +179,7 @@ def list_contacts(
 
 @router.get("/contacts/{contact_id}")
 def get_contact(contact_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("contacts", "read"))):
+    """Return the contact, or raise HTTP 404 if it does not exist."""
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
@@ -164,6 +187,11 @@ def get_contact(contact_id: int, db: Session = Depends(get_db), current_user = D
 
 @router.put("/contacts/{contact_id}")
 def update_contact(contact_id: int, data: ContactUpdate, db: Session = Depends(get_db), current_user = Depends(require_permission("contacts", "update"))):
+    """Commit explicitly supplied fields and return the updated contact.
+
+    Omitted fields remain unchanged; explicit nulls are applied. Raise
+    HTTP 404 if the contact does not exist.
+    """
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
@@ -177,6 +205,10 @@ def update_contact(contact_id: int, data: ContactUpdate, db: Session = Depends(g
 
 @router.delete("/contacts/{contact_id}")
 def delete_contact(contact_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("contacts", "delete"))):
+    """Delete and commit the contact, then return a confirmation message.
+
+    Raise HTTP 404 if the contact does not exist.
+    """
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
@@ -187,6 +219,7 @@ def delete_contact(contact_id: int, db: Session = Depends(get_db), current_user 
 # Deals / Pipeline
 @router.post("/deals")
 def create_deal(data: DealCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("deals", "create"))):
+    """Create, commit, and return a deal assigned to the current user."""
     deal = Deal(**data.model_dump(), assigned_to=current_user.id)
     db.add(deal)
     db.commit()
@@ -202,6 +235,10 @@ def list_deals(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("deals", "read"))
 ):
+    """Return deals after ``skip`` records, capping ``limit`` at 100.
+
+    A nonempty ``stage`` restricts results to that exact stage.
+    """
     if limit > 100:
         limit = 100
     query = db.query(Deal)
@@ -215,6 +252,11 @@ def get_pipeline(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("deals", "read"))
 ):
+    """Return deal summaries, counts, and values for each predefined pipeline stage.
+
+    ``limit_per_stage`` limits the deals fetched for each stage. Counts and
+    total values describe only those fetched deals, with no specified order.
+    """
     stages = ["prospect", "qualification", "proposal", "negotiation", "closed_won", "closed_lost"]
     pipeline = {}
     for stage in stages:
@@ -229,6 +271,7 @@ def get_pipeline(
 
 @router.get("/deals/{deal_id}")
 def get_deal(deal_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("deals", "read"))):
+    """Return the deal, or raise HTTP 404 if it does not exist."""
     deal = db.query(Deal).filter(Deal.id == deal_id).first()
     if not deal:
         raise HTTPException(status_code=404, detail="Deal not found")
@@ -236,6 +279,13 @@ def get_deal(deal_id: int, db: Session = Depends(get_db), current_user = Depends
 
 @router.put("/deals/{deal_id}")
 def update_deal(deal_id: int, data: DealUpdate, db: Session = Depends(get_db), current_user = Depends(require_permission("deals", "update"))):
+    """Commit supplied deal fields and return the updated deal.
+
+    A supplied recognized stage overrides probability with its stage default.
+    A won deal without a close date receives today's date, even if stage was
+    not supplied. Omitted fields otherwise remain unchanged; explicit nulls
+    are applied. Raise HTTP 404 if the deal does not exist.
+    """
     deal = db.query(Deal).filter(Deal.id == deal_id).first()
     if not deal:
         raise HTTPException(status_code=404, detail="Deal not found")
@@ -267,6 +317,10 @@ def update_deal(deal_id: int, data: DealUpdate, db: Session = Depends(get_db), c
 
 @router.delete("/deals/{deal_id}")
 def delete_deal(deal_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("deals", "delete"))):
+    """Delete and commit the deal, then return a confirmation message.
+
+    Raise HTTP 404 if the deal does not exist.
+    """
     deal = db.query(Deal).filter(Deal.id == deal_id).first()
     if not deal:
         raise HTTPException(status_code=404, detail="Deal not found")
@@ -277,6 +331,11 @@ def delete_deal(deal_id: int, db: Session = Depends(get_db), current_user = Depe
 # Dashboard stats
 @router.get("/dashboard")
 def crm_dashboard(db: Session = Depends(get_db), current_user = Depends(require_permission("reports", "read"))):
+    """Return CRM counts, pipeline value, and the percentage of deals won.
+
+    Pipeline value excludes only lost deals. Conversion is zero when no
+    deals exist.
+    """
     total_contacts = db.query(Contact).count()
     total_companies = db.query(Company).count()
     total_deals = db.query(Deal).count()

@@ -27,6 +27,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+/** Serve cached GET responses with network fallback, bypassing URLs containing /api/. */
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 

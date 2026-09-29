@@ -41,6 +41,7 @@ class PaymentCreate(BaseModel):
     @field_validator("amount")
     @classmethod
     def amount_must_be_positive(cls, v: Decimal) -> Decimal:
+        """Return a positive amount unchanged; raise ValueError for zero or less."""
         if v <= 0:
             raise ValueError("Payment amount must be positive")
         return v
@@ -53,6 +54,11 @@ def generate_invoice_number(db: Session) -> str:
 
 @router.post("/invoices")
 def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("invoices", "create"))):
+    """Commit an invoice and its line items and return the invoice.
+
+    ``tax_rate`` is a percentage applied to the sum of quantity times unit
+    price. Raise HTTP 400 if the invoice number already exists.
+    """
     existing = db.query(Invoice).filter(Invoice.invoice_number == data.invoice_number).first()
     if existing:
         raise HTTPException(status_code=400, detail="Invoice number already exists")
@@ -104,6 +110,10 @@ def list_invoices(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("invoices", "read"))
 ):
+    """Return invoices newest first after ``skip`` records, capping ``limit`` at 100.
+
+    Truthy status and contact filters are matched exactly.
+    """
     if limit > 100:
         limit = 100
     query = db.query(Invoice)
@@ -115,6 +125,7 @@ def list_invoices(
 
 @router.get("/invoices/{invoice_id}")
 def get_invoice(invoice_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("invoices", "read"))):
+    """Return the invoice, or raise HTTP 404 if it does not exist."""
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -127,6 +138,10 @@ def update_invoice_status(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("invoices", "update"))
 ):
+    """Commit a status from ``ALLOWED_INVOICE_STATUSES`` and return the invoice.
+
+    Raise HTTP 400 for an unsupported status or HTTP 404 for a missing invoice.
+    """
     if status not in ALLOWED_INVOICE_STATUSES:
         raise HTTPException(status_code=400, detail=f"Invalid status. Allowed: {', '.join(ALLOWED_INVOICE_STATUSES)}")
 
@@ -140,6 +155,12 @@ def update_invoice_status(
 
 @router.post("/payments")
 def create_payment(data: PaymentCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("invoices", "create"))):
+    """Commit and return a payment, updating the invoice balance.
+
+    Mark the invoice paid when its total is covered, otherwise partial. Raise
+    HTTP 404 for a missing invoice or HTTP 400 when payment exceeds the
+    remaining balance; payment equal to the balance is accepted.
+    """
     # Lock the invoice row to prevent race conditions
     invoice = db.query(Invoice).filter(Invoice.id == data.invoice_id).with_for_update().first()
     if not invoice:
@@ -173,6 +194,12 @@ def create_payment(data: PaymentCreate, db: Session = Depends(get_db), current_u
 
 @router.get("/dashboard")
 def finance_dashboard(db: Session = Depends(get_db), current_user = Depends(require_permission("reports", "read"))):
+    """Return invoice counts, paid revenue, outstanding balances, and overdue counts.
+
+    Outstanding and overdue calculations exclude only invoices marked paid.
+    ``monthly_revenue`` groups invoice totals by issue year and month, rather
+    than payment date.
+    """
     total_invoices = db.query(Invoice).count()
     total_revenue = db.query(func.sum(Invoice.amount_paid)).scalar() or Decimal("0")
     outstanding = db.query(func.sum(Invoice.total - Invoice.amount_paid)).filter(Invoice.status != "paid").scalar() or Decimal("0")

@@ -58,6 +58,7 @@ class MovementCreate(BaseModel):
     @field_validator("quantity")
     @classmethod
     def quantity_must_be_positive(cls, v: int) -> int:
+        """Return a positive quantity unchanged; raise ValueError for zero or less."""
         if v <= 0:
             raise ValueError("Quantity must be positive")
         return v
@@ -65,6 +66,7 @@ class MovementCreate(BaseModel):
     @field_validator("movement_type")
     @classmethod
     def validate_movement_type(cls, v: str) -> str:
+        """Return ``in``, ``out``, or ``adjustment``; raise ValueError otherwise."""
         allowed = {"in", "out", "adjustment"}
         if v not in allowed:
             raise ValueError(f"movement_type must be one of: {', '.join(allowed)}")
@@ -74,6 +76,10 @@ ALLOWED_MOVEMENT_TYPES = {"in", "out", "adjustment"}
 
 @router.post("/products")
 def create_product(data: ProductCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("products", "create"))):
+    """Create, commit, and return a product.
+
+    Raise HTTP 400 if the SKU already exists.
+    """
     existing = db.query(Product).filter(Product.sku == data.sku).first()
     if existing:
         raise HTTPException(status_code=400, detail="SKU already exists")
@@ -96,6 +102,12 @@ def list_products(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("products", "read"))
 ):
+    """Return a page of products, capping ``limit`` at 100.
+
+    ``skip`` is a record offset. Nonempty category and status filters match
+    exactly; search applies a case-insensitive SQL LIKE pattern to names.
+    ``low_stock`` includes stock equal to or below the reorder level.
+    """
     if limit > 100:
         limit = 100
     query = db.query(Product)
@@ -111,6 +123,7 @@ def list_products(
 
 @router.get("/products/{product_id}")
 def get_product(product_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("products", "read"))):
+    """Return the product, or raise HTTP 404 if it does not exist."""
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -118,6 +131,11 @@ def get_product(product_id: int, db: Session = Depends(get_db), current_user = D
 
 @router.put("/products/{product_id}")
 def update_product(product_id: int, data: ProductUpdate, db: Session = Depends(get_db), current_user = Depends(require_permission("products", "update"))):
+    """Commit explicitly supplied fields and return the updated product.
+
+    Omitted fields remain unchanged; explicit nulls are applied. Raise
+    HTTP 404 if the product does not exist.
+    """
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -132,6 +150,10 @@ def update_product(product_id: int, data: ProductUpdate, db: Session = Depends(g
 
 @router.delete("/products/{product_id}")
 def delete_product(product_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("products", "delete"))):
+    """Delete and commit the product, then return a confirmation message.
+
+    Raise HTTP 404 if the product does not exist.
+    """
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -141,6 +163,13 @@ def delete_product(product_id: int, db: Session = Depends(get_db), current_user 
 
 @router.post("/movements")
 def create_movement(data: MovementCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("inventory", "create"))):
+    """Commit a stock movement and stock update and return the movement.
+
+    The positive quantity adds stock for ``in``, subtracts stock for ``out``,
+    and replaces the stock count for ``adjustment``. Raise HTTP 404 for a
+    missing product or HTTP 400 for insufficient stock or an unsupported
+    movement type. An outgoing movement may reduce stock to zero.
+    """
     # Lock product row to prevent race conditions
     product = db.query(Product).filter(Product.id == data.product_id).with_for_update().first()
     if not product:
@@ -182,6 +211,10 @@ def list_movements(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("inventory", "read"))
 ):
+    """Return movements newest first after ``skip`` records, capping ``limit`` at 100.
+
+    Truthy product and movement-type filters are matched exactly.
+    """
     if limit > 100:
         limit = 100
     query = db.query(InventoryMovement)
@@ -193,6 +226,11 @@ def list_movements(
 
 @router.get("/dashboard")
 def inventory_dashboard(db: Session = Depends(get_db), current_user = Depends(require_permission("reports", "read"))):
+    """Return product counts, stock value at unit price, and counts by category.
+
+    Low stock includes quantities equal to the reorder level; out of stock
+    counts only quantities equal to zero.
+    """
     total_products = db.query(Product).count()
     total_stock_value = db.query(func.sum(Product.quantity_in_stock * Product.unit_price)).scalar() or Decimal("0")
     low_stock_count = db.query(Product).filter(Product.quantity_in_stock <= Product.reorder_level).count()
