@@ -73,7 +73,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
+      # Vite reads VITE_* at build time; nginx serves /api -> backend so runtime default '/api/v1' works
+      VITE_API_URL: ${VITE_API_URL:-/api/v1}
     depends_on:
       - backend
 

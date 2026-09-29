@@ -88,9 +88,9 @@ JWT_EXPIRE_MINUTES=60
 
 ### Frontend (.env)
 ```env
-REACT_APP_API_URL=https://api.yourdomain.com
-REACT_APP_WS_URL=wss://api.yourdomain.com
-REACT_APP_SENTRY_DSN=https://xxx@yyy.ingest.sentry.io/zzz
+VITE_API_URL=https://api.yourdomain.com
+VITE_WS_URL=wss://api.yourdomain.com
+VITE_SENTRY_DSN=https://xxx@yyy.ingest.sentry.io/zzz
 ```
 
 ## SSL/TLS Setup

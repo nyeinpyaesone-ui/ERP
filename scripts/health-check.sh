@@ -77,9 +77,9 @@ fi
 
 # Check 7: Frontend Environment
 info "[7/10] Checking frontend environment..."
-if [ -f "frontend/.env" ]; then
+if [ -f "backend/frontend-react/.env" ]; then
     ok "Frontend .env exists"
-elif [ -f "frontend/.env.example" ]; then
+elif [ -f "backend/frontend-react/.env.example" ]; then
     warn "Frontend .env missing (copy from .env.example)"
 else
     warn "Frontend .env not found"

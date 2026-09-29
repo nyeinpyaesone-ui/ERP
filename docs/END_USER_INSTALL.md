@@ -352,7 +352,7 @@ docker logs erp-blue-backend --tail 100
 docker logs erp-blue-frontend --tail 50
 
 # Verify API URL in frontend env
-docker exec erp-blue-frontend printenv REACT_APP_API_URL
+docker exec erp-blue-frontend printenv VITE_API_URL
 # Should be: https://api.yourcompany.com
 ```
 

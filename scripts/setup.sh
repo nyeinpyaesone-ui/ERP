@@ -51,9 +51,9 @@ if [ -d "backend" ]; then
 fi
 
 # Setup frontend
-if [ -d "frontend" ]; then
+if [ -d "backend/frontend-react" ]; then
     info "Setting up frontend..."
-    cd frontend
+    cd backend/frontend-react
 
     if [ -f "package.json" ]; then
         npm install
@@ -76,6 +76,7 @@ if [ -d "mobile" ]; then
     cd ..
 fi
 
+
 # Create environment files
 info "Creating environment files..."
 
@@ -83,19 +84,20 @@ if [ ! -f "backend/.env" ]; then
     cat > backend/.env << EOF
 DATABASE_URL=postgresql://erp:erp_secret@localhost:5432/erp_solution
 REDIS_URL=redis://localhost:6379/0
-SECRET_KEY=change-this-in-production-$(openssl rand -hex 16)
+SECRET_KEY=dev-$(openssl rand -hex 16)
 ENVIRONMENT=development
 OLLAMA_URL=http://localhost:11434
 EOF
     ok "backend/.env created"
 fi
 
-if [ ! -f "frontend/.env" ]; then
-    cat > frontend/.env << EOF
-REACT_APP_API_URL=http://localhost:8000
-REACT_APP_WS_URL=ws://localhost:8000
+# Frontend lives at backend/frontend-react (Vite — requires VITE_ prefixed vars)
+if [ ! -f "backend/frontend-react/.env" ]; then
+    cat > backend/frontend-react/.env << EOF
+VITE_API_URL=http://localhost:8000
+VITE_WS_URL=ws://localhost:8000
 EOF
-    ok "frontend/.env created"
+    ok "backend/frontend-react/.env created"
 fi
 
 echo ""
@@ -106,7 +108,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Start services:  docker-compose up -d"
 echo "  2. Run backend:     cd backend && source venv/bin/activate && uvicorn app.main:app --reload"
-echo "  3. Run frontend:    cd frontend && npm run dev"
+echo "  3. Run frontend:    cd backend/frontend-react && npm run dev"
 echo "  4. Run mobile:      cd mobile && npx expo start"
 echo ""
 echo "API docs: http://localhost:8000/docs"
