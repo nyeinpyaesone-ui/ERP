@@ -85,8 +85,11 @@ main() {
     prompt_optional "Stripe Publishable Key (pk_live_...)" STRIPE_PUBLISHABLE_KEY
     prompt_optional "OpenAI API Key (sk-...)" OPENAI_API_KEY
     prompt_optional "Sentry DSN" SENTRY_DSN
+    prompt_optional "Image tag / VERSION (default: latest)" PROD_VERSION
 
     OLLAMA_MODEL="llama3.1"
+    SMTP_FROM_DEFAULT="noreply@${DOMAIN}"
+    PROD_VERSION="${PROD_VERSION:-latest}"
 
     # WRITE .env.production
     info "--- Writing .env.production ---"
@@ -94,6 +97,9 @@ main() {
 # ERP SOLUTION — Production Environment
 # Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 # DO NOT COMMIT THIS FILE — contains secrets
+
+# Image tag used by docker-compose.prod.yml (set to the release you deploy)
+VERSION=${PROD_VERSION}
 
 # ============================================
 # DATABASE
@@ -145,7 +151,7 @@ SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
 SMTP_PORT=${SMTP_PORT:-587}
 SMTP_USER=${SMTP_USER:-}
 SMTP_PASSWORD=${SMTP_PASSWORD:-}
-SMTP_FROM=noreply@${DOMAIN}
+SMTP_FROM=${SMTP_FROM:-${SMTP_FROM_DEFAULT}}
 
 # ============================================
 # STRIPE

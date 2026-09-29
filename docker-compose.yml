@@ -41,6 +41,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in your local .env file}
       ENVIRONMENT: development
       OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
@@ -51,6 +52,7 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
     ports:
       - "8000:8000"
     depends_on:

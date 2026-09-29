@@ -3,7 +3,16 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 # Placeholder values that must never be used in production
-_INSECURE_SECRET_KEYS = {"", "your-super-secret-key-change-in-production", "change-me"}
+_INSECURE_SECRET_KEYS = {
+    "",
+    "change-me",
+    "secret-key",
+    "your-secret-key",
+    "your-secret-key-here",
+    "your-secret-key-change-in-production",
+    "your-super-secret-key",
+    "your-super-secret-key-change-in-production",
+}
 _INSECURE_DATABASE_URLS = {"postgresql://erp_user:erp_password@localhost:5432/erp_db"}
 
 
@@ -27,7 +36,15 @@ class Settings(BaseSettings):
     @field_validator("SECRET_KEY")
     @classmethod
     def secret_key_must_be_set(cls, v: str) -> str:
-        if v.strip() in _INSECURE_SECRET_KEYS:
+        lowered = v.strip().lower()
+        if (
+            lowered in _INSECURE_SECRET_KEYS
+            or "change" in lowered
+            or "replace" in lowered
+            or "your-" in lowered
+            or "xxx" in lowered
+            or len(lowered) < 32
+        ):
             raise ValueError(
                 "SECRET_KEY is not configured. Generate one with `openssl rand -hex 32` "
                 "and provide it via environment variable or .env file."
@@ -38,7 +55,7 @@ class Settings(BaseSettings):
     @classmethod
     def database_url_must_not_be_default_in_production(cls, v: str, info) -> str:
         env = (info.data.get("ENVIRONMENT") or "development").lower()
-        if env == "production" and v in _INSECURE_DATABASE_URLS:
+        if env == "production" and ("erp_user:erp_password" in v or v in _INSECURE_DATABASE_URLS):
             raise ValueError(
                 "DATABASE_URL still uses the insecure default credentials in production. "
                 "Set a real DATABASE_URL (or DB_USER/DB_PASSWORD/DB_NAME) before deploying."
