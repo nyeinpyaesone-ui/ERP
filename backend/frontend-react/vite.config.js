@@ -10,19 +10,8 @@ export default defineConfig({
       manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/localhost:8000\/api\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24
-              }
-            }
-          }
-        ]
+        runtimeCaching: [],
+        cleanupOutdatedCaches: true,
       }
     })
   ],
@@ -31,13 +20,13 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
-        changeOrigin: true
+        changeOrigin: true,
+        ws: true
       }
     }
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: false
   }
 })
-

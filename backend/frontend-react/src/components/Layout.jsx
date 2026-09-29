@@ -29,14 +29,14 @@ const navigation = [
   { name: 'Search', href: '/search', icon: Search },
 ];
 
-export default function Layout({ onLogout }) {
+export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    onLogout?.();
+    logout();
     navigate('/login');
     setUserMenuOpen(false);
   };

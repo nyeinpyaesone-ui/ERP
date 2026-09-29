@@ -1,7 +1,11 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, Query
 from typing import Dict, List
 import json
 import asyncio
+
+from app.auth import get_current_user_optional
+from app.database import get_db
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -35,9 +39,38 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+async def get_websocket_user(
+    websocket: WebSocket,
+    token: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    from app.auth import decode_token
+    from app.models import User
+    try:
+        payload = decode_token(token)
+        user_id = int(payload.get("sub"))
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or not user.is_active:
+            await websocket.close(code=4001, reason="Invalid or inactive user")
+            return None
+        return user
+    except Exception:
+        await websocket.close(code=4001, reason="Invalid token")
+        return None
+
 @router.websocket("/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    await manager.connect(websocket, client_id)
+async def websocket_endpoint(
+    websocket: WebSocket,
+    client_id: str,
+    token: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    user = await get_websocket_user(websocket, token, db)
+    if not user:
+        return
+    
+    # Use user.id as the actual client_id for security
+    await manager.connect(websocket, str(user.id))
     try:
         while True:
             data = await websocket.receive_text()
@@ -45,7 +78,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 
             if message.get("type") == "ping":
                 await manager.send_personal_message(
-                    json.dumps({"type": "pong", "timestamp": str(asyncio.get_event_loop().time())}),
+                    json.dumps({"type": "pong", "timestamp": str(asyncio.get_running_loop().time())}),
                     websocket
                 )
             elif message.get("type") == "subscribe":
@@ -56,16 +89,21 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 )
             else:
                 await manager.broadcast(
-                    json.dumps({"type": "message", "data": message, "from": client_id}),
-                    message.get("channel", client_id)
+                    json.dumps({"type": "message", "data": message, "from": str(user.id)}),
+                    message.get("channel", str(user.id))
                 )
     except WebSocketDisconnect:
-        manager.disconnect(websocket, client_id)
+        manager.disconnect(websocket, str(user.id))
     except Exception:
-        manager.disconnect(websocket, client_id)
+        manager.disconnect(websocket, str(user.id))
 
 @router.post("/broadcast")
-async def broadcast_message(message: dict):
+async def broadcast_message(
+    message: dict,
+    current_user = Depends(get_current_user_optional)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     await manager.broadcast(json.dumps(message))
     return {"status": "sent"}
 

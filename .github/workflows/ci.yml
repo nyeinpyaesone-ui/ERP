@@ -1,4 +1,4 @@
-name: CI & Deploy
+name: CI
 
 on:
   push:
@@ -9,13 +9,160 @@ on:
 
 permissions:
   contents: read
+  security-events: write
   deployments: write
   statuses: write
 
 jobs:
-  docker-backend:
-    name: Build Backend
+  quality:
+    name: Code Quality
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install ruff black mypy
+
+      - name: Run Ruff
+        run: |
+          cd backend && ruff check .
+
+      - name: Run Black
+        run: |
+          cd backend && black --check .
+
+      - name: Run MyPy
+        run: |
+          cd backend && mypy app/ --ignore-missing-imports || true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/frontend-react/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd backend/frontend-react && npm ci
+
+      - name: Run ESLint
+        run: |
+          cd backend/frontend-react && npm run lint || true
+
+      - name: Run TypeScript check
+        run: |
+          cd backend/frontend-react && npx tsc --noEmit || true
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: quality
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: erp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+
+      - name: Run Alembic migrations
+        run: |
+          cd backend
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/erp_test alembic upgrade head
+
+      - name: Run backend tests
+        run: |
+          cd backend
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/erp_test pytest --cov=app --cov-fail-under=80 --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./backend/coverage.xml
+          flags: backend
+
+      - name: Install frontend dependencies
+        run: |
+          cd backend/frontend-react && npm ci
+
+      - name: Run frontend tests
+        run: |
+          cd backend/frontend-react && npm test --if-present
+
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/frontend-react/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd backend/frontend-react && npm ci
+
+      - name: Build frontend
+        run: |
+          cd backend/frontend-react && npm run build
+
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: backend/frontend-react/dist/
+          retention-days: 7
+
+  docker-backend:
+    name: Build Backend Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name != 'pull_request'
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
     steps:
@@ -33,7 +180,6 @@ jobs:
             type=sha
 
       - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ vars.DOCKER_USER }}
@@ -46,14 +192,16 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   docker-frontend:
-    name: Build Frontend
+    name: Build Frontend Image
     runs-on: ubuntu-latest
+    needs: frontend-build
+    if: github.event_name != 'pull_request'
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
     steps:
@@ -71,7 +219,6 @@ jobs:
             type=sha
 
       - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ vars.DOCKER_USER }}
@@ -80,21 +227,57 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: backend/frontend-react/dist/
+
       - name: Build and push frontend
         uses: docker/build-push-action@v6
         with:
           context: ./backend/frontend-react
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [docker-backend, docker-frontend]
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Run Trivy on backend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ vars.DOCKER_USER }}/erp-solution-backend:${{ github.sha }}
+          format: sarif
+          output: trivy-backend.sarif
+
+      - name: Run Trivy on frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ vars.DOCKER_USER }}/erp-solution-frontend:${{ github.sha }}
+          format: sarif
+          output: trivy-frontend.sarif
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-backend.sarif
+
+      - name: Upload Trivy results frontend
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-frontend.sarif
+
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: [docker-backend, docker-frontend]
+    needs: [docker-backend, docker-frontend, security]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: docker
+    environment: staging
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -105,7 +288,7 @@ jobs:
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.STAGING_DOMAIN }}
-          environment: docker
+          environment: staging
           description: Deploy ${{ github.sha }} to staging
           ref: ${{ github.sha }}
           auto_inactive: true
@@ -162,9 +345,9 @@ jobs:
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [docker-backend, docker-frontend]
+    needs: [docker-backend, docker-frontend, security]
     if: startsWith(github.ref, 'refs/tags/v')
-    environment: docker
+    environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -175,7 +358,7 @@ jobs:
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.PRODUCTION_DOMAIN }}
-          environment: docker
+          environment: production
           description: Deploy ${{ github.ref_name }} to production
           ref: ${{ github.sha }}
           auto_inactive: true

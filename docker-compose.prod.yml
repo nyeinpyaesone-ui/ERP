@@ -8,15 +8,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-erp}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME:-erp_solution}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
-    ports:
-      - "5432:5432"
+    # No ports published in production
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-erp}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-erp} -d ${DB_NAME:-erp_solution}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,13 +27,12 @@ services:
     image: redis:7-alpine
     container_name: erp-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-changeme}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
+    # No ports published in production
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,21 +45,21 @@ services:
     container_name: erp-blue-backend
     restart: unless-stopped
     entrypoint: ["/app/entrypoint.sh"]
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-erp}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-erp_solution}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      DATABASE_URL: postgresql://${DB_USER:-erp}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-erp_solution}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
       ENVIRONMENT: production
-      OLLAMA_URL: http://ollama:11434
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://yourdomain.com}
+      OLLAMA_BASE_URL: http://ollama:11434
+      CORS_ORIGINS: ${CORS_ORIGINS}
     volumes:
       - backend_logs:/app/logs
       - ./backend/uploads:/app/uploads
     networks:
       - erp-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/ready"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/ready"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -78,21 +76,21 @@ services:
     container_name: erp-green-backend
     restart: unless-stopped
     entrypoint: ["/app/entrypoint.sh"]
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-erp}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-erp_solution}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      DATABASE_URL: postgresql://${DB_USER:-erp}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-erp_solution}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
       ENVIRONMENT: production
-      OLLAMA_URL: http://ollama:11434
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://yourdomain.com}
+      OLLAMA_BASE_URL: http://ollama:11434
+      CORS_ORIGINS: ${CORS_ORIGINS}
     volumes:
       - backend_logs:/app/logs
       - ./backend/uploads:/app/uploads
     networks:
       - erp-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/ready"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/ready"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -110,11 +108,9 @@ services:
     image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION:-latest}
     container_name: erp-blue-frontend
     restart: unless-stopped
-    environment:
-      REACT_APP_API_URL: ${API_URL:-https://api.yourdomain.com}
-      REACT_APP_WS_URL: ${WS_URL:-wss://api.yourdomain.com}
+    # Vite build-time env vars are baked in; runtime env not used
     volumes:
-      - frontend_static:/usr/share/nginx/html
+      - frontend_blue_static:/usr/share/nginx/html
     networks:
       - erp-network
     depends_on:
@@ -125,11 +121,8 @@ services:
     image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION:-latest}
     container_name: erp-green-frontend
     restart: unless-stopped
-    environment:
-      REACT_APP_API_URL: ${API_URL:-https://api.yourdomain.com}
-      REACT_APP_WS_URL: ${WS_URL:-wss://api.yourdomain.com}
     volumes:
-      - frontend_static:/usr/share/nginx/html
+      - frontend_green_static:/usr/share/nginx/html
     networks:
       - erp-network
     depends_on:
@@ -137,13 +130,12 @@ services:
     profiles:
       - blue-green
 
-  # Ollama AI Service
+  # Ollama AI Service (internal only)
   ollama:
     image: ollama/ollama:latest
     container_name: erp-ollama
     restart: unless-stopped
-    ports:
-      - "11434:11434"
+    # No ports published - internal access only
     volumes:
       - ollama_data:/root/.ollama
     networks:
@@ -172,7 +164,8 @@ volumes:
   redis_data:
   ollama_data:
   backend_logs:
-  frontend_static:
+  frontend_blue_static:
+  frontend_green_static:
 
 networks:
   erp-network:

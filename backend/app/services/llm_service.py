@@ -6,7 +6,7 @@ import httpx
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import LLMModel, AIConversation, AIMessage, LLMUsage, Contact, Company, Deal, Product, Invoice, Project, Task
+from app.models import LLMModel, AIConversation, AIMessage, LLMUsage, AIPromptTemplate, Contact, Company, Deal, Product, Invoice, Project, Task
 from app.config import settings
 
 class LLMService:
@@ -387,9 +387,11 @@ Guidelines:
         if not self.db:
             return {"error": "Database not available"}
 
+        MAX_LIMIT = 50
+
         try:
             if tool_name == "get_contacts":
-                limit = arguments.get("limit", 10)
+                limit = min(arguments.get("limit", 10), MAX_LIMIT)
                 status = arguments.get("status")
                 query = self.db.query(Contact)
                 if status:
@@ -403,7 +405,7 @@ Guidelines:
                 }
 
             elif tool_name == "get_deals":
-                limit = arguments.get("limit", 10)
+                limit = min(arguments.get("limit", 10), MAX_LIMIT)
                 stage = arguments.get("stage")
                 query = self.db.query(Deal)
                 if stage:
@@ -417,7 +419,7 @@ Guidelines:
                 }
 
             elif tool_name == "get_products":
-                limit = arguments.get("limit", 10)
+                limit = min(arguments.get("limit", 10), MAX_LIMIT)
                 low_stock = arguments.get("low_stock", False)
                 query = self.db.query(Product)
                 if low_stock:
@@ -431,7 +433,7 @@ Guidelines:
                 }
 
             elif tool_name == "get_invoices":
-                limit = arguments.get("limit", 10)
+                limit = min(arguments.get("limit", 10), MAX_LIMIT)
                 status = arguments.get("status")
                 query = self.db.query(Invoice)
                 if status:
@@ -445,7 +447,7 @@ Guidelines:
                 }
 
             elif tool_name == "get_projects":
-                limit = arguments.get("limit", 10)
+                limit = min(arguments.get("limit", 10), MAX_LIMIT)
                 status = arguments.get("status")
                 query = self.db.query(Project)
                 if status:
@@ -470,6 +472,9 @@ Guidelines:
                 return {"success": True, "contact_id": contact.id, "message": f"Created contact {contact.first_name} {contact.last_name}"}
 
             elif tool_name == "create_task":
+                project = self.db.query(Project).filter(Project.id == arguments["project_id"]).first()
+                if not project:
+                    return {"error": f"Project {arguments['project_id']} not found"}
                 task = Task(
                     project_id=arguments["project_id"],
                     title=arguments["title"],
@@ -484,5 +489,6 @@ Guidelines:
                 return {"error": f"Unknown tool: {tool_name}"}
 
         except Exception as e:
+            self.db.rollback()
             return {"error": str(e)}
 
