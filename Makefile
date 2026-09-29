@@ -14,19 +14,19 @@ help:
 	@echo "  make status       Show repository status"
 
 install:
-	cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
-	cd backend/frontend-react && node /tmp/opencode/npm10/package/bin/npm-cli.js install
+	cd backend && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
+	cd backend/frontend-react && npm install
 	cd mobile && npm install
 
 dev:
 	docker-compose up -d postgres redis
 	@echo "Start backend:  cd backend && source venv/bin/activate && uvicorn app.main:app --reload"
-	@echo "Start frontend: cd backend/frontend-react && node /tmp/opencode/npm10/package/bin/npm-cli.js run dev"
+	@echo "Start frontend: cd backend/frontend-react && npm run dev"
 	@echo "Start mobile:   cd mobile && npx expo start"
 
 test:
-	cd backend && source venv/bin/activate && pytest
-	cd backend/frontend-react && node /tmp/opencode/npm10/package/bin/npm-cli.js test
+	cd backend && ./venv/bin/python -m pytest
+	cd backend/frontend-react && npm test
 
 clean:
 	find . -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true

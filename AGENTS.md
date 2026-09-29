@@ -40,7 +40,7 @@
 
 **Alembic base migration missing** — Versions 002-004 exist but 001_initial.py needed for current models.
 
-**npm 9 on Node 22 has cache bugs** — Use npm 10.9.2 (downloaded to `/tmp/opencode/npm10/package/bin/npm-cli.js`) for frontend installs.
+**Node 20 LTS + npm 10 recommended.** If you hit `npm ENOENT rename` cache errors on older npm, upgrade npm (`npm i -g npm@10`) and retry.
 
 ## Key Commands
 
@@ -49,10 +49,10 @@
 cd backend && source venv/bin/activate && uvicorn app.main:app --reload
 
 # Frontend dev (WORKING portal)
-cd backend/frontend-react && node /tmp/opencode/npm10/package/bin/npm-cli.js run dev
+cd backend/frontend-react && npm run dev
 
 # Frontend build (WORKING)
-cd backend/frontend-react && node /tmp/opencode/npm10/package/bin/npm-cli.js run build
+cd backend/frontend-react && npm run build
 
 # Mobile (unverified)
 cd mobile && npm install && npx expo start
@@ -78,7 +78,7 @@ cd backend && source venv/bin/activate && alembic revision --autogenerate -m "in
 | Issue | Solution |
 |-------|----------|
 | `ModuleNotFoundError: psycopg2` | `pip install psycopg2-binary` in venv |
-| `npm ENOENT rename` cache errors | Use npm 10: `node /tmp/opencode/npm10/package/bin/npm-cli.js install` |
+| `npm ENOENT rename` cache errors | Upgrade npm: `npm i -g npm@10`, then `npm install` |
 | Frontend build fails | Use `/backend/frontend-react`, not `/frontend` |
 | Backend won't start | Start postgres/redis first: `docker-compose up -d postgres redis` |
 | Alembic "target database not up to date" | Run `alembic upgrade head` or create 001_initial migration |
