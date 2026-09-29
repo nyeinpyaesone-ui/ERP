@@ -44,6 +44,12 @@ async def get_websocket_user(
     token: str = Query(...),
     db: Session = Depends(get_db)
 ):
+    """Return the active user identified by the token's subject.
+
+    Token, subject-conversion, and database errors close the socket with code
+    4001 and return None, as do missing or inactive users. Errors from closing
+    the socket in the exception handler propagate.
+    """
     from app.auth import decode_token
     from app.models import User
     try:
@@ -65,6 +71,13 @@ async def websocket_endpoint(
     token: str = Query(...),
     db: Session = Depends(get_db)
 ):
+    """Authenticate a socket and exchange messages under the user's ID.
+
+    The path's ``client_id`` is ignored. Ping receives pong; subscribe only
+    acknowledges a channel. Other messages target the named connection group
+    or the user's group by default; an unknown group broadcasts to everyone.
+    Receive-loop errors remove the connection and are swallowed.
+    """
     user = await get_websocket_user(websocket, token, db)
     if not user:
         return
@@ -102,6 +115,11 @@ async def broadcast_message(
     message: dict,
     current_user = Depends(get_current_user_optional)
 ):
+    """Send the message as JSON to all connected clients and return sent status.
+
+    Raise HTTP 401 without an authenticated user. Serialization and socket
+    send errors propagate, possibly after some clients received the message.
+    """
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
     await manager.broadcast(json.dumps(message))

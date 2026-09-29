@@ -14,12 +14,18 @@ class SearchService:
     """Advanced search service with PostgreSQL full-text search."""
 
     def __init__(self, db: Session):
+        """Use the supplied session for searches and committed index or analytics writes."""
         self.db = db
 
     # ==================== INDEXING ====================
 
     def index_entity(self, entity_type: str, entity_id: int, title: str, content: str, metadata: Dict[str, Any] = None, tags: List[str] = None):
-        """Index or update an entity in the search index."""
+        """Index or update an entity in the search index and commit the session.
+
+        Replace title, content, and metadata for the entity type and ID. Missing
+        metadata becomes an empty mapping; ``tags`` is ignored. Database errors
+        propagate.
+        """
         searchable = f"{title} {content}"
         if metadata:
             for key, value in metadata.items():
@@ -171,7 +177,14 @@ class SearchService:
         limit: int = 20,
         offset: int = 0
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """Full-text search with PostgreSQL."""
+        """Return a page of matching index records and the total before pagination.
+
+        Search title and content using English full-text prefix terms joined
+        with AND; blank queries omit text filtering. ``metadata.*`` filters
+        compare text values, while tags and other filter keys are ignored.
+        Results are ordered newest-update first with 200-character previews.
+        Database errors, including invalid tsquery syntax, propagate.
+        """
         start_time = datetime.utcnow()
 
         base_query = self.db.query(SearchIndex)
@@ -219,7 +232,12 @@ class SearchService:
         return formatted, total
 
     def get_facets(self, query: str = None, entity_types: List[str] = None) -> Dict[str, Any]:
-        """Get facet counts for search results."""
+        """Return entity-type counts for the matching title/content search.
+
+        Blank queries omit text filtering. Nonblank queries use English prefix
+        terms joined with AND. ``tags`` is always empty. Database errors,
+        including invalid tsquery syntax, propagate.
+        """
         base_query = self.db.query(SearchIndex)
 
         if query and query.strip():
@@ -251,7 +269,12 @@ class SearchService:
     # ==================== SUGGESTIONS ====================
 
     def get_suggestions(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get autocomplete suggestions."""
+        """Return unique matching query suggestions followed by matching titles.
+
+        Queries shorter than two characters return an empty list. Matching uses
+        case-insensitive SQL LIKE patterns; stored queries are ordered by usage
+        count, followed by up to five title matches, then sliced to ``limit``.
+        """
         if not query or len(query) < 2:
             return []
 
@@ -291,7 +314,11 @@ class SearchService:
         return result[:limit]
 
     def record_suggestion(self, query: str, entity_type: str = None, entity_id: int = None):
-        """Record a search query for suggestion building."""
+        """Record a search query for suggestion building and commit the session.
+
+        Lowercase and trim the query, incrementing its count for the given
+        entity type or creating it with count one. ``entity_id`` is ignored.
+        """
         existing = self.db.query(SearchSuggestion).filter(
             SearchSuggestion.query == query.lower().strip(),
             SearchSuggestion.entity_type == entity_type
@@ -313,7 +340,11 @@ class SearchService:
     # ==================== ANALYTICS ====================
 
     def log_query(self, user_id: int, query: str, filters: Dict[str, Any] = None, results_count: int = 0, execution_time_ms: int = 0):
-        """Log a search query for analytics."""
+        """Commit a search analytics record with execution time in milliseconds.
+
+        Only the keys of ``filters`` are stored in ``entity_types``; filter
+        values are discarded.
+        """
         sq = SearchQuery(
             user_id=user_id,
             query=query,
@@ -325,7 +356,12 @@ class SearchService:
         self.db.commit()
 
     def get_search_analytics(self, days: int = 30) -> Dict[str, Any]:
-        """Get search analytics."""
+        """Return query counts, popular queries/filters, and daily volume since ``days`` ago.
+
+        The cutoff is inclusive and based on UTC. Return the no-results rate as
+        a percentage and average execution time in milliseconds, both zero when
+        no queries exist. Popular queries are limited to 20.
+        """
         from datetime import datetime, timedelta
 
         start_date = datetime.utcnow() - timedelta(days=days)

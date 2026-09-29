@@ -23,6 +23,12 @@ import LLMManager from './pages/LLMManager';
 import Search from './pages/Search';
 
 // Role-based route guard
+/**
+ * Render children for an authenticated user whose legacy role is allowed.
+ * Empty allowedRoles or '*' allows any authenticated role; matching ignores case.
+ * Show a spinner while loading, redirect signed-out users to /login, and send
+ * users with a disallowed role to /.
+ */
 function RequireRole({ children, allowedRoles = [] }) {
   const { user, loading } = useAuth();
 
@@ -54,6 +60,7 @@ function RequireRole({ children, allowedRoles = [] }) {
   return children;
 }
 
+/** Render a loading state, login form, or the authenticated application routes. */
 function AppRoutes() {
   const { user, loading, login, logout } = useAuth();
 

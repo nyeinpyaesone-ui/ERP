@@ -52,6 +52,13 @@ def list_webhooks(db: Session = Depends(get_db), current_user = Depends(get_curr
 
 @router.post("/webhooks/{webhook_id}/test")
 async def test_webhook(webhook_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    """Send a test event and commit and return its delivery record.
+
+    Sign the payload when a secret is configured. Request failures and HTTP
+    statuses of 400 or higher become failed deliveries, with response or
+    error text limited to 1,000 characters. Raise HTTP 404 for a missing
+    webhook; database errors propagate.
+    """
     webhook = await asyncio.to_thread(lambda: db.query(Webhook).filter(Webhook.id == webhook_id).first())
     if not webhook:
         raise HTTPException(status_code=404, detail="Webhook not found")

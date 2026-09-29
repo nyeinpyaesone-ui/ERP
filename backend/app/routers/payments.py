@@ -58,6 +58,15 @@ def create_payment_intent(
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+    """Verify a Stripe event and return a success acknowledgment.
+
+    For a successful payment intent with a matching invoice, commit a payment
+    using ``amount_received / 100`` and increase the invoice's paid amount.
+    Mark fully covered invoices paid. Other events and missing invoices are
+    acknowledged without changes; repeated events are not deduplicated.
+    Raise HTTP 400 for a missing secret or invalid payload/signature. Payload
+    shape, invoice-ID conversion, arithmetic, and database errors propagate.
+    """
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 

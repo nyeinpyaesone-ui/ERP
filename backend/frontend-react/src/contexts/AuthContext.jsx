@@ -4,6 +4,7 @@ import api from '../api/axios';
 
 const AuthContext = createContext(null);
 
+/** Restore the stored session and provide user state and authentication actions. */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -29,6 +30,12 @@ export function AuthProvider({ children }) {
     fetchUser();
   }, [fetchUser]);
 
+  /**
+   * Authenticate, store the access token, update user state, and return the user.
+   * A full_name property triggers registration first, followed by login using email.
+   * Otherwise username takes precedence over email. Request and storage failures
+   * reject the promise; a successful registration remains if login fails afterward.
+   */
   const login = useCallback(async (credentials) => {
     const isRegister = 'full_name' in credentials;
     const tokenUrl = '/auth/login';

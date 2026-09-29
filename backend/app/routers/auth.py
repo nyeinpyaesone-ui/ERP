@@ -46,6 +46,11 @@ class UserUpdate(BaseModel):
 
 @router.post("/register", response_model=UserResponse)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
+    """Create and return a user with the legacy ``user`` role.
+
+    Assign the RBAC ``user`` role if it exists and commit the account. Raise
+    HTTP 400 if the email already exists.
+    """
     existing = db.query(User).filter(User.email == user_data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -71,6 +76,11 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """Authenticate using an email in ``username`` and return a bearer token and user.
+
+    Update and commit the last-login time. Raise HTTP 401 for invalid
+    credentials or a disabled account.
+    """
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -101,6 +111,7 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("users", "read"))
 ):
+    """Return users after skipping ``skip`` records, limited to ``limit`` records."""
     return db.query(User).offset(skip).limit(limit).all()
 
 @router.put("/users/{user_id}")
@@ -110,6 +121,12 @@ def update_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("users", "update"))
 ):
+    """Commit explicitly supplied fields and return the updated user.
+
+    A non-null ``roles`` list replaces assigned RBAC roles; unknown names are
+    ignored and an empty list removes all roles. Omitted or null ``roles``
+    leaves assignments intact. Raise HTTP 404 if the user does not exist.
+    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

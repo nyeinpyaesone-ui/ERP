@@ -29,12 +29,14 @@ const navigation = [
   { name: 'Search', href: '/search', icon: Search },
 ];
 
+/** Render navigation, the current user's menu, and the nested route outlet. */
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  /** Clear local authentication, navigate to /login, and close the user menu. */
   const handleLogout = () => {
     logout();
     navigate('/login');

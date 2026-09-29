@@ -383,7 +383,14 @@ Guidelines:
     ]
 
     async def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a tool function and return results."""
+        """Execute an ERP tool and return records, creation details, or an error mapping.
+
+        Read tools default to 10 records and cap the requested limit at 50.
+        Contact and task creation commit the session; tasks require an existing
+        project. Missing database/project and unknown tools return ``error``.
+        Execution exceptions trigger rollback and become ``error`` results;
+        rollback failures propagate.
+        """
         if not self.db:
             return {"error": "Database not available"}
 
