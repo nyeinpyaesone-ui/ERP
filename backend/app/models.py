@@ -27,7 +27,14 @@ class User(Base):
     tasks = relationship("Task", back_populates="assigned_user", foreign_keys="Task.assigned_to")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     activity_logs = relationship("ActivityLog", back_populates="user")
-    roles = relationship("Role", secondary="user_roles", back_populates="users")
+    roles = relationship(
+        "Role",
+        secondary="user_roles",
+        back_populates="users",
+        foreign_keys="[UserRole.user_id, UserRole.role_id]",
+        primaryjoin="User.id==UserRole.user_id",
+        secondaryjoin="UserRole.role_id==Role.id"
+    )
 
 class Company(Base):
     __tablename__ = "companies"
@@ -466,7 +473,14 @@ class Role(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     permissions = relationship("Permission", secondary="role_permissions", back_populates="roles")
-    users = relationship("User", secondary="user_roles", back_populates="roles")
+    users = relationship(
+        "User",
+        secondary="user_roles",
+        back_populates="roles",
+        foreign_keys="[UserRole.user_id, UserRole.role_id]",
+        primaryjoin="Role.id==UserRole.role_id",
+        secondaryjoin="UserRole.user_id==User.id"
+    )
     field_permissions = relationship("FieldPermission", back_populates="role", cascade="all, delete-orphan")
     data_policies = relationship("DataPolicy", back_populates="role", cascade="all, delete-orphan")
 
@@ -502,7 +516,7 @@ class UserRole(Base):
     assigned_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    role = relationship("Role", foreign_keys=[role_id])
+    role = relationship("Role", foreign_keys=[role_id], overlaps="users,roles")
     assigned_by_user = relationship("User", foreign_keys=[assigned_by])
 
 
