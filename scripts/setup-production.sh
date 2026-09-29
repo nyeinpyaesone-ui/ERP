@@ -127,6 +127,16 @@ WS_URL=wss://${API_DOMAIN}
 # ============================================
 OLLAMA_BASE_URL=http://ollama:11434
 OLLAMA_MODEL=${OLLAMA_MODEL}
+OPENAI_API_KEY=${OPENAI_API_KEY:-}
+
+# ============================================
+# FILE STORAGE
+# ============================================
+STORAGE_TYPE=local
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+AWS_BUCKET_NAME=${AWS_BUCKET_NAME:-}
+AWS_REGION=${AWS_REGION:-ap-southeast-1}
 
 # ============================================
 # EMAIL

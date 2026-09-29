@@ -6,15 +6,15 @@ services:
     image: postgres:15-alpine
     container_name: erp_solution-postgres
     environment:
-      POSTGRES_USER: erp
-      POSTGRES_PASSWORD: erp_secret
-      POSTGRES_DB: erp_solution
+      POSTGRES_USER: ${DB_USER:-erp}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-erp_secret}
+      POSTGRES_DB: ${DB_NAME:-erp_solution}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U erp"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-erp}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,10 +36,21 @@ services:
       dockerfile: Dockerfile
     container_name: erp_solution-backend
     environment:
-      DATABASE_URL: postgresql://erp:erp_secret@postgres:5432/erp_solution
+      DATABASE_URL: postgresql://${DB_USER:-erp}:${DB_PASSWORD:-erp_secret}@postgres:5432/${DB_NAME:-erp_solution}
       REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: your-secret-key-change-in-production
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in your local .env file}
       ENVIRONMENT: development
+      OLLAMA_BASE_URL: http://ollama:11434
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@localhost}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
     ports:
       - "8000:8000"
     depends_on:
