@@ -55,3 +55,4 @@ htmlcov/
 # Backup artifacts
 scripts/backups/
 *.tar.gz
+.env.production

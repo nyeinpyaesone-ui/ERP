@@ -79,7 +79,7 @@ main() {
     prompt_optional "SMTP Host (e.g., smtp.gmail.com)" SMTP_HOST
     prompt_optional "SMTP Port (default 587)" SMTP_PORT; [[ -z "${SMTP_PORT}" ]] && SMTP_PORT="587"
     prompt_optional "SMTP User/Email" SMTP_USER
-    prompt_secret "SMTP Password/App Password" SMTP_PASSWORD
+    prompt_optional "SMTP Password/App Password" SMTP_PASSWORD
     prompt_optional "Stripe Secret Key (sk_live_...)" STRIPE_SECRET_KEY
     prompt_optional "Stripe Webhook Secret (whsec_...)" STRIPE_WEBHOOK_SECRET
     prompt_optional "Stripe Publishable Key (pk_live_...)" STRIPE_PUBLISHABLE_KEY
@@ -216,10 +216,15 @@ EOF
     echo "  STAGING_HOST, STAGING_USER, PRODUCTION_HOST, PRODUCTION_USER"
     echo "  DB_PASSWORD, REDIS_PASSWORD, SECRET_KEY, CORS_ORIGINS"
     echo
-    warn "SAVE THESE GENERATED SECRETS SECURELY (password manager):"
+    warn "IMPORTANT: Save the generated secrets to a password manager NOW."
+    warn "They will NOT be shown again after this script exits."
+    echo
+    info "Secrets generated (copy NOW to your password manager):"
     echo "  DB_PASSWORD: ${DB_PASSWORD}"
     echo "  REDIS_PASSWORD: ${REDIS_PASSWORD}"
     echo "  SECRET_KEY: ${SECRET_KEY}"
+    echo
+    warn "These values will NOT be displayed again. Copy them NOW."
 }
 
 main "$@"
