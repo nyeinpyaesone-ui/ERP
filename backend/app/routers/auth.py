@@ -5,20 +5,22 @@ from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
 from app.database import get_db
-from app.models import User
+from app.models import User, Role
 from app.auth import (
     verify_password, get_password_hash, create_access_token,
-    get_current_user, require_admin
+    get_current_user, require_admin, require_superadmin
 )
+from app.services.permissions import require_permission
 from app.services.activity_log import log_activity
 
 router = APIRouter()
+
+ALLOWED_ROLES = {"user", "admin"}  # superadmin only via require_superadmin
 
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: str
-    role: str = "user"
 
 class UserResponse(BaseModel):
     id: int
@@ -36,6 +38,12 @@ class Token(BaseModel):
     token_type: str
     user: UserResponse
 
+class UserUpdate(BaseModel):
+    email: EmailStr | None = None
+    full_name: str | None = None
+    is_active: bool | None = None
+    roles: list[str] | None = None  # Role names to assign
+
 @router.post("/register", response_model=UserResponse)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == user_data.email).first()
@@ -46,9 +54,16 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
         email=user_data.email,
         hashed_password=get_password_hash(user_data.password),
         full_name=user_data.full_name,
-        role=user_data.role
+        role="user"
     )
     db.add(user)
+    db.flush()
+
+    # Assign default "user" role from RBAC system
+    user_role = db.query(Role).filter(Role.name == "user").first()
+    if user_role:
+        user.roles.append(user_role)
+
     db.commit()
     db.refresh(user)
     log_activity(db, user_id=user.id, action="user_registered", entity_type="user", entity_id=user.id)
@@ -59,6 +74,9 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="Account disabled")
 
     user.last_login = datetime.utcnow()
     db.commit()
@@ -81,26 +99,35 @@ def list_users(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_permission("users", "read"))
 ):
     return db.query(User).offset(skip).limit(limit).all()
 
 @router.put("/users/{user_id}")
 def update_user(
     user_id: int,
-    user_data: dict,
+    user_data: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_permission("users", "update"))
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    for key, value in user_data.items():
-        if hasattr(user, key) and key != "id":
+    update_data = user_data.model_dump(exclude_unset=True)
+    roles = update_data.pop("roles", None)
+    for key, value in update_data.items():
+        if hasattr(user, key) and key not in ("id", "hashed_password", "role"):
             setattr(user, key, value)
+
+    if roles is not None:
+        # Sync roles - remove existing, add new
+        user.roles.clear()
+        for role_name in roles:
+            role = db.query(Role).filter(Role.name == role_name).first()
+            if role:
+                user.roles.append(role)
 
     db.commit()
     db.refresh(user)
     return user
-

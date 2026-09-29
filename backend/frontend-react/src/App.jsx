@@ -22,7 +22,8 @@ import Permissions from './pages/Permissions';
 import LLMManager from './pages/LLMManager';
 import Search from './pages/Search';
 
-function AppRoutes() {
+// Role-based route guard
+function RequireRole({ children, allowedRoles = [] }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -34,30 +35,62 @@ function AppRoutes() {
   }
 
   if (!user) {
-    return <Login />;
+    return <Navigate to="/login" replace />;
+  }
+
+  // If no specific roles required, just check authenticated
+  if (allowedRoles.length === 0) {
+    return children;
+  }
+
+  // Check if user has one of the allowed roles
+  const userRole = user?.role?.toLowerCase() || 'user';
+  const hasAccess = allowedRoles.some(role => role.toLowerCase() === userRole || role === '*');
+
+  if (!hasAccess) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+function AppRoutes() {
+  const { user, loading, login, logout } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login onLogin={login} />;
   }
 
   return (
-    <Layout onLogout={() => {}}>
+    <Layout onLogout={logout}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/crm" element={<CRM />} />
-        <Route path="/hr" element={<HR />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route path="/finance" element={<Finance />} />
-        <Route path="/projects" element={<Projects />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/ai-chat" element={<AIChat />} />
-        <Route path="/documents" element={<Documents />} />
-        <Route path="/workflows" element={<Workflows />} />
-        <Route path="/integrations" element={<Integrations />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/bulk-import" element={<BulkImportExport />} />
-        <Route path="/migrations" element={<MigrationManager />} />
-        <Route path="/permissions" element={<Permissions />} />
-        <Route path="/llm-manager" element={<LLMManager />} />
-        <Route path="/search" element={<Search />} />
+        <Route path="/login" element={<Login onLogin={login} />} />
+        <Route path="/crm" element={<RequireRole><CRM /></RequireRole>} />
+        <Route path="/hr" element={<RequireRole allowedRoles={['admin', 'superadmin', 'manager']}><HR /></RequireRole>} />
+        <Route path="/inventory" element={<RequireRole><Inventory /></RequireRole>} />
+        <Route path="/finance" element={<RequireRole allowedRoles={['admin', 'superadmin', 'manager']}><Finance /></RequireRole>} />
+        <Route path="/projects" element={<RequireRole><Projects /></RequireRole>} />
+        <Route path="/reports" element={<RequireRole allowedRoles={['admin', 'superadmin', 'manager']}><Reports /></RequireRole>} />
+        <Route path="/analytics" element={<RequireRole allowedRoles={['admin', 'superadmin', 'manager']}><Analytics /></RequireRole>} />
+        <Route path="/ai-chat" element={<RequireRole><AIChat /></RequireRole>} />
+        <Route path="/documents" element={<RequireRole><Documents /></RequireRole>} />
+        <Route path="/workflows" element={<RequireRole allowedRoles={['admin', 'superadmin', 'manager']}><Workflows /></RequireRole>} />
+        <Route path="/integrations" element={<RequireRole allowedRoles={['admin', 'superadmin']}><Integrations /></RequireRole>} />
+        <Route path="/settings" element={<RequireRole allowedRoles={['admin', 'superadmin']}><Settings /></RequireRole>} />
+        <Route path="/bulk-import" element={<RequireRole allowedRoles={['admin', 'superadmin']}><BulkImportExport /></RequireRole>} />
+        <Route path="/migrations" element={<RequireRole allowedRoles={['admin', 'superadmin']}><MigrationManager /></RequireRole>} />
+        <Route path="/permissions" element={<RequireRole allowedRoles={['admin', 'superadmin']}><Permissions /></RequireRole>} />
+        <Route path="/llm-manager" element={<RequireRole allowedRoles={['admin', 'superadmin']}><LLMManager /></RequireRole>} />
+        <Route path="/search" element={<RequireRole><Search /></RequireRole>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

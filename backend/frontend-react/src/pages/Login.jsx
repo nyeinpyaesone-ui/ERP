@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LogIn, UserPlus, Loader } from 'lucide-react';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Login({ onLogin }) {
   const [isRegister, setIsRegister] = useState(false);
@@ -12,6 +11,9 @@ export default function Login({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const { login: authLogin } = useAuth();
+  const navigate = useNavigate();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -19,20 +21,11 @@ export default function Login({ onLogin }) {
 
     try {
       if (isRegister) {
-        await axios.post(`${API_URL}/api/v1/auth/register`, {
-          email, password, full_name: fullName
-        });
-        // Auto login after register
-        const res = await axios.post(`${API_URL}/api/v1/auth/login`, {
-          username: email, password
-        }, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-        onLogin(res.data.access_token);
+        await authLogin({ email, password, full_name: fullName });
       } else {
-        const res = await axios.post(`${API_URL}/api/v1/auth/login`, {
-          username: email, password
-        }, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-        onLogin(res.data.access_token);
+        await authLogin({ username: email, password });
       }
+      navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || 'Authentication failed');
     } finally {
@@ -120,4 +113,3 @@ export default function Login({ onLogin }) {
     </div>
   );
 }
-

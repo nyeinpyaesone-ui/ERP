@@ -21,6 +21,7 @@ ROLLBACK="${3:-false}"
 
 ACTIVE_COLOR_FILE="/opt/erp-solution/.active_color"
 PREVIOUS_VERSION_FILE="/opt/erp-solution/.previous_version"
+PREVIOUS_IMAGE_FILE="/opt/erp-solution/.previous_image"
 
 LOG_FILE="/opt/erp-solution/logs/deploy-$(date +%Y%m%d-%H%M%S).log"
 
@@ -180,20 +181,20 @@ run_smoke_tests() {
     
     info "Running smoke tests against ${color} environment..."
     
-    # Test health endpoint
-    if ! docker exec "${backend_container}" curl -sf http://localhost:8000/health > /dev/null; then
+    # Test health endpoint (use wget which is in alpine)
+    if ! docker exec "${backend_container}" wget -q --spider http://localhost:8000/health > /dev/null 2>&1; then
         error "Health check failed"
         return 1
     fi
     
     # Test readiness endpoint
-    if ! docker exec "${backend_container}" curl -sf http://localhost:8000/ready > /dev/null; then
+    if ! docker exec "${backend_container}" wget -q --spider http://localhost:8000/ready > /dev/null 2>&1; then
         error "Readiness check failed"
         return 1
     fi
     
     # Test API root
-    if ! docker exec "${backend_container}" curl -sf http://localhost:8000/ > /dev/null; then
+    if ! docker exec "${backend_container}" wget -q --spider http://localhost:8000/ > /dev/null 2>&1; then
         error "API root check failed"
         return 1
     fi
@@ -209,19 +210,18 @@ switch_traffic() {
     info "Switching traffic from ${old_color} to ${new_color}"
     
     local new_upstream_host="${NGINX_UPSTREAM_DIR_HOST}/upstream-${new_color}.conf"
-    local new_upstream_container="${NGINX_UPSTREAM_DIR_CONTAINER}/upstream-${new_color}.conf"
-    local active_upstream_container="${NGINX_UPSTREAM_DIR_CONTAINER}/upstream-active.conf"
+    local active_upstream_host="${NGINX_UPSTREAM_DIR_HOST}/upstream-active.conf"
     
     if [ ! -f "${new_upstream_host}" ]; then
         error "Upstream config not found: ${new_upstream_host}"
         return 1
     fi
     
-    # Atomic switch - create symlink inside nginx container
-    if docker exec erp-nginx ln -sf "${new_upstream_container}" "${active_upstream_container}" 2>&1 | tee -a "${LOG_FILE}"; then
-        info "Symlink created inside nginx container"
+    # Atomic switch - copy on host (not symlink in container since it's ro mount)
+    if cp "${new_upstream_host}" "${active_upstream_host}" 2>&1 | tee -a "${LOG_FILE}"; then
+        info "Upstream config updated on host"
     else
-        error "Failed to create symlink inside nginx container"
+        error "Failed to update upstream config on host"
         return 1
     fi
     
@@ -241,6 +241,10 @@ switch_traffic() {
         mv "${PREVIOUS_VERSION_FILE}" "${PREVIOUS_VERSION_FILE}.bak"
     fi
     echo "${VERSION}" > "${PREVIOUS_VERSION_FILE}"
+    
+    # Also store the image tag for true rollback
+    local new_image="${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION}"
+    echo "${new_image}" > "${PREVIOUS_IMAGE_FILE}"
 }
 
 stop_old_environment() {
@@ -265,6 +269,7 @@ perform_rollback() {
     local current_color=$(get_active_color)
     local previous_color=$(get_inactive_color)
     local previous_version=""
+    local previous_image=""
     
     if [ -f "${PREVIOUS_VERSION_FILE}" ]; then
         previous_version=$(cat "${PREVIOUS_VERSION_FILE}")
@@ -273,7 +278,21 @@ perform_rollback() {
         return 1
     fi
     
+    if [ -f "${PREVIOUS_IMAGE_FILE}" ]; then
+        previous_image=$(cat "${PREVIOUS_IMAGE_FILE}")
+    else
+        previous_image="${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${previous_version}"
+    fi
+    
     warn "Rolling back from ${current_color} to ${previous_color} (version: ${previous_version})"
+    
+    # Pull the previous image
+    info "Pulling previous image: ${previous_image}"
+    docker pull "${previous_image}" 2>&1 | tee -a "${LOG_FILE}"
+    
+    # Retag as current VERSION for the inactive color
+    docker tag "${previous_image}" "${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION}" 2>&1 | tee -a "${LOG_FILE}"
+    docker tag "${previous_image}" "${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION}" 2>&1 | tee -a "${LOG_FILE}"
     
     # Switch traffic back
     switch_traffic "${previous_color}" "${current_color}"
