@@ -1,6 +1,6 @@
 import os
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -50,7 +50,8 @@ class Settings(BaseSettings):
 
     # Security
     SECRET_KEY: str = ""
-    ALGORITHM: str = "HS256"
+    # Env key used across .env / docker-compose / setup scripts is JWT_ALGORITHM.
+    JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
     @field_validator("SECRET_KEY")
@@ -117,6 +118,22 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy_algorithm_alias(cls, values):
+        """Accept the legacy ALGORITHM init key as an alias of JWT_ALGORITHM.
+
+        The canonical configuration key everywhere (.env templates,
+        docker-compose, docs) is JWT_ALGORITHM; older programmatic callers
+        may still pass ALGORITHM. Env vars are read natively by
+        pydantic-settings via the JWT_ALGORITHM field.
+        """
+        if isinstance(values, dict):
+            for key in ("ALGORITHM", "algorithm"):
+                if key in values and not values.get("JWT_ALGORITHM"):
+                    values["JWT_ALGORITHM"] = values.pop(key)
+        return values
 
 def _is_test_run() -> bool:
     """True when executing under pytest (used to keep tests hermetic)."""
