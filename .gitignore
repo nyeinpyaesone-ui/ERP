@@ -1,9 +1,7 @@
 # Dependencies
 node_modules/
 backend/venv/
-backend/__pycache__/
-backend/app/__pycache__/
-backend/app/**/__pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -40,8 +38,7 @@ backend/logs/
 *.sqlite
 backend/test.db
 
-# Docker
-.dockerignore
+# Docker (.dockerignore files are intentionally tracked)
 
 # Test
 .coverage

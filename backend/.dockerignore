@@ -1,0 +1,40 @@
+# Dependencies
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local dev
+.env
+.env.local
+*.db
+*.sqlite
+test.db
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Logs
+logs/
+*.log
+
+# Heap dumps
+*.heapsnapshot
+
+# Build
+dist/
+build/
