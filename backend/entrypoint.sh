@@ -140,10 +140,11 @@ fi
 
 # Seed default data (roles, permissions, etc.)
 info "Seeding default data..."
-if python -m app.scripts.seed_defaults 2>/dev/null; then
+if python -m app.scripts.seed_defaults; then
     success "Default data seeded"
 else
-    warn "Seed script not found or failed (continuing anyway)"
+    error "Seed script failed"
+    exit 1
 fi
 
 # Create uploads directory

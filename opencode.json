@@ -1,0 +1,56 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "watcher": {
+    "ignore": [
+      "**/__pycache__/**",
+      "**/*.pyc",
+      "backend/venv/**",
+      "**/node_modules/**",
+      "backend/frontend-react/dist/**",
+      "scripts/backups/**",
+      ".git/**"
+    ]
+  },
+  "permission": {
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "edit": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "bash": {
+      "*": "allow",
+      "git push *": "ask",
+      "rm -rf *": "ask"
+    }
+  },
+  "mcp": {
+    "postgres": {
+      "type": "local",
+      "command": ["bash", "scripts/mcp-postgres.sh"],
+      "enabled": true
+    },
+    "filesystem": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/admin/ERP/backend"
+      ],
+      "enabled": true
+    },
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp"],
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "enabled": true
+    }
+  }
+}

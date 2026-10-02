@@ -1,57 +1,81 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
-import httpx
-import hmac
-import hashlib
-import json
 import asyncio
+import hashlib
+import hmac
+import json
 from datetime import datetime
+from typing import Any
 
+import httpx
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.auth import get_current_user
 from app.database import get_db
 from app.models import Integration, Webhook, WebhookDelivery
-from app.auth import get_current_user
 
 router = APIRouter()
+
 
 class IntegrationCreate(BaseModel):
     name: str
     provider: str
-    config: Dict[str, Any]
+    config: dict[str, Any]
+
 
 class WebhookCreate(BaseModel):
     name: str
     url: str
     events: list[str]
-    secret: Optional[str] = None
+    secret: str | None = None
+
 
 @router.post("/integrations")
-def create_integration(data: IntegrationCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+def create_integration(
+    data: IntegrationCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     integration = Integration(**data.dict(), created_by=current_user.id)
     db.add(integration)
     db.commit()
     db.refresh(integration)
     return integration
 
+
 @router.get("/integrations")
-def list_integrations(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+def list_integrations(
+    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
     return db.query(Integration).all()
 
+
 @router.post("/webhooks")
-def create_webhook(data: WebhookCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+def create_webhook(
+    data: WebhookCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     webhook = Webhook(**data.dict(), created_by=current_user.id)
     db.add(webhook)
     db.commit()
     db.refresh(webhook)
     return webhook
 
+
 @router.get("/webhooks")
-def list_webhooks(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+def list_webhooks(
+    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
     return db.query(Webhook).all()
 
+
 @router.post("/webhooks/{webhook_id}/test")
-async def test_webhook(webhook_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+async def test_webhook(
+    webhook_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     """Send a test event and commit and return its delivery record.
 
     Sign the payload when a secret is configured. Request failures and HTTP
@@ -59,22 +83,27 @@ async def test_webhook(webhook_id: int, db: Session = Depends(get_db), current_u
     error text limited to 1,000 characters. Raise HTTP 404 for a missing
     webhook; database errors propagate.
     """
-    webhook = await asyncio.to_thread(lambda: db.query(Webhook).filter(Webhook.id == webhook_id).first())
+    webhook = await asyncio.to_thread(
+        lambda: db.query(Webhook).filter(Webhook.id == webhook_id).first()
+    )
     if not webhook:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
-    payload = {"event": "test", "timestamp": str(datetime.now()), "data": {"message": "Test webhook delivery"}}
+    payload = {
+        "event": "test",
+        "timestamp": str(datetime.now()),
+        "data": {"message": "Test webhook delivery"},
+    }
 
     headers = {"Content-Type": "application/json"}
     if webhook.secret:
-        signature = hmac.new(webhook.secret.encode(), json.dumps(payload).encode(), hashlib.sha256).hexdigest()
+        signature = hmac.new(
+            webhook.secret.encode(), json.dumps(payload).encode(), hashlib.sha256
+        ).hexdigest()
         headers["X-Webhook-Signature"] = f"sha256={signature}"
 
     delivery = WebhookDelivery(
-        webhook_id=webhook_id,
-        event="test",
-        payload=payload,
-        attempt=1
+        webhook_id=webhook_id, event="test", payload=payload, attempt=1
     )
     await asyncio.to_thread(db.add, delivery)
 
@@ -92,7 +121,16 @@ async def test_webhook(webhook_id: int, db: Session = Depends(get_db), current_u
     await asyncio.to_thread(db.refresh, delivery)
     return delivery
 
-@router.get("/webhooks/{webhook_id}/deliveries")
-def get_deliveries(webhook_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    return db.query(WebhookDelivery).filter(WebhookDelivery.webhook_id == webhook_id).order_by(WebhookDelivery.created_at.desc()).all()
 
+@router.get("/webhooks/{webhook_id}/deliveries")
+def get_deliveries(
+    webhook_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return (
+        db.query(WebhookDelivery)
+        .filter(WebhookDelivery.webhook_id == webhook_id)
+        .order_by(WebhookDelivery.created_at.desc())
+        .all()
+    )

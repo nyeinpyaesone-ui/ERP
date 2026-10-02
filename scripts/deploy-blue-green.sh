@@ -34,6 +34,9 @@ else
     DOCKER_COMPOSE_CMD="docker-compose"
 fi
 
+# Export VERSION so docker-compose can interpolate it
+export VERSION
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -236,7 +239,7 @@ switch_traffic() {
     # Update active color file on host
     echo "${new_color}" > "${ACTIVE_COLOR_FILE}"
     
-    # Store previous version for rollback
+    # Store the OUTGOING version for rollback (the version we're leaving behind)
     if [ -f "${PREVIOUS_VERSION_FILE}" ]; then
         mv "${PREVIOUS_VERSION_FILE}" "${PREVIOUS_VERSION_FILE}.bak"
     fi
@@ -294,10 +297,27 @@ perform_rollback() {
     docker tag "${previous_image}" "${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION}" 2>&1 | tee -a "${LOG_FILE}"
     docker tag "${previous_image}" "${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION}" 2>&1 | tee -a "${LOG_FILE}"
     
-    # Switch traffic back
-    switch_traffic "${previous_color}" "${current_color}"
+    # START the previous environment (it was stopped after the failed deploy)
+    info "Starting previous environment: ${previous_color}"
+    start_inactive_environment "${previous_color}"
     
-    # Stop the failed environment
+    # Wait for it to be healthy
+    if ! wait_for_health "${previous_color}"; then
+        error "Previous environment failed health checks after rollback start"
+        return 1
+    fi
+    
+    # Run smoke tests on the rolled-back environment
+    if ! run_smoke_tests "${previous_color}"; then
+        error "Rollback environment failed smoke tests"
+        return 1
+    fi
+    
+    # Switch traffic back to the previous environment
+    switch_traffic "${previous_color}" "$(get_active_color)"
+
+    # Stop the failed environment (captured before the switch above, since
+    # switch_traffic rewrites ACTIVE_COLOR_FILE)
     stop_old_environment "${current_color}"
     
     success "Rollback completed to ${previous_color} (version: ${previous_version})"
@@ -316,6 +336,9 @@ load_env() {
 }
 
 main() {
+    # Create log directory FIRST before any logging
+    mkdir -p "$(dirname "${LOG_FILE}")"
+    
     info "=========================================="
     info "ERP SOLUTION — Blue-Green Deployment"
     info "Environment: ${ENVIRONMENT}"
@@ -323,8 +346,6 @@ main() {
     info "Rollback mode: ${ROLLBACK}"
     info "Log file: ${LOG_FILE}"
     info "=========================================="
-    
-    mkdir -p "$(dirname "${LOG_FILE}")"
     
     load_env
     validate_environment

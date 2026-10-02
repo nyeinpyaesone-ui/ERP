@@ -1,33 +1,50 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from contextlib import asynccontextmanager
-from sqlalchemy import text
 
-from app.database import engine, Base, SessionLocal
-from app.routers import (
-    auth, crm, hr, inventory, finance, projects,
-    ai, documents, reports, workflows, payments,
-    integrations, analytics, admin, websocket,
-    search, permissions, llm, health, health_root
-)
 from app.config import settings
+from app.routers import (
+    admin,
+    ai,
+    analytics,
+    auth,
+    crm,
+    documents,
+    finance,
+    health,
+    health_root,
+    hr,
+    integrations,
+    inventory,
+    llm,
+    payments,
+    permissions,
+    projects,
+    reports,
+    search,
+    websocket,
+    workflows,
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Yield control for the application lifetime without startup or shutdown work."""
     yield
 
+
 app = FastAPI(
     title=settings.APP_NAME,
     description="Enterprise Resource Planning with AI-powered features",
     version=settings.APP_VERSION,
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,17 +61,22 @@ app.include_router(documents.router, prefix="/api/v1/documents", tags=["Document
 app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
 app.include_router(workflows.router, prefix="/api/v1/workflows", tags=["Workflows"])
 app.include_router(payments.router, prefix="/api/v1/payments", tags=["Payments"])
-app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["Integrations"])
+app.include_router(
+    integrations.router, prefix="/api/v1/integrations", tags=["Integrations"]
+)
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSocket"])
 app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
-app.include_router(permissions.router, prefix="/api/v1/permissions", tags=["Permissions"])
+app.include_router(
+    permissions.router, prefix="/api/v1/permissions", tags=["Permissions"]
+)
 app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM"])
 app.include_router(health.router, prefix="/api/v1", tags=["Health"])
 app.include_router(health_root.router, prefix="", tags=["Health"])
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.get("/")
 async def root():
@@ -73,7 +95,6 @@ async def root():
             "PWA with Offline Support",
             "AI Forecasting",
             "Bulk Import/Export",
-            "Alembic Migrations"
-        ]
+            "Alembic Migrations",
+        ],
     }
-

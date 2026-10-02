@@ -1,11 +1,22 @@
 from sqlalchemy import (
-    Column, Integer, String, Text, Boolean, DateTime, Date,
-    Numeric, ForeignKey, Index, Float, LargeBinary
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    Numeric,
+    String,
+    Text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+
 from app.database import Base
+
 
 class User(Base):
     __tablename__ = "users"
@@ -19,13 +30,25 @@ class User(Base):
     avatar_url = Column(String(500), nullable=True)
     last_login = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
-    contacts = relationship("Contact", back_populates="assigned_user", foreign_keys="Contact.assigned_to")
-    deals = relationship("Deal", back_populates="assigned_user", foreign_keys="Deal.assigned_to")
-    projects_managed = relationship("Project", back_populates="manager", foreign_keys="Project.manager_id")
-    tasks = relationship("Task", back_populates="assigned_user", foreign_keys="Task.assigned_to")
-    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    contacts = relationship(
+        "Contact", back_populates="assigned_user", foreign_keys="Contact.assigned_to"
+    )
+    deals = relationship(
+        "Deal", back_populates="assigned_user", foreign_keys="Deal.assigned_to"
+    )
+    projects_managed = relationship(
+        "Project", back_populates="manager", foreign_keys="Project.manager_id"
+    )
+    tasks = relationship(
+        "Task", back_populates="assigned_user", foreign_keys="Task.assigned_to"
+    )
+    notifications = relationship(
+        "Notification", back_populates="user", cascade="all, delete-orphan"
+    )
     activity_logs = relationship("ActivityLog", back_populates="user")
     roles = relationship(
         "Role",
@@ -33,8 +56,9 @@ class User(Base):
         back_populates="users",
         foreign_keys="[UserRole.user_id, UserRole.role_id]",
         primaryjoin="User.id==UserRole.user_id",
-        secondaryjoin="UserRole.role_id==Role.id"
+        secondaryjoin="UserRole.role_id==Role.id",
     )
+
 
 class Company(Base):
     __tablename__ = "companies"
@@ -48,11 +72,14 @@ class Company(Base):
     phone = Column(String(50), nullable=True)
     logo_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     contacts = relationship("Contact", back_populates="company")
     deals = relationship("Deal", back_populates="company")
     invoices = relationship("Invoice", back_populates="company")
+
 
 class Contact(Base):
     __tablename__ = "contacts"
@@ -63,41 +90,61 @@ class Contact(Base):
     email = Column(String(255), index=True, nullable=True)
     phone = Column(String(50), nullable=True)
     title = Column(String(100), nullable=True)
-    company_id = Column(Integer, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True)
+    company_id = Column(
+        Integer, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
+    )
     status = Column(String(50), nullable=False, server_default="lead")
     source = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
-    assigned_to = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    assigned_to = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     lifetime_value = Column(Numeric(15, 2), nullable=False, server_default="0")
     last_activity = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     company = relationship("Company", back_populates="contacts")
-    assigned_user = relationship("User", back_populates="contacts", foreign_keys=[assigned_to])
+    assigned_user = relationship(
+        "User", back_populates="contacts", foreign_keys=[assigned_to]
+    )
     deals = relationship("Deal", back_populates="contact")
     invoices = relationship("Invoice", back_populates="contact")
+
 
 class Deal(Base):
     __tablename__ = "deals"
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
-    contact_id = Column(Integer, ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True)
-    company_id = Column(Integer, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True)
+    contact_id = Column(
+        Integer, ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True
+    )
+    company_id = Column(
+        Integer, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
+    )
     value = Column(Numeric(15, 2), nullable=False, server_default="0")
     stage = Column(String(50), nullable=False, server_default="prospect")
     probability = Column(Integer, nullable=False, server_default="0")
     expected_close_date = Column(Date, nullable=True)
     actual_close_date = Column(Date, nullable=True)
-    assigned_to = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    assigned_to = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     contact = relationship("Contact", back_populates="deals")
     company = relationship("Company", back_populates="deals")
-    assigned_user = relationship("User", back_populates="deals", foreign_keys=[assigned_to])
+    assigned_user = relationship(
+        "User", back_populates="deals", foreign_keys=[assigned_to]
+    )
+
 
 class Department(Base):
     __tablename__ = "departments"
@@ -105,20 +152,27 @@ class Department(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
-    manager_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    manager_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     budget = Column(Numeric(15, 2), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     manager = relationship("User", foreign_keys=[manager_id])
     employees = relationship("Employee", back_populates="department")
 
+
 class Employee(Base):
     __tablename__ = "employees"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     employee_code = Column(String(50), unique=True, nullable=False)
-    department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
+    department_id = Column(
+        Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True
+    )
     job_title = Column(String(100), nullable=False)
     salary = Column(Numeric(15, 2), nullable=True)
     hire_date = Column(Date, nullable=False)
@@ -129,10 +183,13 @@ class Employee(Base):
     phone = Column(String(50), nullable=True)
     date_of_birth = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     department = relationship("Department", back_populates="employees")
     user = relationship("User", foreign_keys=[user_id])
+
 
 class Product(Base):
     __tablename__ = "products"
@@ -154,34 +211,50 @@ class Product(Base):
     weight = Column(Float, nullable=True)
     dimensions = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
-    movements = relationship("InventoryMovement", back_populates="product", cascade="all, delete-orphan")
+    movements = relationship(
+        "InventoryMovement", back_populates="product", cascade="all, delete-orphan"
+    )
     invoice_items = relationship("InvoiceItem", back_populates="product")
+
 
 class InventoryMovement(Base):
     __tablename__ = "inventory_movements"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(
+        Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
     movement_type = Column(String(50), nullable=False)  # in, out, adjustment, transfer
     quantity = Column(Integer, nullable=False)
+    previous_quantity = Column(Integer, nullable=False, default=0, server_default="0")
+    new_quantity = Column(Integer, nullable=False, default=0, server_default="0")
     unit_cost = Column(Numeric(15, 2), nullable=True)
     reference = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     product = relationship("Product", back_populates="movements")
     creator = relationship("User", foreign_keys=[created_by])
+
 
 class Invoice(Base):
     __tablename__ = "invoices"
 
     id = Column(Integer, primary_key=True, index=True)
     invoice_number = Column(String(100), unique=True, nullable=False)
-    contact_id = Column(Integer, ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True)
-    company_id = Column(Integer, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True)
+    contact_id = Column(
+        Integer, ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True
+    )
+    company_id = Column(
+        Integer, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
+    )
     issue_date = Column(Date, nullable=False)
     due_date = Column(Date, nullable=False)
     subtotal = Column(Numeric(15, 2), nullable=False, server_default="0")
@@ -193,21 +266,34 @@ class Invoice(Base):
     notes = Column(Text, nullable=True)
     terms = Column(Text, nullable=True)
     stripe_payment_intent_id = Column(String(255), nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     contact = relationship("Contact", back_populates="invoices")
     company = relationship("Company", back_populates="invoices")
-    items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
-    payments = relationship("Payment", back_populates="invoice", cascade="all, delete-orphan")
+    items = relationship(
+        "InvoiceItem", back_populates="invoice", cascade="all, delete-orphan"
+    )
+    payments = relationship(
+        "Payment", back_populates="invoice", cascade="all, delete-orphan"
+    )
+
 
 class InvoiceItem(Base):
     __tablename__ = "invoice_items"
 
     id = Column(Integer, primary_key=True, index=True)
-    invoice_id = Column(Integer, ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    invoice_id = Column(
+        Integer, ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id = Column(
+        Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True
+    )
     description = Column(Text, nullable=False)
     quantity = Column(Numeric(10, 2), nullable=False)
     unit_price = Column(Numeric(15, 2), nullable=False)
@@ -216,11 +302,14 @@ class InvoiceItem(Base):
     invoice = relationship("Invoice", back_populates="items")
     product = relationship("Product", back_populates="invoice_items")
 
+
 class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
-    invoice_id = Column(Integer, ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False)
+    invoice_id = Column(
+        Integer, ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False
+    )
     amount = Column(Numeric(15, 2), nullable=False)
     payment_method = Column(String(50), nullable=False)
     payment_date = Column(Date, nullable=False)
@@ -228,9 +317,14 @@ class Payment(Base):
     stripe_charge_id = Column(String(255), nullable=True)
     status = Column(String(50), nullable=False, server_default="completed")
     notes = Column(Text, nullable=True)
+    created_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     invoice = relationship("Invoice", back_populates="payments")
+    creator = relationship("User", foreign_keys=[created_by])
+
 
 class Project(Base):
     __tablename__ = "projects"
@@ -245,35 +339,55 @@ class Project(Base):
     budget = Column(Numeric(15, 2), nullable=True)
     actual_cost = Column(Numeric(15, 2), nullable=True)
     progress = Column(Integer, nullable=False, server_default="0")
-    manager_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    client_id = Column(Integer, ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True)
+    manager_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    client_id = Column(
+        Integer, ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
-    manager = relationship("User", back_populates="projects_managed", foreign_keys=[manager_id])
+    manager = relationship(
+        "User", back_populates="projects_managed", foreign_keys=[manager_id]
+    )
     client = relationship("Contact", foreign_keys=[client_id])
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+
 
 class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(
+        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(String(50), nullable=False, server_default="todo")
     priority = Column(String(50), nullable=False, server_default="medium")
-    assigned_to = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    assigned_to = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     due_date = Column(Date, nullable=True)
     estimated_hours = Column(Numeric(8, 2), nullable=True)
     actual_hours = Column(Numeric(8, 2), nullable=True)
-    parent_task_id = Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
+    parent_task_id = Column(
+        Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     project = relationship("Project", back_populates="tasks")
-    assigned_user = relationship("User", back_populates="tasks", foreign_keys=[assigned_to])
+    assigned_user = relationship(
+        "User", back_populates="tasks", foreign_keys=[assigned_to]
+    )
     subtasks = relationship("Task", backref="parent", remote_side=[id])
+
 
 class Document(Base):
     __tablename__ = "documents"
@@ -288,10 +402,13 @@ class Document(Base):
     entity_id = Column(Integer, nullable=True)
     embedding_id = Column(String(255), nullable=True)
     extracted_text = Column(Text, nullable=True)
-    uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    uploaded_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     uploader = relationship("User", foreign_keys=[uploaded_by])
+
 
 class Workflow(Base):
     __tablename__ = "workflows"
@@ -300,34 +417,50 @@ class Workflow(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     entity_type = Column(String(50), nullable=False)  # invoice, deal, task, etc.
-    trigger_type = Column(String(50), nullable=False)  # on_create, on_update, scheduled, manual
+    trigger_type = Column(
+        String(50), nullable=False
+    )  # on_create, on_update, scheduled, manual
     trigger_condition = Column(JSONB, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
-    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     creator = relationship("User", foreign_keys=[created_by])
-    steps = relationship("WorkflowStep", back_populates="workflow", cascade="all, delete-orphan")
-    executions = relationship("WorkflowExecution", back_populates="workflow", cascade="all, delete-orphan")
+    steps = relationship(
+        "WorkflowStep", back_populates="workflow", cascade="all, delete-orphan"
+    )
+    executions = relationship(
+        "WorkflowExecution", back_populates="workflow", cascade="all, delete-orphan"
+    )
+
 
 class WorkflowStep(Base):
     __tablename__ = "workflow_steps"
 
     id = Column(Integer, primary_key=True, index=True)
-    workflow_id = Column(Integer, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False)
+    workflow_id = Column(
+        Integer, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
     name = Column(String(255), nullable=False)
-    step_type = Column(String(50), nullable=False)  # approval, condition, action, notification, delay
+    step_type = Column(
+        String(50), nullable=False
+    )  # approval, condition, action, notification, delay
     step_order = Column(Integer, nullable=False)
     config = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     workflow = relationship("Workflow", back_populates="steps")
 
+
 class WorkflowExecution(Base):
     __tablename__ = "workflow_executions"
 
     id = Column(Integer, primary_key=True, index=True)
-    workflow_id = Column(Integer, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False)
+    workflow_id = Column(
+        Integer, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
     entity_type = Column(String(50), nullable=False)
     entity_id = Column(Integer, nullable=False)
     status = Column(String(50), nullable=False, server_default="running")
@@ -337,6 +470,7 @@ class WorkflowExecution(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     workflow = relationship("Workflow", back_populates="executions")
+
 
 class Webhook(Base):
     __tablename__ = "webhooks"
@@ -349,17 +483,24 @@ class Webhook(Base):
     is_active = Column(Boolean, nullable=False, server_default="true")
     retry_count = Column(Integer, nullable=False, server_default="3")
     last_triggered = Column(DateTime(timezone=True), nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     creator = relationship("User", foreign_keys=[created_by])
-    deliveries = relationship("WebhookDelivery", back_populates="webhook", cascade="all, delete-orphan")
+    deliveries = relationship(
+        "WebhookDelivery", back_populates="webhook", cascade="all, delete-orphan"
+    )
+
 
 class WebhookDelivery(Base):
     __tablename__ = "webhook_deliveries"
 
     id = Column(Integer, primary_key=True, index=True)
-    webhook_id = Column(Integer, ForeignKey("webhooks.id", ondelete="CASCADE"), nullable=False)
+    webhook_id = Column(
+        Integer, ForeignKey("webhooks.id", ondelete="CASCADE"), nullable=False
+    )
     event = Column(String(100), nullable=False)
     payload = Column(JSONB, nullable=False)
     response_status = Column(Integer, nullable=True)
@@ -370,6 +511,7 @@ class WebhookDelivery(Base):
 
     webhook = relationship("Webhook", back_populates="deliveries")
 
+
 class Integration(Base):
     __tablename__ = "integrations"
 
@@ -379,16 +521,21 @@ class Integration(Base):
     config = Column(JSONB, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
     last_sync = Column(DateTime(timezone=True), nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     creator = relationship("User", foreign_keys=[created_by])
+
 
 class ActivityLog(Base):
     __tablename__ = "activity_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     action = Column(String(100), nullable=False)
     entity_type = Column(String(50), nullable=True)
     entity_id = Column(Integer, nullable=True)
@@ -399,11 +546,14 @@ class ActivityLog(Base):
 
     user = relationship("User", back_populates="activity_logs")
 
+
 class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
     type = Column(String(50), nullable=False, server_default="info")
@@ -415,6 +565,7 @@ class Notification(Base):
 
     user = relationship("User", back_populates="notifications")
 
+
 class Report(Base):
     __tablename__ = "reports"
 
@@ -425,10 +576,13 @@ class Report(Base):
     file_path = Column(String(500), nullable=True)
     file_format = Column(String(20), nullable=True)
     chart_data = Column(JSONB, nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     creator = relationship("User", foreign_keys=[created_by])
+
 
 class Forecast(Base):
     __tablename__ = "forecasts"
@@ -448,6 +602,7 @@ class Forecast(Base):
     insights = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 class Setting(Base):
     __tablename__ = "settings"
 
@@ -455,10 +610,11 @@ class Setting(Base):
     key = Column(String(255), unique=True, nullable=False)
     value = Column(Text, nullable=True)
     category = Column(String(100), nullable=False, server_default="general")
-    is_encrypted = Column(Boolean, nullable=False, server_default="false")
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class Role(Base):
@@ -470,19 +626,27 @@ class Role(Base):
     description = Column(Text, nullable=True)
     is_system = Column(Boolean, nullable=False, server_default="false")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
-    permissions = relationship("Permission", secondary="role_permissions", back_populates="roles")
+    permissions = relationship(
+        "Permission", secondary="role_permissions", back_populates="roles"
+    )
     users = relationship(
         "User",
         secondary="user_roles",
         back_populates="roles",
         foreign_keys="[UserRole.user_id, UserRole.role_id]",
         primaryjoin="Role.id==UserRole.role_id",
-        secondaryjoin="UserRole.user_id==User.id"
+        secondaryjoin="UserRole.user_id==User.id",
     )
-    field_permissions = relationship("FieldPermission", back_populates="role", cascade="all, delete-orphan")
-    data_policies = relationship("DataPolicy", back_populates="role", cascade="all, delete-orphan")
+    field_permissions = relationship(
+        "FieldPermission", back_populates="role", cascade="all, delete-orphan"
+    )
+    data_policies = relationship(
+        "DataPolicy", back_populates="role", cascade="all, delete-orphan"
+    )
 
 
 class Permission(Base):
@@ -495,15 +659,21 @@ class Permission(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    roles = relationship("Role", secondary="role_permissions", back_populates="permissions")
+    roles = relationship(
+        "Role", secondary="role_permissions", back_populates="permissions"
+    )
 
 
 class RolePermission(Base):
     __tablename__ = "role_permissions"
 
     id = Column(Integer, primary_key=True, index=True)
-    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
-    permission_id = Column(Integer, ForeignKey("permissions.id", ondelete="CASCADE"), nullable=False)
+    role_id = Column(
+        Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False
+    )
+    permission_id = Column(
+        Integer, ForeignKey("permissions.id", ondelete="CASCADE"), nullable=False
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -511,9 +681,15 @@ class UserRole(Base):
     __tablename__ = "user_roles"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
-    assigned_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    role_id = Column(
+        Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False
+    )
+    assigned_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     role = relationship("Role", foreign_keys=[role_id], overlaps="users,roles")
@@ -524,12 +700,16 @@ class FieldPermission(Base):
     __tablename__ = "field_permissions"
 
     id = Column(Integer, primary_key=True, index=True)
-    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    role_id = Column(
+        Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False
+    )
     resource = Column(String(100), nullable=False, index=True)
     field_name = Column(String(100), nullable=False)
     access_level = Column(String(20), nullable=False, server_default="read")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     role = relationship("Role", back_populates="field_permissions")
 
@@ -540,13 +720,17 @@ class DataPolicy(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     resource = Column(String(100), nullable=False, index=True)
-    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    role_id = Column(
+        Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False
+    )
     condition = Column(JSONB, nullable=True)
     effect = Column(String(10), nullable=False, server_default="allow")
     priority = Column(Integer, nullable=False, server_default="100")
     is_active = Column(Boolean, nullable=False, server_default="true")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     role = relationship("Role", back_populates="data_policies")
 
@@ -562,14 +746,18 @@ class SearchIndex(Base):
     meta_data = Column("metadata", JSONB, nullable=True)
     embedding = Column(LargeBinary, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class SearchQuery(Base):
     __tablename__ = "search_queries"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     query = Column(String(500), nullable=False)
     entity_types = Column(JSONB, nullable=True)
     results_count = Column(Integer, nullable=False, server_default="0")
@@ -586,7 +774,9 @@ class SearchSuggestion(Base):
     query = Column(String(500), nullable=False, index=True)
     entity_type = Column(String(50), nullable=True, index=True)
     count = Column(Integer, nullable=False, server_default="1")
-    last_used = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_used = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -606,30 +796,43 @@ class LLMModel(Base):
     supports_tools = Column(Boolean, nullable=False, server_default="false")
     context_window = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class AIConversation(Base):
     __tablename__ = "ai_conversations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     title = Column(String(500), nullable=True)
     model_id = Column(String(100), nullable=False)
     system_prompt = Column(Text, nullable=True)
     is_archived = Column(Boolean, nullable=False, server_default="false")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     user = relationship("User", foreign_keys=[user_id])
-    messages = relationship("AIMessage", back_populates="conversation", cascade="all, delete-orphan", order_by="AIMessage.created_at")
+    messages = relationship(
+        "AIMessage",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="AIMessage.created_at",
+    )
 
 
 class AIMessage(Base):
     __tablename__ = "ai_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    conversation_id = Column(Integer, ForeignKey("ai_conversations.id", ondelete="CASCADE"), nullable=False)
+    conversation_id = Column(
+        Integer, ForeignKey("ai_conversations.id", ondelete="CASCADE"), nullable=False
+    )
     role = Column(String(50), nullable=False)
     content = Column(Text, nullable=False)
     model_id = Column(String(100), nullable=True)
@@ -644,9 +847,13 @@ class LLMUsage(Base):
     __tablename__ = "llm_usage"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     model_id = Column(String(100), nullable=False, index=True)
-    conversation_id = Column(Integer, ForeignKey("ai_conversations.id", ondelete="SET NULL"), nullable=True)
+    conversation_id = Column(
+        Integer, ForeignKey("ai_conversations.id", ondelete="SET NULL"), nullable=True
+    )
     prompt_tokens = Column(Integer, nullable=False, server_default="0")
     completion_tokens = Column(Integer, nullable=False, server_default="0")
     total_tokens = Column(Integer, nullable=False, server_default="0")
@@ -673,9 +880,12 @@ class AIPromptTemplate(Base):
     category = Column(String(50), nullable=False, server_default="general")
     model_id = Column(String(100), nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
-    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     creator = relationship("User", foreign_keys=[created_by])
-

@@ -1,66 +1,84 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
-from pydantic import BaseModel, field_validator
-from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, field_validator
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.models import Product, InventoryMovement
-from app.auth import get_current_user
-from app.services.permissions import require_permission
+from app.models import InventoryMovement, Product
 from app.services.activity_log import log_activity
+from app.services.permissions import require_permission
 
 router = APIRouter()
+
 
 class ProductCreate(BaseModel):
     sku: str
     name: str
-    description: Optional[str] = None
-    category: Optional[str] = None
+    description: str | None = None
+    category: str | None = None
     unit_price: Decimal = Decimal("0")
-    cost_price: Optional[Decimal] = None
+    cost_price: Decimal | None = None
     quantity_in_stock: int = 0
     reorder_level: int = 10
     reorder_quantity: int = 50
-    supplier: Optional[str] = None
-    supplier_contact: Optional[str] = None
+    supplier: str | None = None
+    supplier_contact: str | None = None
     status: str = "active"
-    barcode: Optional[str] = None
-    weight: Optional[Decimal] = None
-    dimensions: Optional[str] = None
+    barcode: str | None = None
+    weight: Decimal | None = None
+    dimensions: str | None = None
+
 
 class ProductUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[str] = None
-    unit_price: Optional[Decimal] = None
-    cost_price: Optional[Decimal] = None
-    quantity_in_stock: Optional[int] = None
-    reorder_level: Optional[int] = None
-    reorder_quantity: Optional[int] = None
-    supplier: Optional[str] = None
-    supplier_contact: Optional[str] = None
-    status: Optional[str] = None
-    barcode: Optional[str] = None
-    weight: Optional[Decimal] = None
-    dimensions: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
+    category: str | None = None
+    unit_price: Decimal | None = None
+    cost_price: Decimal | None = None
+    quantity_in_stock: int | None = None
+    reorder_level: int | None = None
+    reorder_quantity: int | None = None
+    supplier: str | None = None
+    supplier_contact: str | None = None
+    status: str | None = None
+    barcode: str | None = None
+    weight: Decimal | None = None
+    dimensions: str | None = None
+
 
 class MovementCreate(BaseModel):
     product_id: int
     movement_type: str
     quantity: int
-    unit_cost: Optional[Decimal] = None
-    reference: Optional[str] = None
-    notes: Optional[str] = None
+    unit_cost: Decimal | None = None
+    reference: str | None = None
+    notes: str | None = None
 
     @field_validator("quantity")
     @classmethod
-    def quantity_must_be_positive(cls, v: int) -> int:
-        """Return a positive quantity unchanged; raise ValueError for zero or less."""
-        if v <= 0:
-            raise ValueError("Quantity must be positive")
+    def validate_quantity(cls, v: int, info) -> int:
+        """Validate quantity based on movement type.
+
+        For 'in' and 'out': must be positive.
+        For 'adjustment': must be non-negative (allows zero).
+        """
+        movement_type = info.data.get("movement_type")
+        if movement_type in ("in", "out"):
+            if v <= 0:
+                raise ValueError(
+                    "Quantity must be positive for 'in' and 'out' movements"
+                )
+        elif movement_type == "adjustment":
+            if v < 0:
+                raise ValueError(
+                    "Quantity must be non-negative for 'adjustment' movements"
+                )
+        else:
+            if v < 0:
+                raise ValueError("Quantity must be non-negative")
         return v
 
     @field_validator("movement_type")
@@ -72,10 +90,16 @@ class MovementCreate(BaseModel):
             raise ValueError(f"movement_type must be one of: {', '.join(allowed)}")
         return v
 
+
 ALLOWED_MOVEMENT_TYPES = {"in", "out", "adjustment"}
 
+
 @router.post("/products")
-def create_product(data: ProductCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("products", "create"))):
+def create_product(
+    data: ProductCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("products", "create")),
+):
     """Create, commit, and return a product.
 
     Raise HTTP 400 if the SKU already exists.
@@ -88,19 +112,26 @@ def create_product(data: ProductCreate, db: Session = Depends(get_db), current_u
     db.add(product)
     db.commit()
     db.refresh(product)
-    log_activity(db, user_id=current_user.id, action="product_created", entity_type="product", entity_id=product.id)
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="product_created",
+        entity_type="product",
+        entity_id=product.id,
+    )
     return product
+
 
 @router.get("/products")
 def list_products(
-    category: Optional[str] = None,
-    status: Optional[str] = None,
+    category: str | None = None,
+    status: str | None = None,
     low_stock: bool = False,
-    search: Optional[str] = None,
+    search: str | None = None,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user = Depends(require_permission("products", "read"))
+    current_user=Depends(require_permission("products", "read")),
 ):
     """Return a page of products, capping ``limit`` at 100.
 
@@ -121,16 +152,27 @@ def list_products(
         query = query.filter(Product.name.ilike(f"%{search}%"))
     return query.offset(skip).limit(limit).all()
 
+
 @router.get("/products/{product_id}")
-def get_product(product_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("products", "read"))):
+def get_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("products", "read")),
+):
     """Return the product, or raise HTTP 404 if it does not exist."""
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
+
 @router.put("/products/{product_id}")
-def update_product(product_id: int, data: ProductUpdate, db: Session = Depends(get_db), current_user = Depends(require_permission("products", "update"))):
+def update_product(
+    product_id: int,
+    data: ProductUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("products", "update")),
+):
     """Commit explicitly supplied fields and return the updated product.
 
     Omitted fields remain unchanged; explicit nulls are applied. Raise
@@ -148,8 +190,13 @@ def update_product(product_id: int, data: ProductUpdate, db: Session = Depends(g
     db.refresh(product)
     return product
 
+
 @router.delete("/products/{product_id}")
-def delete_product(product_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("products", "delete"))):
+def delete_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("products", "delete")),
+):
     """Delete and commit the product, then return a confirmation message.
 
     Raise HTTP 404 if the product does not exist.
@@ -161,19 +208,33 @@ def delete_product(product_id: int, db: Session = Depends(get_db), current_user 
     db.commit()
     return {"message": "Product deleted"}
 
+
 @router.post("/movements")
-def create_movement(data: MovementCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("inventory", "create"))):
+def create_movement(
+    data: MovementCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("inventory", "create")),
+):
     """Commit a stock movement and stock update and return the movement.
 
     The positive quantity adds stock for ``in``, subtracts stock for ``out``,
     and replaces the stock count for ``adjustment``. Raise HTTP 404 for a
     missing product or HTTP 400 for insufficient stock or an unsupported
     movement type. An outgoing movement may reduce stock to zero.
+    An adjustment may set stock to zero.
     """
     # Lock product row to prevent race conditions
-    product = db.query(Product).filter(Product.id == data.product_id).with_for_update().first()
+    product = (
+        db.query(Product)
+        .filter(Product.id == data.product_id)
+        .with_for_update()
+        .first()
+    )
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+
+    # Capture previous quantity for audit trail
+    previous_quantity = product.quantity_in_stock
 
     if data.movement_type == "in":
         product.quantity_in_stock += data.quantity
@@ -184,7 +245,10 @@ def create_movement(data: MovementCreate, db: Session = Depends(get_db), current
     elif data.movement_type == "adjustment":
         product.quantity_in_stock = data.quantity
     else:
-        raise HTTPException(status_code=400, detail=f"Invalid movement_type. Allowed: {', '.join(ALLOWED_MOVEMENT_TYPES)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid movement_type. Allowed: {', '.join(ALLOWED_MOVEMENT_TYPES)}",
+        )
 
     product.updated_at = datetime.utcnow()
     movement = InventoryMovement(
@@ -194,22 +258,35 @@ def create_movement(data: MovementCreate, db: Session = Depends(get_db), current
         unit_cost=data.unit_cost,
         reference=data.reference,
         notes=data.notes,
-        created_by=current_user.id
+        previous_quantity=previous_quantity,
+        new_quantity=product.quantity_in_stock,
+        created_by=current_user.id,
     )
     db.add(movement)
     db.commit()
     db.refresh(movement)
-    log_activity(db, user_id=current_user.id, action="inventory_moved", entity_type="inventory_movement", entity_id=movement.id)
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="inventory_moved",
+        entity_type="inventory_movement",
+        entity_id=movement.id,
+        details={
+            "previous_quantity": previous_quantity,
+            "new_quantity": product.quantity_in_stock,
+        },
+    )
     return movement
+
 
 @router.get("/movements")
 def list_movements(
-    product_id: Optional[int] = None,
-    movement_type: Optional[str] = None,
+    product_id: int | None = None,
+    movement_type: str | None = None,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user = Depends(require_permission("inventory", "read"))
+    current_user=Depends(require_permission("inventory", "read")),
 ):
     """Return movements newest first after ``skip`` records, capping ``limit`` at 100.
 
@@ -222,18 +299,33 @@ def list_movements(
         query = query.filter(InventoryMovement.product_id == product_id)
     if movement_type:
         query = query.filter(InventoryMovement.movement_type == movement_type)
-    return query.order_by(InventoryMovement.created_at.desc()).offset(skip).limit(limit).all()
+    return (
+        query.order_by(InventoryMovement.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
 
 @router.get("/dashboard")
-def inventory_dashboard(db: Session = Depends(get_db), current_user = Depends(require_permission("reports", "read"))):
+def inventory_dashboard(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("reports", "read")),
+):
     """Return product counts, stock value at unit price, and counts by category.
 
     Low stock includes quantities equal to the reorder level; out of stock
     counts only quantities equal to zero.
     """
     total_products = db.query(Product).count()
-    total_stock_value = db.query(func.sum(Product.quantity_in_stock * Product.unit_price)).scalar() or Decimal("0")
-    low_stock_count = db.query(Product).filter(Product.quantity_in_stock <= Product.reorder_level).count()
+    total_stock_value = db.query(
+        func.sum(Product.quantity_in_stock * Product.unit_price)
+    ).scalar() or Decimal("0")
+    low_stock_count = (
+        db.query(Product)
+        .filter(Product.quantity_in_stock <= Product.reorder_level)
+        .count()
+    )
     out_of_stock = db.query(Product).filter(Product.quantity_in_stock == 0).count()
 
     return {
@@ -241,5 +333,7 @@ def inventory_dashboard(db: Session = Depends(get_db), current_user = Depends(re
         "total_stock_value": float(total_stock_value),
         "low_stock_count": low_stock_count,
         "out_of_stock": out_of_stock,
-        "categories": db.query(Product.category, func.count(Product.id)).group_by(Product.category).all()
+        "categories": db.query(Product.category, func.count(Product.id))
+        .group_by(Product.category)
+        .all(),
     }

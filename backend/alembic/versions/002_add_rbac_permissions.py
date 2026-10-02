@@ -5,93 +5,112 @@ Revises: 001
 Create Date: 2024-06-15 10:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
-revision: str = '002'
-down_revision: Union[str, None] = '001'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "002"
+down_revision: str | None = "001"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
 
 def upgrade() -> None:
     # Roles table
     op.create_table(
-        'roles',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(length=100), nullable=False),
-        sa.Column('display_name', sa.String(length=255), nullable=False),
-        sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('is_system', sa.Boolean(), nullable=False, server_default='false'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
-        sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('name')
+        "roles",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("name", sa.String(length=100), nullable=False),
+        sa.Column("display_name", sa.String(length=255), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("is_system", sa.Boolean(), nullable=False, server_default="false"),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name"),
     )
 
     # Permissions table
     op.create_table(
-        'permissions',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(length=100), nullable=False),
-        sa.Column('resource', sa.String(length=100), nullable=False),
-        sa.Column('action', sa.String(length=50), nullable=False),
-        sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
-        sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('name')
+        "permissions",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("name", sa.String(length=100), nullable=False),
+        sa.Column("resource", sa.String(length=100), nullable=False),
+        sa.Column("action", sa.String(length=50), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name"),
     )
 
     # Role-Permission junction
     op.create_table(
-        'role_permissions',
-        sa.Column('role_id', sa.Integer(), nullable=False),
-        sa.Column('permission_id', sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['permission_id'], ['permissions.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('role_id', 'permission_id')
+        "role_permissions",
+        sa.Column("role_id", sa.Integer(), nullable=False),
+        sa.Column("permission_id", sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(["role_id"], ["roles.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["permission_id"], ["permissions.id"], ondelete="CASCADE"
+        ),
+        sa.PrimaryKeyConstraint("role_id", "permission_id"),
     )
 
     # User-Role junction (many-to-many)
     op.create_table(
-        'user_roles',
-        sa.Column('user_id', sa.Integer(), nullable=False),
-        sa.Column('role_id', sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('user_id', 'role_id')
+        "user_roles",
+        sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column("role_id", sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["role_id"], ["roles.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("user_id", "role_id"),
     )
 
     # Field-level permissions
     op.create_table(
-        'field_permissions',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('role_id', sa.Integer(), nullable=False),
-        sa.Column('resource', sa.String(length=100), nullable=False),
-        sa.Column('field_name', sa.String(length=100), nullable=False),
-        sa.Column('access_level', sa.String(length=20), nullable=False, server_default='read'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
-        sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('role_id', 'resource', 'field_name', name='uq_field_permission')
+        "field_permissions",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("role_id", sa.Integer(), nullable=False),
+        sa.Column("resource", sa.String(length=100), nullable=False),
+        sa.Column("field_name", sa.String(length=100), nullable=False),
+        sa.Column(
+            "access_level", sa.String(length=20), nullable=False, server_default="read"
+        ),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")
+        ),
+        sa.ForeignKeyConstraint(["role_id"], ["roles.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "role_id", "resource", "field_name", name="uq_field_permission"
+        ),
     )
 
     # Data policies (row-level access)
     op.create_table(
-        'data_policies',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(length=255), nullable=False),
-        sa.Column('resource', sa.String(length=100), nullable=False),
-        sa.Column('role_id', sa.Integer(), nullable=False),
-        sa.Column('condition', postgresql.JSONB(), nullable=True),
-        sa.Column('effect', sa.String(length=20), nullable=False, server_default='allow'),
-        sa.Column('priority', sa.Integer(), nullable=False, server_default='100'),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
-        sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('id')
+        "data_policies",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("resource", sa.String(length=100), nullable=False),
+        sa.Column("role_id", sa.Integer(), nullable=False),
+        sa.Column("condition", postgresql.JSONB(), nullable=True),
+        sa.Column(
+            "effect", sa.String(length=20), nullable=False, server_default="allow"
+        ),
+        sa.Column("priority", sa.Integer(), nullable=False, server_default="100"),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")
+        ),
+        sa.ForeignKeyConstraint(["role_id"], ["roles.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
     )
 
     # Insert default roles
@@ -206,11 +225,11 @@ def upgrade() -> None:
         FROM roles r WHERE r.name = 'viewer'
     """)
 
-def downgrade() -> None:
-    op.drop_table('data_policies')
-    op.drop_table('field_permissions')
-    op.drop_table('user_roles')
-    op.drop_table('role_permissions')
-    op.drop_table('permissions')
-    op.drop_table('roles')
 
+def downgrade() -> None:
+    op.drop_table("data_policies")
+    op.drop_table("field_permissions")
+    op.drop_table("user_roles")
+    op.drop_table("role_permissions")
+    op.drop_table("permissions")
+    op.drop_table("roles")

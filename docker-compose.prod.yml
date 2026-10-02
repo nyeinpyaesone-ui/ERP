@@ -108,9 +108,7 @@ services:
     image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION:-latest}
     container_name: erp-blue-frontend
     restart: unless-stopped
-    # Vite build-time env vars are baked in; runtime env not used
-    volumes:
-      - frontend_blue_static:/usr/share/nginx/html
+    # Frontend image contains built dist/ from build; no volume needed
     networks:
       - erp-network
     depends_on:
@@ -121,8 +119,6 @@ services:
     image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION:-latest}
     container_name: erp-green-frontend
     restart: unless-stopped
-    volumes:
-      - frontend_green_static:/usr/share/nginx/html
     networks:
       - erp-network
     depends_on:
@@ -164,8 +160,6 @@ volumes:
   redis_data:
   ollama_data:
   backend_logs:
-  frontend_blue_static:
-  frontend_green_static:
 
 networks:
   erp-network:

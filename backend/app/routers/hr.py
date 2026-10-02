@@ -1,80 +1,85 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from pydantic import BaseModel, field_validator
-from typing import Optional
 from datetime import date, datetime
 from decimal import Decimal
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.models import Employee, Department
-from app.auth import get_current_user
-from app.services.permissions import require_permission
+from app.models import Department, Employee
 from app.services.activity_log import log_activity
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
+
 class DepartmentCreate(BaseModel):
     name: str
-    description: Optional[str] = None
-    manager_id: Optional[int] = None
-    budget: Optional[Decimal] = None
+    description: str | None = None
+    manager_id: int | None = None
+    budget: Decimal | None = None
+
 
 class DepartmentUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    manager_id: Optional[int] = None
-    budget: Optional[Decimal] = None
+    name: str | None = None
+    description: str | None = None
+    manager_id: int | None = None
+    budget: Decimal | None = None
+
 
 class EmployeeCreate(BaseModel):
     employee_code: str
     job_title: str
-    department_id: Optional[int] = None
-    salary: Optional[Decimal] = None
+    department_id: int | None = None
+    salary: Decimal | None = None
     hire_date: date
     status: str = "active"
     employment_type: str = "full_time"
-    address: Optional[str] = None
-    emergency_contact: Optional[str] = None
-    phone: Optional[str] = None
-    date_of_birth: Optional[date] = None
+    address: str | None = None
+    emergency_contact: str | None = None
+    phone: str | None = None
+    date_of_birth: date | None = None
+
 
 class EmployeeUpdate(BaseModel):
-    job_title: Optional[str] = None
-    department_id: Optional[int] = None
-    salary: Optional[Decimal] = None
-    hire_date: Optional[date] = None
-    status: Optional[str] = None
-    employment_type: Optional[str] = None
-    address: Optional[str] = None
-    emergency_contact: Optional[str] = None
-    phone: Optional[str] = None
-    date_of_birth: Optional[date] = None
+    job_title: str | None = None
+    department_id: int | None = None
+    salary: Decimal | None = None
+    hire_date: date | None = None
+    status: str | None = None
+    employment_type: str | None = None
+    address: str | None = None
+    emergency_contact: str | None = None
+    phone: str | None = None
+    date_of_birth: date | None = None
+
 
 class EmployeeResponse(BaseModel):
     id: int
     employee_code: str
     job_title: str
-    department_id: Optional[int]
-    salary: Optional[Decimal]
+    department_id: int | None
+    salary: Decimal | None
     hire_date: date
     status: str
     employment_type: str
-    address: Optional[str]
-    emergency_contact: Optional[str]
-    phone: Optional[str]
-    date_of_birth: Optional[date]
+    address: str | None
+    emergency_contact: str | None
+    phone: str | None
+    date_of_birth: date | None
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime | None
 
     class Config:
         from_attributes = True
+
 
 class EmployeeListResponse(BaseModel):
     id: int
     employee_code: str
     job_title: str
-    department_id: Optional[int]
+    department_id: int | None
     hire_date: date
     status: str
     employment_type: str
@@ -82,35 +87,54 @@ class EmployeeListResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 @router.post("/departments")
-def create_department(data: DepartmentCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("departments", "create"))):
+def create_department(
+    data: DepartmentCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("departments", "create")),
+):
     """Create, commit, and return a department."""
     dept = Department(**data.model_dump())
     db.add(dept)
     db.commit()
     db.refresh(dept)
-    log_activity(db, user_id=current_user.id, action="department_created", entity_type="department", entity_id=dept.id)
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="department_created",
+        entity_type="department",
+        entity_id=dept.id,
+    )
     return dept
+
 
 @router.get("/departments")
 def list_departments(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user = Depends(require_permission("departments", "read"))
+    current_user=Depends(require_permission("departments", "read")),
 ):
     """Return departments after ``skip`` records, capping ``limit`` at 100."""
     if limit > 100:
         limit = 100
     return db.query(Department).offset(skip).limit(limit).all()
 
+
 @router.post("/employees")
-def create_employee(data: EmployeeCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("employees", "create"))):
+def create_employee(
+    data: EmployeeCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("employees", "create")),
+):
     """Create, commit, and return an employee.
 
     Raise HTTP 400 if the employee code already exists.
     """
-    existing = db.query(Employee).filter(Employee.employee_code == data.employee_code).first()
+    existing = (
+        db.query(Employee).filter(Employee.employee_code == data.employee_code).first()
+    )
     if existing:
         raise HTTPException(status_code=400, detail="Employee code already exists")
 
@@ -118,17 +142,24 @@ def create_employee(data: EmployeeCreate, db: Session = Depends(get_db), current
     db.add(emp)
     db.commit()
     db.refresh(emp)
-    log_activity(db, user_id=current_user.id, action="employee_created", entity_type="employee", entity_id=emp.id)
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="employee_created",
+        entity_type="employee",
+        entity_id=emp.id,
+    )
     return emp
+
 
 @router.get("/employees")
 def list_employees(
-    status: Optional[str] = None,
-    department_id: Optional[int] = None,
+    status: str | None = None,
+    department_id: int | None = None,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user = Depends(require_permission("employees", "read"))
+    current_user=Depends(require_permission("employees", "read")),
 ):
     """Return a page of employee work details, capping ``limit`` at 100.
 
@@ -153,22 +184,44 @@ def list_employees(
             "department_id": e.department_id,
             "hire_date": e.hire_date,
             "status": e.status,
-            "employment_type": e.employment_type
+            "employment_type": e.employment_type,
         }
         for e in employees
     ]
 
-@router.get("/employees/{employee_id}")
-def get_employee(employee_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("employees", "read"))):
-    """Return the employee, or raise HTTP 404 if it does not exist."""
+
+@router.get("/employees/{employee_id}", response_model=EmployeeListResponse)
+def get_employee(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("employees", "read")),
+):
+    """Return the employee work profile, or raise HTTP 404 if it does not exist.
+
+    Returns work details only (no PII like salary, address, phone, birth date).
+    Full PII fields require employees:update via the update endpoint.
+    """
     emp = db.query(Employee).filter(Employee.id == employee_id).first()
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found")
-    # Return full details for single employee (authorized access)
-    return emp
+    return {
+        "id": emp.id,
+        "employee_code": emp.employee_code,
+        "job_title": emp.job_title,
+        "department_id": emp.department_id,
+        "hire_date": emp.hire_date,
+        "status": emp.status,
+        "employment_type": emp.employment_type,
+    }
+
 
 @router.put("/employees/{employee_id}")
-def update_employee(employee_id: int, data: EmployeeUpdate, db: Session = Depends(get_db), current_user = Depends(require_permission("employees", "update"))):
+def update_employee(
+    employee_id: int,
+    data: EmployeeUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("employees", "update")),
+):
     """Commit explicitly supplied fields and return the updated employee.
 
     Omitted fields remain unchanged; explicit nulls are applied. Raise
@@ -186,8 +239,13 @@ def update_employee(employee_id: int, data: EmployeeUpdate, db: Session = Depend
     db.refresh(emp)
     return emp
 
+
 @router.delete("/employees/{employee_id}")
-def delete_employee(employee_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("employees", "delete"))):
+def delete_employee(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("employees", "delete")),
+):
     """Delete and commit the employee, then return a confirmation message.
 
     Raise HTTP 404 if the employee does not exist.
@@ -199,8 +257,12 @@ def delete_employee(employee_id: int, db: Session = Depends(get_db), current_use
     db.commit()
     return {"message": "Employee deleted"}
 
+
 @router.get("/dashboard")
-def hr_dashboard(db: Session = Depends(get_db), current_user = Depends(require_permission("reports", "read"))):
+def hr_dashboard(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("reports", "read")),
+):
     """Return employee and department counts with active-employee salary totals.
 
     ``monthly_payroll`` is the sum of stored salaries for active employees.
@@ -210,12 +272,16 @@ def hr_dashboard(db: Session = Depends(get_db), current_user = Depends(require_p
     total_employees = db.query(Employee).count()
     active_employees = db.query(Employee).filter(Employee.status == "active").count()
     total_departments = db.query(Department).count()
-    total_payroll = db.query(func.sum(Employee.salary)).filter(Employee.status == "active").scalar() or Decimal("0")
+    total_payroll = db.query(func.sum(Employee.salary)).filter(
+        Employee.status == "active"
+    ).scalar() or Decimal("0")
 
     return {
         "total_employees": total_employees,
         "active_employees": active_employees,
         "total_departments": total_departments,
         "monthly_payroll": float(total_payroll),
-        "avg_salary": float(total_payroll / active_employees) if active_employees > 0 else 0
+        "avg_salary": (
+            float(total_payroll / active_employees) if active_employees > 0 else 0
+        ),
     }

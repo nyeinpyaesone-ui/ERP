@@ -1,6 +1,6 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 pytest_plugins = ("pytest_asyncio",)
 
@@ -14,6 +14,7 @@ def anyio_backend():
 def client():
     """Create a test client for the FastAPI app."""
     from app.main import app
+
     with TestClient(app) as c:
         yield c
 
@@ -22,6 +23,7 @@ def client():
 async def async_client():
     """Create an async test client for the FastAPI app."""
     from app.main import app
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

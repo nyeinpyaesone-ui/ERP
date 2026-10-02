@@ -52,6 +52,10 @@ htmlcov/
 # Heap dumps
 *.heapsnapshot
 
+# Opencode session dumps
+session-*.md
+.opencode/session*
+
 # Backup artifacts
 scripts/backups/
 *.tar.gz

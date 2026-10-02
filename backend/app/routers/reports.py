@@ -1,25 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import Optional
-from datetime import datetime, date
-import io
 import base64
+import io
+from datetime import date
 
-from app.database import get_db
-from app.models import Invoice, Deal, Contact, Product, Employee, Project, Task
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
 from app.auth import get_current_user
-from app.services.activity_log import log_activity
+from app.database import get_db
+from app.models import Deal, Invoice, Product
 
 router = APIRouter()
 
+
 @router.get("/revenue")
 def revenue_report(
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
-    from sqlalchemy import func, extract
+    from sqlalchemy import extract, func
 
     query = db.query(Invoice)
     if start_date:
@@ -31,12 +31,17 @@ def revenue_report(
     total = sum(i.total or 0 for i in invoices)
     paid = sum(i.amount_paid or 0 for i in invoices)
 
-    monthly = db.query(
-        extract('month', Invoice.issue_date).label('month'),
-        extract('year', Invoice.issue_date).label('year'),
-        func.sum(Invoice.total).label('total'),
-        func.count(Invoice.id).label('count')
-    ).group_by('year', 'month').order_by('year', 'month').all()
+    monthly = (
+        db.query(
+            extract("month", Invoice.issue_date).label("month"),
+            extract("year", Invoice.issue_date).label("year"),
+            func.sum(Invoice.total).label("total"),
+            func.count(Invoice.id).label("count"),
+        )
+        .group_by("year", "month")
+        .order_by("year", "month")
+        .all()
+    )
 
     return {
         "total_revenue": float(total),
@@ -44,25 +49,42 @@ def revenue_report(
         "outstanding": float(total - paid),
         "invoice_count": len(invoices),
         "monthly_breakdown": [
-            {"month": f"{m.year}-{m.month}", "revenue": float(m.total), "count": m.count}
+            {
+                "month": f"{m.year}-{m.month}",
+                "revenue": float(m.total),
+                "count": m.count,
+            }
             for m in monthly
-        ]
+        ],
     }
 
+
 @router.get("/pipeline")
-def pipeline_report(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    stages = ["prospect", "qualification", "proposal", "negotiation", "closed_won", "closed_lost"]
+def pipeline_report(
+    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
+    stages = [
+        "prospect",
+        "qualification",
+        "proposal",
+        "negotiation",
+        "closed_won",
+        "closed_lost",
+    ]
     result = {}
     for stage in stages:
         deals = db.query(Deal).filter(Deal.stage == stage).all()
         result[stage] = {
             "count": len(deals),
-            "value": float(sum(d.value or 0 for d in deals))
+            "value": float(sum(d.value or 0 for d in deals)),
         }
     return result
 
+
 @router.get("/inventory")
-def inventory_report(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+def inventory_report(
+    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
     products = db.query(Product).all()
     total_value = sum(p.quantity_in_stock * p.unit_price for p in products)
     low_stock = [p for p in products if p.quantity_in_stock <= p.reorder_level]
@@ -75,22 +97,31 @@ def inventory_report(db: Session = Depends(get_db), current_user = Depends(get_c
             {"id": p.id, "name": p.name, "sku": p.sku, "stock": p.quantity_in_stock}
             for p in low_stock
         ],
-        "categories": {}
+        "categories": {},
     }
 
+
 @router.get("/chart/revenue")
-def revenue_chart(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+def revenue_chart(
+    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
     try:
         import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        from sqlalchemy import func, extract
 
-        monthly = db.query(
-            extract('month', Invoice.issue_date).label('month'),
-            extract('year', Invoice.issue_date).label('year'),
-            func.sum(Invoice.total).label('total')
-        ).group_by('year', 'month').order_by('year', 'month').all()
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from sqlalchemy import extract, func
+
+        monthly = (
+            db.query(
+                extract("month", Invoice.issue_date).label("month"),
+                extract("year", Invoice.issue_date).label("year"),
+                func.sum(Invoice.total).label("total"),
+            )
+            .group_by("year", "month")
+            .order_by("year", "month")
+            .all()
+        )
 
         if not monthly:
             return {"chart": None}
@@ -99,15 +130,15 @@ def revenue_chart(db: Session = Depends(get_db), current_user = Depends(get_curr
         values = [float(m.total) for m in monthly]
 
         fig, ax = plt.subplots(figsize=(10, 5))
-        ax.bar(labels, values, color='#4f46e5')
-        ax.set_xlabel('Month')
-        ax.set_ylabel('Revenue ($)')
-        ax.set_title('Monthly Revenue')
+        ax.bar(labels, values, color="#4f46e5")
+        ax.set_xlabel("Month")
+        ax.set_ylabel("Revenue ($)")
+        ax.set_title("Monthly Revenue")
         plt.xticks(rotation=45)
         plt.tight_layout()
 
         buf = io.BytesIO()
-        plt.savefig(buf, format='png')
+        plt.savefig(buf, format="png")
         buf.seek(0)
         img_base64 = base64.b64encode(buf.read()).decode()
         plt.close()
@@ -115,4 +146,3 @@ def revenue_chart(db: Session = Depends(get_db), current_user = Depends(get_curr
         return {"chart": f"data:image/png;base64,{img_base64}"}
     except Exception as e:
         return {"chart": None, "error": str(e)}
-

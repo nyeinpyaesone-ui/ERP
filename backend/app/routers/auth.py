@@ -1,26 +1,31 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
-from app.database import get_db
-from app.models import User, Role
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel, EmailStr
+from sqlalchemy.orm import Session
+
 from app.auth import (
-    verify_password, get_password_hash, create_access_token,
-    get_current_user, require_admin, require_superadmin
+    create_access_token,
+    get_current_user,
+    get_password_hash,
+    verify_password,
 )
-from app.services.permissions import require_permission
+from app.database import get_db
+from app.models import Role, User
 from app.services.activity_log import log_activity
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
 ALLOWED_ROLES = {"user", "admin"}  # superadmin only via require_superadmin
 
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: str
+
 
 class UserResponse(BaseModel):
     id: int
@@ -33,16 +38,19 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class Token(BaseModel):
     access_token: str
     token_type: str
     user: UserResponse
+
 
 class UserUpdate(BaseModel):
     email: EmailStr | None = None
     full_name: str | None = None
     is_active: bool | None = None
     roles: list[str] | None = None  # Role names to assign
+
 
 @router.post("/register", response_model=UserResponse)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
@@ -59,7 +67,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
         email=user_data.email,
         hashed_password=get_password_hash(user_data.password),
         full_name=user_data.full_name,
-        role="user"
+        role="user",
     )
     db.add(user)
     db.flush()
@@ -71,11 +79,20 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(user)
-    log_activity(db, user_id=user.id, action="user_registered", entity_type="user", entity_id=user.id)
+    log_activity(
+        db,
+        user_id=user.id,
+        action="user_registered",
+        entity_type="user",
+        entity_id=user.id,
+    )
     return user
 
+
 @router.post("/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+):
     """Authenticate using an email in ``username`` and return a bearer token and user.
 
     Update and commit the last-login time. Raise HTTP 401 for invalid
@@ -92,34 +109,35 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     db.commit()
 
     token = create_access_token({"sub": str(user.id), "role": user.role})
-    log_activity(db, user_id=user.id, action="user_login", entity_type="user", entity_id=user.id)
+    log_activity(
+        db, user_id=user.id, action="user_login", entity_type="user", entity_id=user.id
+    )
 
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": user
-    }
+    return {"access_token": token, "token_type": "bearer", "user": user}
+
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
 
 @router.get("/users", response_model=list[UserResponse])
 def list_users(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("users", "read"))
+    current_user: User = Depends(require_permission("users", "read")),
 ):
     """Return users after skipping ``skip`` records, limited to ``limit`` records."""
     return db.query(User).offset(skip).limit(limit).all()
+
 
 @router.put("/users/{user_id}")
 def update_user(
     user_id: int,
     user_data: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("users", "update"))
+    current_user: User = Depends(require_permission("users", "update")),
 ):
     """Commit explicitly supplied fields and return the updated user.
 

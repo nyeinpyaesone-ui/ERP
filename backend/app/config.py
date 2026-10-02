@@ -1,5 +1,8 @@
-from pydantic_settings import BaseSettings
+import json
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     APP_NAME: str = "ERP SOLUTION System"
@@ -16,6 +19,35 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-super-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+
+    # CORS: plain string in env (comma-separated or JSON array) so that
+    # pydantic-settings never attempts JSON decoding at the source layer.
+    # Use cors_origins_list to get the parsed list.
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse CORS_ORIGINS as a JSON array, a comma-separated string,
+        or a single origin. Never raises: falls back to splitting on commas.
+        Empty input falls back to local-dev defaults so allow_credentials
+        does not block every origin.
+        """
+        default = ["http://localhost:3000", "http://localhost:5173"]
+        raw = (self.CORS_ORIGINS or "").strip()
+        if not raw:
+            return default
+        if raw.startswith("["):
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, list):
+                items = [str(item).strip() for item in parsed if str(item).strip()]
+                if items:
+                    return items
+                return ["http://localhost:3000", "http://localhost:5173"]
+        parsed = [origin.strip() for origin in raw.split(",") if origin.strip()]
+        return parsed or ["http://localhost:3000", "http://localhost:5173"]
 
     # Email
     SMTP_HOST: str = "smtp.gmail.com"
@@ -40,13 +72,12 @@ class Settings(BaseSettings):
     # WebSocket
     WS_HEARTBEAT_INTERVAL: int = 30
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore"}
 
-@lru_cache()
+
+@lru_cache
 def get_settings() -> Settings:
     return Settings()
 
-settings = get_settings()
 
+settings = get_settings()

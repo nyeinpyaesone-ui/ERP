@@ -1,17 +1,17 @@
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
-from alembic import context
 import os
 import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Add the app directory to sys.path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-from app.database import Base
-from app.config import settings
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # Import all models so they are registered with Base.metadata
-from app import models
+from app.config import settings
+from app.database import Base
 
 config = context.config
 
@@ -21,7 +21,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url with the actual database URL from settings
-config.set_main_option('sqlalchemy.url', settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 
 def run_migrations_offline() -> None:
@@ -47,10 +47,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

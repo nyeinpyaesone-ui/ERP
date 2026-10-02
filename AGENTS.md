@@ -12,8 +12,10 @@
 │   │   ├── database.py     # SQLAlchemy engine/session
 │   │   ├── config.py       # Pydantic Settings (.env)
 │   │   └── auth.py         # JWT, bcrypt, RBAC dependencies
-│   ├── alembic/            # Migrations (001_initial needed, 002-004 exist)
+│   ├── alembic/            # Migrations 001-005 (001_initial exists, chain intact)
 │   ├── Dockerfile          # Single-stage (needs multi-stage)
+│   ├── pytest.ini          # Active pytest config — TAKES PRECEDENCE over pyproject.toml
+│   ├── pyproject.toml      # ruff/black/mypy/coverage/isort config
 │   ├── requirements.txt    # Created during fixes
 │   └── venv/               # Local venv (gitignored)
 ├── backend/frontend-react/  # WORKING Vite+React PWA (use this, not /frontend)
@@ -24,7 +26,7 @@
 ├── deploy.sh               # Manual SSH deploy (needs blue-green replacement)
 ├── scripts/                # deploy-blue-green.sh, backup.sh (created during fixes)
 ├── nginx/                  # nginx.conf, upstream configs (created during fixes)
-└── .github/workflows/      # CI (build only), CodeQL, Snyk, release
+└── .github/workflows/      # CI (Gitleaks gate, advisory lint), CodeQL, Snyk
 ```
 
 ## Critical Context
@@ -32,15 +34,17 @@
 **Two frontends exist:**
 - `/backend/frontend-react` — **WORKING**: Vite 6.4.3, React 18, PWA, builds successfully (2068 modules)
 - `/frontend` — **BROKEN**: No package.json, no nginx.conf, Dockerfile references missing files
-- **CI/CD builds `/frontend`** — will fail. Use `/backend/frontend-react` for any frontend work.
+- **CI/CD already targets `/backend/frontend-react`** — `.github/workflows/ci.yml` builds `backend/frontend-react/dist/`. The stale `/frontend` warning in older notes is resolved.
 
 **Database not running** — PostgreSQL/Redis only exist in docker-compose. Backend boots but fails on DB connection (expected). Run `docker-compose up -d postgres redis` first.
 
-**No tests exist** — Zero test files anywhere. `make test` and CI test steps will fail.
+**Tests exist and pass** — `backend/app/tests/`: `conftest.py`, `test_health.py`, `test_permission_consistency.py` (3 tests). Run with `make test` or `cd backend && . venv/bin/activate && pytest`. Note `pythonpath` lives in `pytest.ini`, not `pyproject.toml` — pytest.ini wins.
 
-**Alembic base migration missing** — Versions 002-004 exist but 001_initial.py needed for current models.
+**Alembic chain is intact** — 001 through 005. `005_reconcile_permissions.py` reconciles the permissions table against the catalogue. Not yet run against a live PostgreSQL.
 
-**npm 9 on Node 22 has cache bugs** — Use npm 10.9.2 (downloaded to `/tmp/opencode/npm10/package/bin/npm-cli.js`) for frontend installs.
+**`make test` frontend step fails** — `npx` is not on PATH in this environment (node v22.22.1 is at /usr/bin/node, but npm/npx are absent). Use npm 10.9.2 at `/tmp/opencode/npm10/package/bin/npm-cli.js` for frontend installs and builds.
+
+**Permissions have a single source of truth** — `backend/app/permissions_catalogue.py` defines all resources, actions, and role grants. `has_permission`/`get_user_permissions` live only in `app/services/permissions.py` (removed from `auth.py` to break a circular import). Any router calling `require_permission()` must reference a catalogue entry or `test_permission_consistency.py` fails.
 
 ## Key Commands
 
@@ -83,6 +87,9 @@ cd backend && source venv/bin/activate && alembic revision --autogenerate -m "in
 | Backend won't start | Start postgres/redis first: `docker-compose up -d postgres redis` |
 | Alembic "target database not up to date" | Run `alembic upgrade head` or create 001_initial migration |
 | CI builds broken frontend | Update `.github/workflows/ci.yml` context to `./backend/frontend-react` |
+| `npx: not found` in Makefile | npm/npx absent from PATH; use npm 10 at `/tmp/opencode/npm10/package/bin/npm-cli.js` |
+| pytest `ModuleNotFoundError: app` | `pythonpath` must be in `pytest.ini`; `pyproject.toml` `[tool.pytest.ini_options]` is ignored |
+| Postgres MCP queries fail | `POSTGRES_MCP_URL` unset **and** Postgres not running. `export POSTGRES_MCP_URL=...` then `docker-compose up -d postgres` |
 
 ## Environment Variables
 
@@ -108,10 +115,17 @@ CORS_ORIGINS=https://app.domain.com
 
 ## File Conventions
 
-- Python: `ruff`/`black` style (not configured yet), type hints required
-- TypeScript: `eslint` + `prettier` (config in `.github/workflows/package.json.devops-snippet.json`)
+- Python: `ruff`/`black` style (configured in `backend/pyproject.toml`), type hints required
+- TypeScript: no `eslint`/`prettier` config and no `lint` script in `backend/frontend-react/package.json` (CI's `npm run lint || true` is a no-op). The old `.github/workflows/package.json.devops-snippet.json` config was removed with the nested-workflow cleanup.
 - Migrations: `alembic revision --autogenerate -m "description"`
 - Docker: Multi-stage builds preferred (backend Dockerfile currently single-stage)
+
+## OpenCode Config
+
+- `opencode.json` (project) — watcher ignores, permissions, 4 MCP servers
+- `~/.config/opencode/opencode.jsonc` (global) — `share: disabled`, compaction, `mcp_timeout`
+- MCP servers: `postgres` (via `scripts/mcp-postgres.sh`), `filesystem`, `playwright`, `sequential-thinking`
+- `POSTGRES_MCP_URL` must be exported for the Postgres MCP server; wrapper exits 1 if unset
 
 ## References
 
@@ -119,5 +133,7 @@ CORS_ORIGINS=https://app.domain.com
 - `docker-compose.yml` / `docker-compose.prod.yml` — Service definitions
 - `backend/app/main.py` — App wiring, all routers
 - `backend/app/models.py` — Complete schema
+- `backend/app/permissions_catalogue.py` — Permission source of truth
 - `scripts/deploy-blue-green.sh` — New deploy automation
-- `.github/workflows/ci.yml` — Current CI (build only)
+- `scripts/mcp-postgres.sh` — Postgres MCP wrapper (reads `POSTGRES_MCP_URL`)
+- `.github/workflows/ci.yml` — Current CI (Gitleaks secret gate first, advisory lint)

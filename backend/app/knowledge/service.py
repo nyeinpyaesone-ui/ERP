@@ -1,18 +1,23 @@
-from typing import Optional, Dict, Any, List
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any
+
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 class KnowledgeQuery(BaseModel):
     query: str
-    category_id: Optional[int] = None
-    difficulty: Optional[str] = None
+    category_id: int | None = None
+    difficulty: str | None = None
     limit: int = 5
+
 
 class KnowledgeService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def search(self, query: KnowledgeQuery, embedding_model=None) -> List[Dict[str, Any]]:
+    async def search(
+        self, query: KnowledgeQuery, embedding_model=None
+    ) -> list[dict[str, Any]]:
         if embedding_model:
             query_embedding = await embedding_model.embed(query.query)
             sql = """
@@ -39,10 +44,14 @@ class KnowledgeService:
                     "id": row.id,
                     "title": row.title,
                     "slug": row.slug,
-                    "content": row.content[:500] + "..." if len(row.content) > 500 else row.content,
+                    "content": (
+                        row.content[:500] + "..."
+                        if len(row.content) > 500
+                        else row.content
+                    ),
                     "tags": row.tags,
                     "difficulty": row.difficulty,
-                    "relevance_score": 1.0 - float(row.distance)
+                    "relevance_score": 1.0 - float(row.distance),
                 }
                 for row in rows
             ]
@@ -68,20 +77,22 @@ class KnowledgeService:
                 "id": row.id,
                 "title": row.title,
                 "slug": row.slug,
-                "content": row.content[:500] + "..." if len(row.content) > 500 else row.content,
+                "content": (
+                    row.content[:500] + "..." if len(row.content) > 500 else row.content
+                ),
                 "tags": row.tags,
-                "difficulty": row.difficulty
+                "difficulty": row.difficulty,
             }
             for row in rows
         ]
 
-    async def get_article(self, slug: str) -> Optional[Dict[str, Any]]:
+    async def get_article(self, slug: str) -> dict[str, Any] | None:
         sql = "SELECT * FROM knowledge_articles WHERE slug = :slug AND is_published = TRUE"
         result = await self.db.execute(sql, {"slug": slug})
         row = result.fetchone()
         return dict(row) if row else None
 
-    async def get_by_category(self, category_id: int) -> List[Dict[str, Any]]:
+    async def get_by_category(self, category_id: int) -> list[dict[str, Any]]:
         sql = """
             SELECT id, title, slug, difficulty, tags
             FROM knowledge_articles
@@ -91,9 +102,15 @@ class KnowledgeService:
         result = await self.db.execute(sql, {"category_id": category_id})
         return [dict(row) for row in result.fetchall()]
 
-    async def get_learning_path(self, from_difficulty: str = "beginner") -> List[Dict[str, Any]]:
+    async def get_learning_path(
+        self, from_difficulty: str = "beginner"
+    ) -> list[dict[str, Any]]:
         difficulties = ["beginner", "intermediate", "advanced"]
-        start_idx = difficulties.index(from_difficulty) if from_difficulty in difficulties else 0
+        start_idx = (
+            difficulties.index(from_difficulty)
+            if from_difficulty in difficulties
+            else 0
+        )
 
         sql = """
             SELECT id, title, slug, difficulty, category_id, prerequisites
@@ -108,4 +125,3 @@ class KnowledgeService:
         """
         result = await self.db.execute(sql, {"difficulties": difficulties[start_idx:]})
         return [dict(row) for row in result.fetchall()]
-

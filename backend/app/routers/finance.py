@@ -1,42 +1,44 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
-from pydantic import BaseModel, field_validator
-from typing import Optional, List
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, field_validator
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Invoice, InvoiceItem, Payment
-from app.auth import get_current_user
-from app.services.permissions import require_permission
 from app.services.activity_log import log_activity
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
+
 class InvoiceItemCreate(BaseModel):
-    product_id: Optional[int] = None
+    product_id: int | None = None
     description: str
     quantity: Decimal = Decimal("1")
     unit_price: Decimal
 
+
 class InvoiceCreate(BaseModel):
     invoice_number: str
-    contact_id: Optional[int] = None
-    company_id: Optional[int] = None
+    contact_id: int | None = None
+    company_id: int | None = None
     issue_date: date
     due_date: date
     tax_rate: Decimal = Decimal("0")
-    notes: Optional[str] = None
-    terms: Optional[str] = None
-    items: List[InvoiceItemCreate]
+    notes: str | None = None
+    terms: str | None = None
+    items: list[InvoiceItemCreate]
+
 
 class PaymentCreate(BaseModel):
     invoice_id: int
     amount: Decimal
     payment_method: str
     payment_date: date
-    notes: Optional[str] = None
+    notes: str | None = None
 
     @field_validator("amount")
     @classmethod
@@ -46,20 +48,24 @@ class PaymentCreate(BaseModel):
             raise ValueError("Payment amount must be positive")
         return v
 
+
 ALLOWED_INVOICE_STATUSES = {"draft", "sent", "paid", "overdue", "cancelled", "partial"}
 
-def generate_invoice_number(db: Session) -> str:
-    count = db.query(Invoice).count() + 1
-    return f"INV-{datetime.now().year}-{count:05d}"
 
 @router.post("/invoices")
-def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("invoices", "create"))):
+def create_invoice(
+    data: InvoiceCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("invoices", "create")),
+):
     """Commit an invoice and its line items and return the invoice.
 
     ``tax_rate`` is a percentage applied to the sum of quantity times unit
     price. Raise HTTP 400 if the invoice number already exists.
     """
-    existing = db.query(Invoice).filter(Invoice.invoice_number == data.invoice_number).first()
+    existing = (
+        db.query(Invoice).filter(Invoice.invoice_number == data.invoice_number).first()
+    )
     if existing:
         raise HTTPException(status_code=400, detail="Invoice number already exists")
 
@@ -79,7 +85,7 @@ def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_u
         total=total,
         notes=data.notes,
         terms=data.terms,
-        created_by=current_user.id
+        created_by=current_user.id,
     )
     db.add(invoice)
     db.flush()
@@ -92,23 +98,30 @@ def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_u
             description=item_data.description,
             quantity=item_data.quantity,
             unit_price=item_data.unit_price,
-            total=item_total
+            total=item_total,
         )
         db.add(item)
 
     db.commit()
     db.refresh(invoice)
-    log_activity(db, user_id=current_user.id, action="invoice_created", entity_type="invoice", entity_id=invoice.id)
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="invoice_created",
+        entity_type="invoice",
+        entity_id=invoice.id,
+    )
     return invoice
+
 
 @router.get("/invoices")
 def list_invoices(
-    status: Optional[str] = None,
-    contact_id: Optional[int] = None,
+    status: str | None = None,
+    contact_id: int | None = None,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user = Depends(require_permission("invoices", "read"))
+    current_user=Depends(require_permission("invoices", "read")),
 ):
     """Return invoices newest first after ``skip`` records, capping ``limit`` at 100.
 
@@ -123,27 +136,36 @@ def list_invoices(
         query = query.filter(Invoice.contact_id == contact_id)
     return query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit).all()
 
+
 @router.get("/invoices/{invoice_id}")
-def get_invoice(invoice_id: int, db: Session = Depends(get_db), current_user = Depends(require_permission("invoices", "read"))):
+def get_invoice(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("invoices", "read")),
+):
     """Return the invoice, or raise HTTP 404 if it does not exist."""
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     return invoice
 
+
 @router.put("/invoices/{invoice_id}/status")
 def update_invoice_status(
     invoice_id: int,
     status: str,
     db: Session = Depends(get_db),
-    current_user = Depends(require_permission("invoices", "update"))
+    current_user=Depends(require_permission("invoices", "update")),
 ):
     """Commit a status from ``ALLOWED_INVOICE_STATUSES`` and return the invoice.
 
     Raise HTTP 400 for an unsupported status or HTTP 404 for a missing invoice.
     """
     if status not in ALLOWED_INVOICE_STATUSES:
-        raise HTTPException(status_code=400, detail=f"Invalid status. Allowed: {', '.join(ALLOWED_INVOICE_STATUSES)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Allowed: {', '.join(ALLOWED_INVOICE_STATUSES)}",
+        )
 
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
@@ -153,8 +175,13 @@ def update_invoice_status(
     db.refresh(invoice)
     return invoice
 
+
 @router.post("/payments")
-def create_payment(data: PaymentCreate, db: Session = Depends(get_db), current_user = Depends(require_permission("invoices", "create"))):
+def create_payment(
+    data: PaymentCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("invoices", "create")),
+):
     """Commit and return a payment, updating the invoice balance.
 
     Mark the invoice paid when its total is covered, otherwise partial. Raise
@@ -162,14 +189,21 @@ def create_payment(data: PaymentCreate, db: Session = Depends(get_db), current_u
     remaining balance; payment equal to the balance is accepted.
     """
     # Lock the invoice row to prevent race conditions
-    invoice = db.query(Invoice).filter(Invoice.id == data.invoice_id).with_for_update().first()
+    invoice = (
+        db.query(Invoice)
+        .filter(Invoice.id == data.invoice_id)
+        .with_for_update()
+        .first()
+    )
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     # Validate payment doesn't exceed remaining balance
     remaining = (invoice.total or Decimal("0")) - (invoice.amount_paid or Decimal("0"))
     if data.amount > remaining:
-        raise HTTPException(status_code=400, detail=f"Payment exceeds remaining balance of {remaining}")
+        raise HTTPException(
+            status_code=400, detail=f"Payment exceeds remaining balance of {remaining}"
+        )
 
     payment = Payment(
         invoice_id=data.invoice_id,
@@ -177,7 +211,7 @@ def create_payment(data: PaymentCreate, db: Session = Depends(get_db), current_u
         payment_method=data.payment_method,
         payment_date=data.payment_date,
         notes=data.notes,
-        created_by=current_user.id
+        created_by=current_user.id,
     )
     db.add(payment)
 
@@ -189,11 +223,21 @@ def create_payment(data: PaymentCreate, db: Session = Depends(get_db), current_u
 
     db.commit()
     db.refresh(payment)
-    log_activity(db, user_id=current_user.id, action="payment_received", entity_type="payment", entity_id=payment.id)
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="payment_received",
+        entity_type="payment",
+        entity_id=payment.id,
+    )
     return payment
 
+
 @router.get("/dashboard")
-def finance_dashboard(db: Session = Depends(get_db), current_user = Depends(require_permission("reports", "read"))):
+def finance_dashboard(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("reports", "read")),
+):
     """Return invoice counts, paid revenue, outstanding balances, and overdue counts.
 
     Outstanding and overdue calculations exclude only invoices marked paid.
@@ -202,16 +246,29 @@ def finance_dashboard(db: Session = Depends(get_db), current_user = Depends(requ
     """
     total_invoices = db.query(Invoice).count()
     total_revenue = db.query(func.sum(Invoice.amount_paid)).scalar() or Decimal("0")
-    outstanding = db.query(func.sum(Invoice.total - Invoice.amount_paid)).filter(Invoice.status != "paid").scalar() or Decimal("0")
-    overdue = db.query(Invoice).filter(Invoice.due_date < date.today(), Invoice.status != "paid").count()
+    outstanding = db.query(func.sum(Invoice.total - Invoice.amount_paid)).filter(
+        Invoice.status != "paid"
+    ).scalar() or Decimal("0")
+    overdue = (
+        db.query(Invoice)
+        .filter(Invoice.due_date < date.today(), Invoice.status != "paid")
+        .count()
+    )
 
     # Monthly revenue with year
     from sqlalchemy import extract
-    monthly = db.query(
-        extract('year', Invoice.issue_date).label('year'),
-        extract('month', Invoice.issue_date).label('month'),
-        func.sum(Invoice.total)
-    ).group_by(extract('year', Invoice.issue_date), extract('month', Invoice.issue_date)).all()
+
+    monthly = (
+        db.query(
+            extract("year", Invoice.issue_date).label("year"),
+            extract("month", Invoice.issue_date).label("month"),
+            func.sum(Invoice.total),
+        )
+        .group_by(
+            extract("year", Invoice.issue_date), extract("month", Invoice.issue_date)
+        )
+        .all()
+    )
 
     return {
         "total_invoices": total_invoices,
@@ -221,5 +278,5 @@ def finance_dashboard(db: Session = Depends(get_db), current_user = Depends(requ
         "monthly_revenue": [
             {"year": int(m.year), "month": int(m.month), "total": float(m[2] or 0)}
             for m in monthly
-        ]
+        ],
     }

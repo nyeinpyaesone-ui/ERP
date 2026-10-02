@@ -127,7 +127,7 @@ jobs:
       - name: Run backend tests
         run: |
           cd backend
-          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/erp_test pytest --cov=app --cov-fail-under=80 --cov-report=xml
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/erp_test pytest --cov=app --cov-report=xml --cov-fail-under=80
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -266,14 +266,14 @@ jobs:
       - name: Run Trivy on backend
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ vars.DOCKER_USER }}/erp-solution-backend:${{ github.sha }}
+          image-ref: ${{ vars.DOCKER_USER }}/erp-solution-backend:sha-${{ github.sha }}
           format: sarif
           output: trivy-backend.sarif
 
       - name: Run Trivy on frontend
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ vars.DOCKER_USER }}/erp-solution-frontend:${{ github.sha }}
+          image-ref: ${{ vars.DOCKER_USER }}/erp-solution-frontend:sha-${{ github.sha }}
           format: sarif
           output: trivy-frontend.sarif
 

@@ -2,166 +2,171 @@
 ###############################################################################
 # ERP SOLUTION — Seed Default Data
 # Creates default roles, permissions, and system settings
+# Uses app/permissions_catalogue as the single source of truth
 ###############################################################################
 
 import sys
+
 from sqlalchemy.orm import Session
-from app.database import SessionLocal, engine
-from app.models import (
-    Base, Role, Permission, RolePermission, UserRole,
-    FieldPermission, DataPolicy, Setting
+
+from app.database import SessionLocal
+from app.models import Permission, Role, Setting
+from app.permissions_catalogue import (
+    ROLE_GRANTS,
+    SYSTEM_ROLES,
+    get_actions_for_resource,
+    get_resources,
 )
+
 
 def seed_roles(db: Session):
     """Create default roles"""
-    roles = [
-        {"name": "superadmin", "display_name": "Super Administrator", "description": "Full system access", "is_system": True},
-        {"name": "admin", "display_name": "Administrator", "description": "Administrative access", "is_system": True},
-        {"name": "manager", "display_name": "Manager", "description": "Department/team management", "is_system": True},
-        {"name": "user", "display_name": "Standard User", "description": "Basic user access", "is_system": True},
-        {"name": "viewer", "display_name": "Viewer", "description": "Read-only access", "is_system": True},
-    ]
-    
-    for role_data in roles:
-        existing = db.query(Role).filter(Role.name == role_data["name"]).first()
+    for role_data in SYSTEM_ROLES:
+        existing = db.query(Role).filter(Role.name == role_data).first()
         if not existing:
-            role = Role(**role_data)
+            role = Role(
+                name=role_data,
+                display_name=role_data.title(),
+                description="",
+                is_system=True,
+            )
             db.add(role)
-            print(f"Created role: {role_data['name']}")
+            print(f"Created role: {role_data}")
         else:
-            print(f"Role exists: {role_data['name']}")
-    
+            print(f"Role exists: {role_data}")
+
     db.commit()
 
 
 def seed_permissions(db: Session):
-    """Create default permissions"""
-    resources = [
-        "users", "companies", "contacts", "deals", "products",
-        "invoices", "payments", "projects", "tasks", "documents",
-        "workflows", "reports", "analytics", "settings", "integrations",
-        "webhooks", "ai", "search", "notifications", "activity_logs"
-    ]
-    actions = ["create", "read", "update", "delete", "list", "export", "import"]
-    
-    for resource in resources:
-        for action in actions:
+    """Create default permissions from the catalogue"""
+    for resource in get_resources():
+        for action in get_actions_for_resource(resource):
             name = f"{resource}:{action}"
             existing = db.query(Permission).filter(Permission.name == name).first()
             if not existing:
+                desc = f"{action.capitalize()} {resource.replace('_', ' ')}"
                 perm = Permission(
-                    name=name,
-                    resource=resource,
-                    action=action,
-                    description=f"{action.capitalize()} {resource}"
+                    name=name, resource=resource, action=action, description=desc
                 )
                 db.add(perm)
                 print(f"Created permission: {name}")
-    
+
     db.commit()
 
 
 def seed_role_permissions(db: Session):
-    """Assign permissions to roles"""
-    # Superadmin gets all permissions
-    superadmin = db.query(Role).filter(Role.name == "superadmin").first()
-    admin = db.query(Role).filter(Role.name == "admin").first()
-    manager = db.query(Role).filter(Role.name == "manager").first()
-    user = db.query(Role).filter(Role.name == "user").first()
-    viewer = db.query(Role).filter(Role.name == "viewer").first()
-    
-    all_perms = db.query(Permission).all()
-    
-    # Superadmin - all permissions
-    for perm in all_perms:
-        existing = db.query(RolePermission).filter(
-            RolePermission.role_id == superadmin.id,
-            RolePermission.permission_id == perm.id
-        ).first()
-        if not existing:
-            db.add(RolePermission(role_id=superadmin.id, permission_id=perm.id))
-    
-    # Admin - all except user management
-    admin_perms = [p for p in all_perms if not p.name.startswith("users:")]
-    for perm in admin_perms:
-        existing = db.query(RolePermission).filter(
-            RolePermission.role_id == admin.id,
-            RolePermission.permission_id == perm.id
-        ).first()
-        if not existing:
-            db.add(RolePermission(role_id=admin.id, permission_id=perm.id))
-    
-    # Manager - CRUD on business objects
-    manager_actions = ["create", "read", "update", "list", "export"]
-    manager_resources = ["companies", "contacts", "deals", "products", "invoices", 
-                         "projects", "tasks", "documents", "reports"]
-    for resource in manager_resources:
-        for action in manager_actions:
-            perm = db.query(Permission).filter(Permission.name == f"{resource}:{action}").first()
-            if perm:
-                existing = db.query(RolePermission).filter(
-                    RolePermission.role_id == manager.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                if not existing:
-                    db.add(RolePermission(role_id=manager.id, permission_id=perm.id))
-    
-    # User - basic CRUD on own data
-    user_perms = [
-        "contacts:read", "contacts:create", "contacts:update",
-        "deals:read", "deals:create", "deals:update",
-        "tasks:read", "tasks:create", "tasks:update",
-        "documents:read", "documents:create",
-        "projects:read", "reports:read", "analytics:read",
-        "search:read", "ai:read", "notifications:read"
-    ]
-    for perm_name in user_perms:
-        perm = db.query(Permission).filter(Permission.name == perm_name).first()
-        if perm:
-            existing = db.query(RolePermission).filter(
-                RolePermission.role_id == user.id,
-                RolePermission.permission_id == perm.id
-            ).first()
-            if not existing:
-                db.add(RolePermission(role_id=user.id, permission_id=perm.id))
-    
-    # Viewer - read only
-    read_perms = [p for p in all_perms if p.action == "read"]
-    for perm in read_perms:
-        existing = db.query(RolePermission).filter(
-            RolePermission.role_id == viewer.id,
-            RolePermission.permission_id == perm.id
-        ).first()
-        if not existing:
-            db.add(RolePermission(role_id=viewer.id, permission_id=perm.id))
-    
+    """Assign permissions to roles from the catalogue grants"""
+    # Fetch role objects
+    roles = {
+        role.name: role
+        for role in db.query(Role).filter(Role.name.in_(SYSTEM_ROLES)).all()
+    }
+
+    # Get all permissions from DB
+    all_perms = {perm.name: perm.id for perm in db.query(Permission).all()}
+
+    for grant in ROLE_GRANTS:
+        role = roles.get(grant.role_name)
+        if not role:
+            print(f"Warning: Role {grant.role_name} not found, skipping")
+            continue
+
+        role_perm_ids = {rp.id for rp in role.permissions}
+
+        for perm_name in grant.permissions:
+            perm_id = all_perms.get(perm_name)
+            if not perm_id:
+                print(f"Warning: Permission '{perm_name}' not found in DB, skipping")
+                continue
+
+            if perm_id not in role_perm_ids:
+                from app.models import RolePermission
+
+                db.add(RolePermission(role_id=role.id, permission_id=perm_id))
+
     db.commit()
-    print("Role permissions assigned")
+    print("Role permissions assigned from catalogue grants")
 
 
 def seed_settings(db: Session):
     """Create default system settings"""
     settings = [
-        {"key": "company_name", "value": "ERP SOLUTION", "category": "general", "description": "Company display name"},
-        {"key": "timezone", "value": "UTC", "category": "general", "description": "Default timezone"},
-        {"key": "date_format", "value": "YYYY-MM-DD", "category": "general", "description": "Default date format"},
-        {"key": "currency", "value": "USD", "category": "finance", "description": "Default currency"},
-        {"key": "invoice_prefix", "value": "INV", "category": "finance", "description": "Invoice number prefix"},
-        {"key": "max_upload_size", "value": "52428800", "category": "system", "description": "Max upload size in bytes (50MB)"},
-        {"key": "session_timeout", "value": "86400", "category": "security", "description": "Session timeout in seconds (24h)"},
-        {"key": "password_min_length", "value": "8", "category": "security", "description": "Minimum password length"},
-        {"key": "enable_registration", "value": "false", "category": "security", "description": "Allow user self-registration"},
-        {"key": "ollama_model", "value": "llama3.1", "category": "ai", "description": "Default Ollama model"},
-        {"key": "ai_temperature", "value": "0.7", "category": "ai", "description": "Default AI temperature"},
+        {
+            "key": "company_name",
+            "value": "ERP SOLUTION",
+            "category": "general",
+            "description": "Company display name",
+        },
+        {
+            "key": "timezone",
+            "value": "UTC",
+            "category": "general",
+            "description": "Default timezone",
+        },
+        {
+            "key": "date_format",
+            "value": "YYYY-MM-DD",
+            "category": "general",
+            "description": "Default date format",
+        },
+        {
+            "key": "currency",
+            "value": "USD",
+            "category": "finance",
+            "description": "Default currency",
+        },
+        {
+            "key": "invoice_prefix",
+            "value": "INV",
+            "category": "finance",
+            "description": "Invoice number prefix",
+        },
+        {
+            "key": "max_upload_size",
+            "value": "52428800",
+            "category": "system",
+            "description": "Max upload size in bytes (50MB)",
+        },
+        {
+            "key": "session_timeout",
+            "value": "86400",
+            "category": "security",
+            "description": "Session timeout in seconds (24h)",
+        },
+        {
+            "key": "password_min_length",
+            "value": "8",
+            "category": "security",
+            "description": "Minimum password length",
+        },
+        {
+            "key": "enable_registration",
+            "value": "false",
+            "category": "security",
+            "description": "Allow user self-registration",
+        },
+        {
+            "key": "ollama_model",
+            "value": "llama3.1",
+            "category": "ai",
+            "description": "Default Ollama model",
+        },
+        {
+            "key": "ai_temperature",
+            "value": "0.7",
+            "category": "ai",
+            "description": "Default AI temperature",
+        },
     ]
-    
+
     for setting_data in settings:
         existing = db.query(Setting).filter(Setting.key == setting_data["key"]).first()
         if not existing:
             setting = Setting(**setting_data)
             db.add(setting)
             print(f"Created setting: {setting_data['key']}")
-    
+
     db.commit()
 
 
@@ -172,9 +177,9 @@ def main():
     current transaction and exit with status 1; earlier commits remain.
     """
     print("==========================================")
-    print("ERP SOLUTION — Seeding Default Data")
+    print("ERP SOLUTION — Seeding Default Data (from Catalogue)")
     print("==========================================")
-    
+
     db = SessionLocal()
     try:
         seed_roles(db)

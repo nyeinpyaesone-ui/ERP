@@ -5,7 +5,7 @@
 #   environment: production (default) | staging
 ###############################################################################
 
-set -e
+set -euo pipefail
 
 OUTPUT_DIR="${1:-/opt/erp-solution/backups}"
 ENVIRONMENT="${2:-production}"
@@ -18,6 +18,9 @@ if docker compose version &> /dev/null; then
     DOCKER_COMPOSE_CMD="docker compose"
 elif command -v docker-compose &> /dev/null; then
     DOCKER_COMPOSE_CMD="docker-compose"
+else
+    echo "Error: Neither 'docker compose' nor 'docker-compose' found" >&2
+    exit 1
 fi
 
 PROJECT_NAME="${ENVIRONMENT}-blue"
@@ -40,24 +43,34 @@ mkdir -p "${BACKUP_PATH}"
 
 # Backup source code (excluding .git and node_modules)
 echo "[1/4] Backing up source code..."
-tar -czf "${BACKUP_PATH}/source_code.tar.gz"     --exclude='.git'     --exclude='node_modules'     --exclude='venv'     --exclude='__pycache__'     --exclude='*.pyc'     /opt/erp-solution 2>/dev/null || tar -czf "${BACKUP_PATH}/source_code.tar.gz" --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' .
+tar -czf "${BACKUP_PATH}/source_code.tar.gz" \
+    --exclude='.git' \
+    --exclude='node_modules' \
+    --exclude='venv' \
+    --exclude='__pycache__' \
+    --exclude='*.pyc' \
+    /opt/erp-solution 2>/dev/null || tar -czf "${BACKUP_PATH}/source_code.tar.gz" --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' .
 echo "  ✓ Source code backed up"
 
-# Backup database (if running)
+# Backup database (if running) — never abort env/manifest on DB skip
 echo "[2/4] Backing up database..."
 if ${DOCKER_COMPOSE_CMD} -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps postgres 2>/dev/null | grep -q "Up"; then
-    ${DOCKER_COMPOSE_CMD} -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" exec -T postgres pg_dump -U erp erp_solution > "${BACKUP_PATH}/database.sql"
+    DB_USER="${DB_USER:-erp}"
+    DB_NAME="${DB_NAME:-erp_solution}"
+    ${DOCKER_COMPOSE_CMD} -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" exec -T postgres pg_dump -U "${DB_USER}" "${DB_NAME}" > "${BACKUP_PATH}/database.sql"
     echo "  ✓ Database backed up"
 else
-    echo "  ! PostgreSQL not running, skipping database backup"
+    echo "  ! PostgreSQL not running, database backup skipped (env + manifest continue)"
+    echo "PostgreSQL not running at $(date)" > "${BACKUP_PATH}/database.skipped"
 fi
 
-# Backup environment files
-echo "[3/4] Backing up environment files..."
+# Backup environment files (WITHOUT copying .env.production which contains secrets)
+echo "[3/4] Backing up environment template (without secrets)..."
 if [ -f "${ENV_FILE}" ]; then
-    cp "${ENV_FILE}" "${BACKUP_PATH}/env.production"
+    # Create a template without secrets
+    sed -E 's/^(DB_PASSWORD|REDIS_PASSWORD|SECRET_KEY|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|OPENAI_API_KEY|SMTP_PASSWORD|SENTRY_DSN)=.*/\1=(REDACTED)/' "${ENV_FILE}" > "${BACKUP_PATH}/env.template"
+    echo "  ✓ Environment template backed up (secrets redacted)"
 fi
-echo "  ✓ Environment files backed up"
 
 # Create backup manifest
 echo "[4/4] Creating backup manifest..."
@@ -73,7 +86,7 @@ Branch: $(git branch --show-current 2>/dev/null || echo "unknown")
 Contents:
 - source_code.tar.gz (full source)
 - database.sql (PostgreSQL dump)
-- env.production (production configuration)
+- env.template (environment template with redacted secrets)
 EOF
 echo "  ✓ Manifest created"
 

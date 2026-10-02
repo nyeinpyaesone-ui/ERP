@@ -1,31 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import Optional
-import stripe
 import asyncio
 from datetime import datetime
 
-from app.database import get_db
-from app.models import Invoice, Payment
+import stripe
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
 from app.auth import get_current_user
 from app.config import settings
-from app.services.activity_log import log_activity
+from app.database import get_db
+from app.models import Invoice, Payment
 
 router = APIRouter()
 
 if settings.STRIPE_SECRET_KEY:
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
+
 class PaymentIntentRequest(BaseModel):
     invoice_id: int
-    amount: Optional[float] = None
+    amount: float | None = None
+
 
 @router.post("/create-intent")
 def create_payment_intent(
     data: PaymentIntentRequest,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     if not settings.STRIPE_SECRET_KEY:
         raise HTTPException(status_code=400, detail="Stripe not configured")
@@ -41,7 +42,10 @@ def create_payment_intent(
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
             currency="usd",
-            metadata={"invoice_id": invoice.id, "invoice_number": invoice.invoice_number}
+            metadata={
+                "invoice_id": invoice.id,
+                "invoice_number": invoice.invoice_number,
+            },
         )
 
         invoice.stripe_payment_intent_id = intent.id
@@ -51,10 +55,11 @@ def create_payment_intent(
             "client_secret": intent.client_secret,
             "payment_intent_id": intent.id,
             "amount": amount,
-            "publishable_key": settings.STRIPE_PUBLISHABLE_KEY
+            "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
         }
     except stripe.error.StripeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
@@ -74,16 +79,20 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Webhook secret not configured")
 
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, settings.STRIPE_WEBHOOK_SECRET)
-    except (ValueError, stripe.error.SignatureVerificationError):
-        raise HTTPException(status_code=400, detail="Invalid signature")
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+    except (ValueError, stripe.error.SignatureVerificationError) as err:
+        raise HTTPException(status_code=400, detail="Invalid signature") from err
 
     if event["type"] == "payment_intent.succeeded":
         intent = event["data"]["object"]
         invoice_id = intent["metadata"].get("invoice_id")
 
         if invoice_id:
-            invoice = await asyncio.to_thread(lambda: db.query(Invoice).filter(Invoice.id == int(invoice_id)).first())
+            invoice = await asyncio.to_thread(
+                lambda: db.query(Invoice).filter(Invoice.id == int(invoice_id)).first()
+            )
             if invoice:
                 amount = intent["amount_received"] / 100
                 payment = Payment(
@@ -92,8 +101,12 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                     payment_method="stripe",
                     payment_date=datetime.now().date(),
                     stripe_payment_intent_id=intent["id"],
-                    stripe_charge_id=intent["charges"]["data"][0]["id"] if intent.get("charges") else None,
-                    status="completed"
+                    stripe_charge_id=(
+                        intent["charges"]["data"][0]["id"]
+                        if intent.get("charges")
+                        else None
+                    ),
+                    status="completed",
                 )
                 await asyncio.to_thread(db.add, payment)
                 invoice.amount_paid = (invoice.amount_paid or 0) + amount
@@ -102,4 +115,3 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 await asyncio.to_thread(db.commit)
 
     return {"status": "success"}
-
