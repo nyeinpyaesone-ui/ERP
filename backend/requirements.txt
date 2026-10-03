@@ -3,7 +3,7 @@
 # Docker image (python:3.11-slim) and CI.  Run `make venv` after changing.
 
 # ── Core ─────────────────────────────────────────────────────────────────────
-fastapi==0.141.1
+fastapi==0.142.2
 uvicorn[standard]==0.52.4
 SQLAlchemy==2.0.52
 psycopg2-binary==2.9.13
