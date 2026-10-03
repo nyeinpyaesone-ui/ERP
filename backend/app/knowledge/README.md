@@ -13,7 +13,7 @@ This is the **operational intelligence layer** that transforms your ERP SOLUTION
 - **Agent Registry** вҖ” Role-based agents (Orchestrator, Specialist, Reviewer, Executor, Observer)
 - **Configuration Management** вҖ” Runtime feature flags, model settings, business rules
 - **Domain Ontology** вҖ” Myanmar-specific structured data (townships, tax rates, border stations, terminology)
-- **AI Systems Thinking** вҖ” 24-article curriculum teaching AI how to reason about systems
+- **AI Systems Thinking** вҖ” 24-article curriculum teaching AI how to reason about systems (18 of 24 present; articles 13–18 pending)
 - **Knowledge Base** вҖ” Semantic search over articles with learning paths
 
 ---
@@ -221,9 +221,9 @@ erp_solution-knowledge-system/
 в”Ӯ       в”Ӯ   в””в”Җв”Җ service.py                 # Configuration management
 в”Ӯ       в”ңв”Җв”Җ knowledge/
 в”Ӯ       в”Ӯ   в”ңв”Җв”Җ service.py                 # Knowledge base search
-в”Ӯ       в”Ӯ   в””в”Җв”Җ routes.py                  # API endpoints
+в”Ӯ       в”Ӯ   в””в”Җв”Җ routes.py                  # API endpoints (planned — not yet in tree)
 в”ңв”Җв”Җ knowledge-base/
-в”Ӯ   в”ңв”Җв”Җ ai-systems-thinking/              # 24 curriculum articles
+в”Ӯ   в”ңв”Җв”Җ ai-systems-thinking/              # 18 curriculum articles present (13–18 pending)
 в”Ӯ   в”Ӯ   в”ңв”Җв”Җ 01_introduction.md
 в”Ӯ   в”Ӯ   в”ңв”Җв”Җ 02_ai_roles.md
 в”Ӯ   в”Ӯ   в”ңв”Җв”Җ ...

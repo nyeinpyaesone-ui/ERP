@@ -74,3 +74,17 @@ kubectl apply -f infra/k8s/
 ---
 
 **Full Changelog**: https://github.com/nyeinpyaesone-ui/ERP/commits/v1.0.0
+
+---
+
+## Appendix A — v1.0.0 snapshot vs HEAD (informational, added post-release)
+
+> This release note describes tag `v1.0.0`. It is a frozen snapshot.
+> Current development (`HEAD`, branch `main`) has diverged. Do not read module
+> paths below as current.
+
+- **Counts at tag:** `git ls-tree -r v1.0.0 --name-only | wc -l` = **274** tracked files.
+- **Counts at HEAD (2026-10-03):** `git ls-tree -r HEAD` = **259** files; `git rev-list --count HEAD` = **64** commits.
+- **Module-table erratum:** the table in "What's Included" sums to **279** (91+20+9+10+12+17+22+10+21+7+31+29), not the `274` in its heading. `274` is the total tracked-file count at the tag, not the module-file sum.
+- **Removed since v1.0.0** (absent from `HEAD` and worktree): `frontend/` — 51 files deleted (canonical frontend is now `backend/frontend-react/`); `backend-v2.1/` — 31 files; `backend-v1.8/` — 29 files; `docker/` — 4 files (superseded by root `nginx.conf`, `nginx/` and `docker-compose*.yml`).
+- **Added since v1.0.0** (selected): `RELEASE_v1.0.0.md`, `STATUS_CHECKLIST.md`, `AGENTS.md`, `docker-compose.prod.yml`, `nginx/`, `scripts/deploy-blue-green.sh`, `scripts/backup.sh`.

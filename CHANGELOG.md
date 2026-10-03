@@ -4,7 +4,7 @@
 
 ### Initial Release
 - 12 production modules extracted and organized
-- 295+ source files
+- 274 tracked files at tag `v1.0.0` (`git ls-tree -r v1.0.0 --name-only | wc -l`)
 - Multi-version backend (v1.8, v2.1, v2.2)
 - React Native mobile application
 - BI Dashboard, POS, MRP, E-commerce frontend modules

@@ -14,6 +14,13 @@
 | Kubernetes Deployment | v3.1 | ✅ Complete | 25+ manifests |
 | System Integration | v3.1 | ✅ Complete | This package |
 
+> Note (2026-10-03): `src/` in this folder is a 6-file reference skeleton
+> (`App.tsx`, `RootNavigator.tsx`, `common/index.tsx`, `useCommon.ts`,
+> `helpers.ts`, `types/index.ts`). The MRP/HR/POS/E-commerce navigators,
+> screens, stores and `mrp`/`hr`/`pos`/`ecommerce` type modules referenced
+> above are not present here — mobile/ roadmap likewise lists them as future
+> (P3). Treat those rows as target architecture, not shipped code.
+
 ## Architecture Overview
 
 ```

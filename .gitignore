@@ -57,3 +57,16 @@ session-*.md
 scripts/backups/
 *.tar.gz
 .env.production
+
+# Python tool caches (explicit)
+.ruff_cache/
+.mypy_cache/
+
+# Virtualenvs at any location
+venv/
+
+# Coverage extras
+coverage.xml
+
+# Packaging
+*.egg-info/
