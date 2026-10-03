@@ -9,7 +9,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 NGINX_CONF_DIR="${PROJECT_ROOT}/nginx"
+NGINX_CONF_FILE="${PROJECT_ROOT}/nginx.conf"
 SSL_DIR="/opt/erp-solution/ssl"
+# Path the same files have inside the erp-nginx container
+# (docker-compose.prod.yml mounts <project>/ssl at /etc/nginx/ssl).
+SSL_DIR_IN_CONTAINER="/etc/nginx/ssl"
 LOG_FILE="/opt/erp-solution/logs/ssl-setup-$(date +%Y%m%d-%H%M%S).log"
 
 DOMAIN="${1:-api.yourdomain.com}"
@@ -74,7 +78,11 @@ validate_inputs() {
 generate_nginx_config() {
     info "Generating nginx configuration for ${DOMAIN}..."
     
-    cat > "${NGINX_CONF_DIR}/ssl-${DOMAIN}.conf" <<EOF
+    # Written over the placeholder nginx/ssl.conf that docker-compose.prod.yml
+    # bind-mounts at /etc/nginx/conf.d/ssl.conf; nginx.conf includes that path
+    # from its http block.  Certificate paths must be the in-container ones,
+    # not the host paths.
+    cat > "${NGINX_CONF_DIR}/ssl.conf" <<EOF
 # Auto-generated SSL config for ${DOMAIN}
 # DO NOT EDIT MANUALLY - managed by setup-ssl.sh
 
@@ -95,21 +103,40 @@ server {
 }
 
 server {
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name ${DOMAIN};
     
-    ssl_certificate ${SSL_DIR}/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key ${SSL_DIR}/live/${DOMAIN}/privkey.pem;
+    ssl_certificate ${SSL_DIR_IN_CONTAINER}/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key ${SSL_DIR_IN_CONTAINER}/live/${DOMAIN}/privkey.pem;
     
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
     ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
     
-    # HSTS
+    # Security headers
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' wss:;" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     
-    # API endpoints
+    # Rate limit for auth endpoints (zone declared in nginx.conf)
+    location ~ ^/api/v1/auth/(login|register) {
+        limit_req zone=auth_limit burst=3 nodelay;
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+    
+    # API endpoints, including the WebSocket at /api/v1/ws
     location /api {
+        limit_req zone=api_limit burst=20 nodelay;
         proxy_pass http://backend;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -117,35 +144,39 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 300s;
-        proxy_send_timeout 300s;
+        # \$connection_upgrade is the map defined in nginx.conf; forcing
+        # "upgrade" unconditionally breaks ordinary HTTP/1.1 requests.
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_buffering off;
     }
     
-    # WebSocket
-    location /ws {
-        proxy_pass http://backend;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 86400s;
-    }
-    
-    # Health check
+    # Health/readiness checks (also reachable as /api/v1/health and
+    # /api/v1/ready).  There is no /ws route - the WebSocket lives under /api.
     location /health {
         proxy_pass http://backend;
         access_log off;
     }
     
-    # Readiness check
     location /ready {
         proxy_pass http://backend;
         access_log off;
     }
+    
+    # Everything else is the SPA
+    location / {
+        proxy_pass http://frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
 }
 EOF
     
-    success "Nginx config generated: ${NGINX_CONF_DIR}/ssl-${DOMAIN}.conf"
+    success "Nginx config generated: ${NGINX_CONF_DIR}/ssl.conf"
 }
 
 obtain_certificate() {
@@ -222,15 +253,17 @@ RENEWAL_SCRIPT
 }
 
 update_nginx_main_config() {
-    info "Updating main nginx configuration..."
+    info "Checking main nginx configuration..."
     
-    # Include the SSL config in main nginx.conf
-    if ! grep -q "include.*ssl-${DOMAIN}.conf" "${NGINX_CONF_DIR}/nginx.conf" 2>/dev/null; then
-        # Add include before the closing http brace
-        sed -i "/^http {/a \    include ${NGINX_CONF_DIR}/ssl-${DOMAIN}.conf;" "${NGINX_CONF_DIR}/nginx.conf"
-        success "Main nginx config updated"
+    # nginx.conf already carries "include /etc/nginx/conf.d/ssl.conf;" inside
+    # its http block, so there is nothing to inject - just make sure it is
+    # still there before we rely on the reload below.
+    if grep -q "include /etc/nginx/conf.d/ssl.conf;" "${NGINX_CONF_FILE}" 2>/dev/null; then
+        success "Main nginx.conf includes /etc/nginx/conf.d/ssl.conf"
     else
-        info "SSL config already included in main nginx.conf"
+        error "Main nginx config ${NGINX_CONF_FILE} is missing"
+        error "  'include /etc/nginx/conf.d/ssl.conf;' inside the http block"
+        exit 1
     fi
 }
 

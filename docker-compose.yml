@@ -58,7 +58,8 @@ services:
       dockerfile: Dockerfile
     container_name: erp-frontend
     ports:
-      - "3000:3000"
+      # nginx inside the image listens on 80 (see backend/frontend-react/Dockerfile)
+      - "3000:80"
     environment:
       REACT_APP_API_URL: http://localhost:8000
     depends_on:

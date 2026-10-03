@@ -150,6 +150,7 @@ services:
       - ./nginx/upstream-blue.conf:/etc/nginx/conf.d/upstream-blue.conf:ro
       - ./nginx/upstream-green.conf:/etc/nginx/conf.d/upstream-green.conf:ro
       - ./nginx/upstream-active.conf:/etc/nginx/conf.d/upstream-active.conf:ro
+      - ./nginx/ssl.conf:/etc/nginx/conf.d/ssl.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
       - ./logs/nginx:/var/log/nginx
     networks:
