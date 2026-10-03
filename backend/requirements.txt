@@ -17,7 +17,9 @@ python-multipart==0.0.32
 python-dotenv==1.2.3
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
-python-jose[cryptography]==3.5.0
+# PyJWT replaces python-jose (unmaintained; pulled ecdsa with an unfixable
+# Minerva timing CVE). HS256-only usage keeps the swap API-compatible.
+PyJWT==2.15.1
 passlib[bcrypt]==1.7.4
 # passlib 1.7.4 breaks on bcrypt 5.x's removed __about__ module.
 bcrypt<5.0.0
