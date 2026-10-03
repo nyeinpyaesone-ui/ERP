@@ -9,9 +9,12 @@ from alembic import context
 # Add the app directory to sys.path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-# Import all models so they are registered with Base.metadata
-from app.config import settings
-from app.database import Base
+# Importing the models registers every table on Base.metadata. Without this,
+# target_metadata is empty and `alembic revision --autogenerate` emits DROP
+# TABLE for the entire schema.
+import app.models  # noqa: E402,F401
+from app.config import settings  # noqa: E402
+from app.database import Base  # noqa: E402
 
 config = context.config
 
