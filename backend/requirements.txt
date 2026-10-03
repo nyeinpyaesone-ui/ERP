@@ -7,7 +7,7 @@ fastapi==0.141.1
 uvicorn[standard]==0.52.4
 SQLAlchemy==2.0.52
 psycopg2-binary==2.9.13
-alembic==1.13.1
+alembic==1.20.0
 
 # ── Validation / settings ────────────────────────────────────────────────────
 pydantic==2.13.5
