@@ -167,7 +167,7 @@ jobs:
           cd backend/frontend-react && npm run build
 
       - name: Upload frontend artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: backend/frontend-react/dist/
