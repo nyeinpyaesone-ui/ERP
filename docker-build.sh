@@ -23,7 +23,7 @@ echo ""
 
 # Build frontend
 echo "[3/5] Building frontend..."
-docker build -t $DOCKER_USER/erp-solution-frontend:$VERSION ./frontend
+docker build -t $DOCKER_USER/erp-solution-frontend:$VERSION ./backend/frontend-react
 echo ""
 
 # Tag latest

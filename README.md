@@ -50,7 +50,7 @@ docker-compose up -d      # Start services
 cd backend && source venv/bin/activate && uvicorn app.main:app --reload
 
 # Terminal 2 — Frontend
-cd frontend && npm run dev
+cd backend/frontend-react && npm run dev
 
 # Terminal 3 — Mobile
 cd mobile && npx expo start

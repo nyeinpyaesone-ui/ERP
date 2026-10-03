@@ -19,7 +19,7 @@ source venv/bin/activate
 uvicorn app.main:app --reload --port 8000
 
 # Terminal 2 — Frontend
-cd frontend
+cd backend/frontend-react
 npm run dev
 
 # Terminal 3 — Mobile (optional)

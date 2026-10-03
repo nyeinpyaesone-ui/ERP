@@ -40,7 +40,7 @@ echo "  ✅ Backend built: $DOCKER_USERNAME/erp-solution-backend:$VERSION"
 # Build frontend
 echo ""
 echo "[3/6] Building frontend image..."
-docker build -t $DOCKER_USERNAME/erp-solution-frontend:$VERSION ./frontend
+docker build -t $DOCKER_USERNAME/erp-solution-frontend:$VERSION ./backend/frontend-react
 echo "  ✅ Frontend built: $DOCKER_USERNAME/erp-solution-frontend:$VERSION"
 
 # Tag as latest

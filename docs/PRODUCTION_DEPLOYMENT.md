@@ -39,39 +39,38 @@ cp backend/.env.example backend/.env
 # Edit: DATABASE_URL, REDIS_URL, SECRET_KEY
 
 # 3. Start production stack
-docker-compose -f docker-compose.yml up -d
+docker-compose -f docker-compose.prod.yml up -d
 
 # 4. Run migrations
-docker-compose exec backend alembic upgrade head
+docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
 
-# 5. Verify
-curl http://localhost:8000/health
+# 5. Verify (nginx is the only published port in the prod stack)
+curl http://localhost/api/v1/health
 ```
 
 ### Option 2: Kubernetes (Production Scale)
 
 ```bash
-# 1. Apply manifests
-kubectl apply -f infra/k8s/namespace.yaml
-kubectl apply -f infra/k8s/configmap.yaml
-kubectl apply -f infra/k8s/secrets.yaml
-kubectl apply -f infra/k8s/postgres.yaml
-kubectl apply -f infra/k8s/redis.yaml
-kubectl apply -f infra/k8s/backend.yaml
-kubectl apply -f infra/k8s/frontend.yaml
-kubectl apply -f infra/k8s/ingress.yaml
+# 1. Apply the kustomize base (manifests live in infra/k8s/base/, not loose
+#    files at infra/k8s/*.yaml)
+kubectl apply -k infra/k8s/base
 
 # 2. Verify
 kubectl get pods -n erp_solution
 kubectl get svc -n erp_solution
 ```
 
-### Option 3: GitHub Actions Auto-Deploy
+### Option 3: Blue-Green Script
 
-The `.github/workflows/release.yml` automatically:
-1. Builds Docker images on version tags (`v*`)
-2. Pushes to Docker Hub
-3. Can trigger deployment to your server
+`.github/workflows/` has no release workflow — tags do not deploy anything on
+their own. Run the script on the server instead:
+
+```bash
+./scripts/deploy-blue-green.sh production v1.2.3
+./scripts/deploy-blue-green.sh production v1.2.2 --rollback
+```
+
+See `DEPLOYMENT_GUIDE.md` and `docs/BLUE_GREEN_DEPLOYMENT.md`.
 
 ## Environment Variables
 
@@ -81,7 +80,7 @@ DATABASE_URL=postgresql://erp:password@postgres:5432/erp_solution
 REDIS_URL=redis://redis:6379/0
 SECRET_KEY=your-256-bit-secret-key
 ENVIRONMENT=production
-OLLAMA_URL=http://ollama:11434
+OLLAMA_BASE_URL=http://ollama:11434
 CORS_ORIGINS=https://yourdomain.com
 JWT_EXPIRE_MINUTES=60
 ```

@@ -2,45 +2,49 @@
 
 ## Testing Strategy
 
-### Unit Tests
+### Backend Unit Tests
+Tests live in `backend/app/tests/` (with `app/tests/unit/`). They need no
+running services: fixtures use SQLite in-memory engines or mocked sessions, so
+PostgreSQL and Redis are not required.
 ```bash
 cd backend
 source venv/bin/activate
-pytest tests/ -v --cov=app --cov-report=html
+pytest app/tests/ -v --cov=app --cov-report=html
 ```
 
-### Integration Tests
-```bash
-cd backend
-pytest tests/integration/ -v
-```
+Integration tests that need PostgreSQL are marked `integration`; none exist yet.
 
 ### Frontend Tests
+Vitest, via the `test` script. This is the only script the package defines for
+testing — there is no `test:coverage` or `lint` script.
 ```bash
-cd frontend
+cd backend/frontend-react
+npm ci
 npm test
-npm run test:coverage
 ```
 
 ### E2E Tests
-```bash
-cd frontend
-npx playwright test
-```
+No Playwright/Cypress configuration exists yet, so there is nothing to run.
 
 ### Mobile Tests
+The Expo package defines `start`/`android`/`ios`/`web` only — no `test` script.
 ```bash
 cd mobile
-npm test
+npm run web
 ```
 
-## Test Coverage Targets
-| Module | Target |
-|--------|--------|
-| Backend API | 85% |
-| Frontend Components | 80% |
-| Mobile Screens | 75% |
-| Integration | 70% |
+## Coverage
+
+CI enforces `--cov-fail-under=58` (see `.github/workflows/ci.yml` and
+`backend/pyproject.toml`). That number is a ratchet: it is the measured floor,
+raised as coverage grows — it was never a goal of 80, which the suite could not
+reach.
+
+| Module | Measured | Aspiration |
+|--------|----------|------------|
+| Backend API | 58.3% | 85% |
+| Frontend Components | (no threshold) | 80% |
+| Mobile Screens | (untested) | 75% |
 
 ## CI/CD Testing
 Tests run automatically on:

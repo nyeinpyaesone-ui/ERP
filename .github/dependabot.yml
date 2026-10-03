@@ -12,7 +12,7 @@ updates:
 
   # Node.js dependencies (Frontend)
   - package-ecosystem: "npm"
-    directory: "/frontend"
+    directory: "/backend/frontend-react"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10

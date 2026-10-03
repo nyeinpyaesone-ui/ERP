@@ -104,35 +104,20 @@ mkdir -p /opt/erp-solution/ssl /opt/erp-solution/logs/nginx /opt/erp-solution/ba
 docker-compose -f docker-compose.prod.yml up -d
 
 # 6. Verify deployment
-curl https://api.yourdomain.com/health
-curl https://api.yourdomain.com/ready
+# /health and /ready are served by the API, so they carry the /api/v1 prefix
+# once they pass through nginx
+curl https://api.yourdomain.com/api/v1/health
+curl https://api.yourdomain.com/api/v1/ready
 ```
 
 ## Deployment Commands
 
-### Using Make (Recommended)
+### Using Make
 
-```bash
-# Deploy to staging (auto on push to main)
-make deploy-staging
-
-# Deploy specific version to production
-make deploy-production VERSION=v1.2.3
-
-# Deploy latest to production
-make deploy-production
-
-# Rollback production
-make rollback
-
-# Rollback to specific version
-make rollback VERSION=v1.2.2
-
-# View logs
-make logs
-make logs-backend
-make logs-frontend
-```
+`make` only covers local development (see `make help`): `install`, `dev`,
+`build`, `test`, `lint`, `clean`, `docker-up`, `docker-down`, `push`, `status`.
+There is no `deploy-*`, `rollback` or `logs-*` target — deployment runs from
+`scripts/`, which you invoke directly.
 
 ### Using Scripts Directly
 
@@ -149,16 +134,17 @@ make logs-frontend
 # SSL setup
 ./scripts/setup-ssl.sh api.yourdomain.com admin@yourdomain.com
 
-# Manual SSL renewal
-./scripts/renew-ssl.sh
+# Manual SSL renewal (setup-ssl.sh writes this onto the server; there is no
+# copy of it in the repo)
+/opt/erp-solution/scripts/renew-ssl.sh
 ```
 
 ### Using GitHub Actions
 
-1. **Automatic Staging**: Push to `main` branch → auto-deploys to staging
-2. **Production Release**: Create git tag `v1.2.3` → triggers production deploy
-3. **Manual Deploy**: Actions → Deploy workflow → Run workflow
-4. **Rollback**: Actions → Deploy workflow → Run with `rollback: true`
+There is no deploy workflow. `.github/workflows/` holds `ci.yml` (test/lint
+gate), `codeql.yml` and `snyk-container.yml` — none of them deploy. Pushes to
+`main` run CI only, and tags release nothing. Deployment is manual, via
+`./scripts/deploy-blue-green.sh`.
 
 ## Blue-Green Deployment Details
 
@@ -344,7 +330,7 @@ cp backup/backend.env /opt/erp-solution/.env.production
 |-------|----------|
 | Backend unhealthy | Check logs: `docker logs erp-blue-backend` |
 | Nginx 502 Bad Gateway | Verify backend container is running and healthy |
-| SSL certificate expired | Run `./scripts/renew-ssl.sh` |
+| SSL certificate expired | Run `/opt/erp-solution/scripts/renew-ssl.sh` on the server |
 | Database connection failed | Verify PostgreSQL is running and credentials correct |
 | Deployment stuck | Check deployment logs in `/opt/erp-solution/logs/` |
 
