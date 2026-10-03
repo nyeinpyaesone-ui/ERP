@@ -130,7 +130,7 @@ jobs:
           DATABASE_URL=postgresql://postgres:postgres@localhost:5432/erp_test pytest --cov=app --cov-report=xml --cov-fail-under=58
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           files: ./backend/coverage.xml
           flags: backend
