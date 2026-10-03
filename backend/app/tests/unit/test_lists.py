@@ -35,22 +35,22 @@ def test_list_pagination_caps_limit_and_keeps_offset(
 def test_employee_list_excludes_personal_and_salary_data(
     db: Mock, actor: SimpleNamespace
 ) -> None:
-    public = dict(
-        id=1,
-        employee_code="E1",
-        job_title="Analyst",
-        department_id=3,
-        hire_date=date(2026, 1, 1),
-        status="active",
-        employment_type="full_time",
-    )
+    public = {
+        "id": 1,
+        "employee_code": "E1",
+        "job_title": "Analyst",
+        "department_id": 3,
+        "hire_date": date(2026, 1, 1),
+        "status": "active",
+        "employment_type": "full_time",
+    }
     employee = SimpleNamespace(
         **public,
         salary=Decimal("1200.00"),
         address="Private address",
         phone="555-0100",
         emergency_contact="Private contact",
-        date_of_birth=date(1990, 1, 1)
+        date_of_birth=date(1990, 1, 1),
     )
     db.query.return_value.all.return_value = [employee]
     assert hr.list_employees(db=db, current_user=actor) == [public]

@@ -126,7 +126,9 @@ ROLE_GRANTS: tuple[RolePermGrant, ...] = (
             if r not in ("users", "settings", "migrations", "admin")
         ),
     ),
-    # user: basic CRUD on core resources
+    # user: basic CRUD on core resources. Finance stays read-only — the
+    # frontend already gates /finance to admin/manager, so grant writes only
+    # to those roles.
     RolePermGrant(
         role_name="user",
         permissions=tuple(
@@ -142,6 +144,7 @@ ROLE_GRANTS: tuple[RolePermGrant, ...] = (
                 "integrations",
                 "webhooks",
             )
+            and not (r in ("invoices", "payments") and a in ("create", "update"))
         ),
     ),
     # viewer: read-only

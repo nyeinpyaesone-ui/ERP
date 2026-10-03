@@ -42,7 +42,7 @@ def test_reindex_updates_existing_record_and_clears_old_metadata(db: Mock) -> No
     "content,metadata,updated",
     [(None, None, None), ("x" * 201, {"status": "active"}, datetime(2026, 1, 1))],
 )
-def test_search_returns_pair_and_serializes_mapped_fields(
+def test_search_returns_triple_and_serializes_mapped_fields(
     db: Mock, content: str | None, metadata: dict | None, updated: datetime | None
 ) -> None:
     db.query.return_value.all.return_value = [
@@ -57,7 +57,8 @@ def test_search_returns_pair_and_serializes_mapped_fields(
         )
     ]
     db.query.return_value.count.return_value = 9
-    rows, total = SearchService(db).search("", limit=2, offset=4)
+    rows, total, execution_time = SearchService(db).search("", limit=2, offset=4)
+    assert execution_time >= 0
     assert total == 9
     assert rows == [
         {
@@ -92,7 +93,9 @@ def test_search_uses_bound_terms_and_mapped_json_metadata(db: Mock) -> None:
 
 @pytest.mark.parametrize("query", ["", " ", "\t"])
 def test_empty_search_does_not_build_fulltext_predicate(db: Mock, query: str) -> None:
-    assert SearchService(db).search(query) == ([], 0)
+    rows, total, execution_time = SearchService(db).search(query)
+    assert (rows, total) == ([], 0)
+    assert execution_time >= 0
     db.query.return_value.filter.assert_not_called()
 
 

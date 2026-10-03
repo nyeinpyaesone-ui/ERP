@@ -59,27 +59,27 @@ def test_list_routes_enforce_specific_read_permission(
         assert response.json() == []
     else:
         assert response.status_code == 403
-        assert response.json() == {"detail": f"Permission denied: {resource}.read"}
+        assert response.json() == {"detail": f"Permission denied: {resource}:read"}
         db.query.assert_not_called()
 
 
 @pytest.mark.parametrize(
     "module,method,path,permission",
     [
-        (auth, "put", "/users/1", "users.update"),
-        (crm, "post", "/companies", "companies.create"),
-        (crm, "put", "/contacts/1", "contacts.update"),
-        (crm, "delete", "/deals/1", "deals.delete"),
-        (documents, "post", "/upload", "documents.create"),
-        (documents, "delete", "/documents/1", "documents.delete"),
-        (finance, "post", "/payments", "invoices.create"),
-        (finance, "put", "/invoices/1/status?status=paid", "invoices.update"),
-        (hr, "delete", "/employees/1", "employees.delete"),
-        (inventory, "post", "/movements", "inventory.create"),
-        (crm, "get", "/dashboard", "reports.read"),
-        (finance, "get", "/dashboard", "reports.read"),
-        (hr, "get", "/dashboard", "reports.read"),
-        (inventory, "get", "/dashboard", "reports.read"),
+        (auth, "put", "/users/1", "users:update"),
+        (crm, "post", "/companies", "companies:create"),
+        (crm, "put", "/contacts/1", "contacts:update"),
+        (crm, "delete", "/deals/1", "deals:delete"),
+        (documents, "post", "/upload", "documents:create"),
+        (documents, "delete", "/documents/1", "documents:delete"),
+        (finance, "post", "/payments", "invoices:create"),
+        (finance, "put", "/invoices/1/status?status=paid", "invoices:update"),
+        (hr, "delete", "/employees/1", "employees:delete"),
+        (inventory, "post", "/movements", "inventory:create"),
+        (crm, "get", "/dashboard", "reports:read"),
+        (finance, "get", "/dashboard", "reports:read"),
+        (hr, "get", "/dashboard", "reports:read"),
+        (inventory, "get", "/dashboard", "reports:read"),
     ],
 )
 def test_changed_write_and_report_routes_deny_unprivileged_users(

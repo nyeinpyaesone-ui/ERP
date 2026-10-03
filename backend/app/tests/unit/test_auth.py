@@ -4,9 +4,10 @@ from unittest.mock import Mock
 import pytest
 from fastapi import HTTPException
 
-from app import auth as auth_service
 from app.models import Permission, Role, User
+from app.permissions_catalogue import ALL_PERMISSIONS
 from app.routers import auth
+from app.services.permissions import get_user_permissions, has_permission
 
 pytestmark = pytest.mark.unit
 
@@ -98,9 +99,12 @@ def test_user_update_preserves_protected_fields_and_syncs_roles(
         roles=[original_role],
     )
     db.query.return_value.first.side_effect = [user, manager, None]
-    changes = dict(
-        full_name="New", id=99, role="superadmin", hashed_password="replacement"
-    )
+    changes = {
+        "full_name": "New",
+        "id": 99,
+        "role": "superadmin",
+        "hashed_password": "replacement",
+    }
     if roles is not None:
         changes["roles"] = roles
 
@@ -133,22 +137,23 @@ def test_permission_helpers_return_synchronous_deduplicated_results(db: Mock) ->
     read = Permission(resource="contacts", action="read")
     write = Permission(resource="contacts", action="update")
     user = User(
-        role="user", roles=[Role(permissions=[read]), Role(permissions=[read, write])]
+        role="user",
+        is_active=True,
+        roles=[Role(permissions=[read]), Role(permissions=[read, write])],
     )
-    assert set(auth_service.get_user_permissions(user, db)) == {
+    assert set(get_user_permissions(user, db)) == {
         "contacts:read",
         "contacts:update",
     }
-    assert auth_service.has_permission(user, "contacts:read", db) is True
-    assert auth_service.has_permission(user, "contacts:delete", db) is False
+    assert has_permission(user, "contacts", "read", db) is True
+    assert has_permission(user, "contacts", "delete", db) is False
 
 
-@pytest.mark.parametrize("role,expected", [("user", []), ("superadmin", ["*"])])
-def test_permission_helpers_handle_empty_roles(
-    db: Mock, role: str, expected: list[str]
-) -> None:
-    user = User(role=role, roles=[])
-    assert auth_service.get_user_permissions(user, db) == expected
-    assert auth_service.has_permission(user, "users:delete", db) is (
-        role == "superadmin"
-    )
+@pytest.mark.parametrize("role", ["user", "superadmin"])
+def test_permission_helpers_handle_empty_roles(db: Mock, role: str) -> None:
+    user = User(role=role, is_active=True, roles=[])
+    if role == "superadmin":
+        assert set(get_user_permissions(user, db)) == set(ALL_PERMISSIONS)
+    else:
+        assert get_user_permissions(user, db) == []
+    assert has_permission(user, "users", "delete", db) is (role == "superadmin")

@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.models import Base, Permission, Role, RolePermission, Setting, User, UserRole
+from app.permissions_catalogue import ALL_PERMISSIONS
 from app.scripts import seed_defaults
 
 pytestmark = pytest.mark.integration
@@ -66,7 +67,7 @@ def test_seed_is_repeatable_and_preserves_customized_settings(rbac_db: Session) 
         seed_defaults.seed_settings(rbac_db)
         rbac_db.expire_all()
         assert rbac_db.query(Role).count() == 5
-        assert rbac_db.query(Permission).count() == 140
+        assert rbac_db.query(Permission).count() == len(ALL_PERMISSIONS)
         assert rbac_db.query(Setting).count() == 11
         assert rbac_db.query(Setting).filter_by(key="currency").one().value == "EUR"
         assignments = rbac_db.query(RolePermission).all()
@@ -80,9 +81,8 @@ def test_seed_is_repeatable_and_preserves_customized_settings(rbac_db: Session) 
     }
     all_permissions = {perm.name for perm in rbac_db.query(Permission).all()}
     assert roles["superadmin"] == all_permissions
-    assert roles["admin"] == {
-        name for name in all_permissions if not name.startswith("users:")
-    }
+    # Admin holds everything except the one superadmin-only grant (see catalogue).
+    assert roles["admin"] == all_permissions - {"migrations:manage"}
     assert roles["viewer"] == {
         name for name in all_permissions if name.endswith(":read")
     }

@@ -20,7 +20,8 @@ def application(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 async def test_lifespan_does_not_create_database_schema(
     application, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.main import Base, lifespan
+    from app.database import Base
+    from app.main import lifespan
 
     create = Mock(side_effect=AssertionError("Schema creation belongs to migrations"))
     monkeypatch.setattr(Base.metadata, "create_all", create)
