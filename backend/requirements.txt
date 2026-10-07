@@ -26,8 +26,9 @@ python-dotenv==1.2.4
 # Minerva timing CVE). HS256-only usage keeps the swap API-compatible.
 PyJWT==2.15.1
 passlib[bcrypt]==1.7.4
-# passlib 1.7.4 breaks on bcrypt 5.x's removed __about__ module.
-bcrypt<5.0.0
+# passlib 1.7.4 breaks on bcrypt 5.x's removed __about__ module, hence the
+# upper bound. Exact-pinned (not just "<5") so the image is reproducible.
+bcrypt==4.3.0
 
 # ── Integrations / clients ───────────────────────────────────────────────────
 httpx==0.28.1
