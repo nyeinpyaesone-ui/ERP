@@ -36,7 +36,7 @@
 
 **Database not running** — PostgreSQL/Redis only exist in docker-compose. Backend boots but fails on DB connection (expected). Run `docker compose up -d postgres redis` first.
 
-**Tests exist and pass** — `backend/app/tests/` (`unit/` plus top-level files): 285 tests, coverage 58.84%. Run with `make test` or `cd backend && . venv/bin/activate && pytest`. Note `pythonpath` and `testpaths` live in `pytest.ini`, not `pyproject.toml` — pytest.ini wins. CI enforces `--cov-fail-under=58`. No PostgreSQL needed: fixtures use SQLite in-memory or mocks.
+**Tests exist and pass** — `backend/app/tests/` (`unit/` plus top-level files): 285 tests, coverage 58.21%. Run with `make test` or `cd backend && . venv/bin/activate && pytest`. Note `pythonpath` and `testpaths` live in `pytest.ini`, not `pyproject.toml` — pytest.ini wins. The coverage floor (58) is declared once in `backend/pyproject.toml`; CI passes no `--cov-fail-under`. No PostgreSQL needed: fixtures use SQLite in-memory or mocks.
 
 **Alembic chain is intact** — 001 through 008. `005` reconciles the permissions table against the catalogue; `007`/`008` bring the migrated schema level with `app/models.py` (verified: all 39 tables, columns and primary keys match). `alembic/env.py` imports `app.models`, so `revision --autogenerate` now works. Still only exercised in offline `--sql` mode — no live PostgreSQL here.
 
