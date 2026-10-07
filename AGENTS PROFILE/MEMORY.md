@@ -4,7 +4,7 @@ Durable cross-session state. Companion to [`AGENTS.md`](../AGENTS.md)
 (AGENTS.md = **how the repo works**; this file = **what is true right now**).
 Append-only ledger; never store secrets (env var *names* only).
 
-**Last verified:** 2026-10-08 (session: CI/CD hardening — pins, Trivy fix, release workflow)
+**Last verified:** 2026-10-08 (session: CI/CD hardening + prod env correctness)
 
 ---
 
