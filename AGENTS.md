@@ -114,7 +114,7 @@ CORS_ORIGINS=https://app.domain.com
 ## File Conventions
 
 - Python: `ruff`/`black` style (configured in `backend/pyproject.toml`), type hints required
-- TypeScript: no `eslint`/`prettier` config and no `lint` script in `backend/frontend-react/package.json`. CI does **not** run frontend lint/tsc (the old `npm run lint || true` + `tsc || true` steps were removed as no-ops — real eslint tracked in IMPROVEMENTS.md). The old `.github/workflows/package.json.devops-snippet.json` config was removed with the nested-workflow cleanup.
+- TypeScript: **eslint 10 flat config** (`eslint.config.js`) + `npm run lint` — fails on errors (currently 0 errors / 127 warnings); CI enforces it. No tsc/prettier (JSX project, no tsconfig). The old `.github/workflows/package.json.devops-snippet.json` config was removed with the nested-workflow cleanup.
 - Migrations: `alembic revision --autogenerate -m "description"` (works now that `env.py` imports `app.models`; check the generated diff against `Base.metadata` before committing)
 - Docker: Multi-stage builds preferred (backend Dockerfile: builder + runtime `AS` stages — already multi-stage)
 
@@ -150,4 +150,4 @@ state there — cross-link, never duplicate.
 - `backend/app/permissions_catalogue.py` — Permission source of truth
 - `scripts/deploy-blue-green.sh` — New deploy automation
 - `scripts/mcp-postgres.sh` — Postgres MCP wrapper (reads `POSTGRES_MCP_URL`)
-- `.github/workflows/ci.yml` — Current CI (Gitleaks secret gate first; backend ruff+black enforced, mypy advisory; no frontend lint step)
+- `.github/workflows/ci.yml` — Current CI (Gitleaks secret gate first; backend ruff+black enforced, mypy advisory; frontend real eslint enforced)

@@ -33,7 +33,7 @@ Scope: **what to improve next, in order**. IDs are referenced from
 | ⬜ **IMP-P2-2** | v1.1.0 (Q3 2026): AI forecasting, NL queries, auto reports, anomaly detection, Thai/Vietnamese | `ROADMAP.md`, `CHANGELOG.md` |
 | ⬜ **IMP-P2-3** | Verify/repair **mobile** (Expo SDK 50 — marked unverified in AGENTS.md) | `mobile/README.md` |
 | ⬜ **IMP-P2-4** | v1.2.0+: offline mobile, barcode/QR, advanced RBAC/audit, multi-currency, BI → v2.0.0 microservices | `ROADMAP.md` |
-| ⬜ **IMP-P2-5** | Add real **eslint** config + `lint` script for `frontend-react` (replaces the removed CI no-op; IMP-P0-4) | `frontend-react/`, `ci.yml` | `npm run lint` fails on real errors; CI enforces it |
+| ✅ **IMP-P2-5** | Add real **eslint** config + `lint` script for `frontend-react` (replaces the removed CI no-op; IMP-P0-4) | `frontend-react/`, `ci.yml` | **Done 2026-10-08:** `fe239e9f` — 0 errors / 127 warnings, CI enforces |
 
 ## Working agreement
 

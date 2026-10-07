@@ -82,6 +82,10 @@ Append-only ledger; never store secrets (env var *names* only).
   (all hunks superseded; mobile-ci templates noted for IMP-P2-3), backend/.env
   created from example with random SECRET_KEY (gitignored). SQLAlchemy 2.1
   upgrade attempted → reverted (D-007). **Not pushed** (ask-gate).
+- **Done (2026-10-08 lint pass):** endpoint prefix matrix verified — 57/57
+  frontend calls ↔ 98 backend routes exact match; AIChat stream token bug
+  fixed (`lastContent`→`lastMsg`, `8b3bf6de`); real eslint 10 flat config +
+  `npm run lint` + CI step (`fe239e9f`); `make test` green (ledger ✅).
 
 ## 4. Open threads
 
@@ -103,6 +107,8 @@ Append-only ledger; never store secrets (env var *names* only).
 | backend `ruff check` + `black --check` | ✅ clean (67 files) | 2026-10-08 |
 | `backend/frontend-react` vitest | ✅ 105/105 (incl. single-client gate) | 2026-10-08 |
 | `backend/frontend-react` build | ✅ vite + PWA sw generated | 2026-10-08 |
+| `backend/frontend-react` lint (eslint 10) | ✅ 0 errors / 127 warnings; CI enforces | 2026-10-08 |
+| `make test` (backend + frontend) | ✅ pytest 285 + vitest 105 both green | 2026-10-08 |
 | `alembic upgrade head --sql` (offline) | ✅ 47 DDL stmts to 008 | 2026-10-08 |
 | `alembic upgrade head` vs live DB | ⬜ not run — docker daemon down | — |
 | Full suite w/ `make test` | ⬜ not run this session (pytest used directly) | — |
