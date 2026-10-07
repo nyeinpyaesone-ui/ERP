@@ -7,37 +7,54 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-NGINX_CONF_DIR="${PROJECT_ROOT}/nginx"
+# shellcheck source=lib.sh
+. "${SCRIPT_DIR}/lib.sh"
+PROJECT_ROOT="${ERP_PROJECT_ROOT}"
+NGINX_CONF_DIR="${ERP_NGINX_DIR}"
 NGINX_CONF_FILE="${PROJECT_ROOT}/nginx.conf"
-SSL_DIR="/opt/erp-solution/ssl"
+SSL_DIR="${ERP_SSL_DIR}"
 # Path the same files have inside the erp-nginx container
 # (docker-compose.prod.yml mounts <project>/ssl at /etc/nginx/ssl).
 SSL_DIR_IN_CONTAINER="/etc/nginx/ssl"
-LOG_FILE="/opt/erp-solution/logs/ssl-setup-$(date +%Y%m%d-%H%M%S).log"
+mkdir -p "${ERP_DIR}/logs"
+LOG_FILE="${ERP_DIR}/logs/ssl-setup-$(date +%Y%m%d-%H%M%S).log"
+export ERP_LOG_FILE="${LOG_FILE}"
 
-DOMAIN="${1:-api.yourdomain.com}"
-EMAIL="${2:-admin@yourdomain.com}"
+# Sensible defaults, but a placeholder domain must never be sent to Let's
+# Encrypt: it would burn a rate-limit attempt on a name that cannot validate.
+DOMAIN="${1:-}"
+EMAIL="${2:-}"
 STAGING="${3:-false}"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+usage() {
+    cat <<'USAGE'
+Usage: ./scripts/setup-ssl.sh <domain> [email] [--staging]
 
-log() {
-    local level="$1"
-    shift
-    local msg="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${timestamp} [${level}] ${msg}" | tee -a "${LOG_FILE}"
+  domain   Fully-qualified name to certify, e.g. api.erp.example.com
+  email    Let's Encrypt contact address
+  --staging  Use the Let's Encrypt staging environment (untrusted by browsers)
+
+Certificates are written to <install>/ssl/live/<domain>/ and the nginx TLS
+block is regenerated to match, so the running proxy picks them up on reload.
+
+Examples:
+  ./scripts/setup-ssl.sh api.erp.example.com ops@erp.example.com
+  ./scripts/setup-ssl.sh api.erp.example.com ops@erp.example.com --staging
+USAGE
 }
 
-info() { log "INFO" "${BLUE}$*${NC}"; }
-success() { log "SUCCESS" "${GREEN}$*${NC}"; }
-warn() { log "WARN" "${YELLOW}$*${NC}"; }
-error() { log "ERROR" "${RED}$*${NC}"; }
+for arg in "$@"; do
+    case "${arg}" in
+        --staging) STAGING=true ;;
+        --help|-h) usage; exit 0 ;;
+    esac
+done
+
+log()       { erp_log "$@"; }
+info()      { erp_info "$@"; }
+success()   { erp_success "$@"; }
+warn()      { erp_warn "$@"; }
+error()     { erp_error "$@"; }
 
 cleanup() {
     local exit_code=$?
@@ -51,7 +68,26 @@ trap cleanup EXIT
 
 validate_inputs() {
     info "Validating inputs..."
-    
+
+    if [ -z "${DOMAIN}" ] || [ -z "${EMAIL}" ]; then
+        error "Both a domain and a contact email are required."
+        usage
+        exit 1
+    fi
+    if [[ "${DOMAIN}" == *"yourdomain"* ]] || [ "${EMAIL}" == *"yourdomain"* ]; then
+        error "Refusing to request a certificate for the placeholder ${DOMAIN}."
+        exit 1
+    fi
+    # A certificate has to be issued against a fully-qualified name, so the
+    # value must contain a dot. "localhost" and bare hostnames cannot validate.
+    case "${DOMAIN}" in
+        *.*) ;;
+        *)
+            error "Not a fully-qualified domain: ${DOMAIN}"
+            error "Pass the name including the subdomain, e.g. api.erp.example.com."
+            exit 1
+            ;;
+    esac
     if [[ ! "${DOMAIN}" =~ ^[a-zA-Z0-9.-]+$ ]]; then
         error "Invalid domain format: ${DOMAIN}"
         exit 1
@@ -76,107 +112,11 @@ validate_inputs() {
 }
 
 generate_nginx_config() {
-    info "Generating nginx configuration for ${DOMAIN}..."
-    
-    # Written over the placeholder nginx/ssl.conf that docker-compose.prod.yml
-    # bind-mounts at /etc/nginx/conf.d/ssl.conf; nginx.conf includes that path
-    # from its http block.  Certificate paths must be the in-container ones,
-    # not the host paths.
-    cat > "${NGINX_CONF_DIR}/ssl.conf" <<EOF
-# Auto-generated SSL config for ${DOMAIN}
-# DO NOT EDIT MANUALLY - managed by setup-ssl.sh
-
-server {
-    listen 80;
-    server_name ${DOMAIN};
-    
-    # ACME challenge location for Let's Encrypt
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-        try_files \$uri =404;
-    }
-    
-    # Redirect all other traffic to HTTPS
-    location / {
-        return 301 https://\$host\$request_uri;
-    }
-}
-
-server {
-    listen 443 ssl;
-    http2 on;
-    server_name ${DOMAIN};
-    
-    ssl_certificate ${SSL_DIR_IN_CONTAINER}/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key ${SSL_DIR_IN_CONTAINER}/live/${DOMAIN}/privkey.pem;
-    
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
-    
-    # Security headers
-    add_header X-Frame-Options "DENY" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' wss:;" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    
-    # Rate limit for auth endpoints (zone declared in nginx.conf)
-    location ~ ^/api/v1/auth/(login|register) {
-        limit_req zone=auth_limit burst=3 nodelay;
-        proxy_pass http://backend;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-    
-    # API endpoints, including the WebSocket at /api/v1/ws
-    location /api {
-        limit_req zone=api_limit burst=20 nodelay;
-        proxy_pass http://backend;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header Upgrade \$http_upgrade;
-        # \$connection_upgrade is the map defined in nginx.conf; forcing
-        # "upgrade" unconditionally breaks ordinary HTTP/1.1 requests.
-        proxy_set_header Connection \$connection_upgrade;
-        proxy_read_timeout 3600s;
-        proxy_send_timeout 3600s;
-        proxy_buffering off;
-    }
-    
-    # Health/readiness checks (also reachable as /api/v1/health and
-    # /api/v1/ready).  There is no /ws route - the WebSocket lives under /api.
-    location /health {
-        proxy_pass http://backend;
-        access_log off;
-    }
-    
-    location /ready {
-        proxy_pass http://backend;
-        access_log off;
-    }
-    
-    # Everything else is the SPA
-    location / {
-        proxy_pass http://frontend;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-}
-EOF
-    
-    success "Nginx config generated: ${NGINX_CONF_DIR}/ssl.conf"
+    # Single source of truth, shared with install.sh: a certificate obtained by
+    # either script is immediately usable by the other, because the paths in
+    # the generated block are the in-container ones the compose file mounts.
+    info "Generating nginx TLS block for ${DOMAIN}..."
+    erp_render_ssl_conf "${DOMAIN}"
 }
 
 obtain_certificate() {
@@ -215,13 +155,14 @@ setup_auto_renewal() {
     info "Setting up automatic certificate renewal..."
     
     # Create renewal script
-    cat > "/opt/erp-solution/scripts/renew-ssl.sh" <<'RENEWAL_SCRIPT'
+    mkdir -p "${ERP_DIR}/scripts"
+    cat > "${ERP_DIR}/scripts/renew-ssl.sh" <<'RENEWAL_SCRIPT'
 #!/bin/bash
 # Auto-generated SSL renewal script
 
 set -euo pipefail
 
-LOG_FILE="/opt/erp-solution/logs/ssl-renewal-$(date +%Y%m%d).log"
+LOG_FILE="${ERP_DIR}/logs/ssl-renewal-$(date +%Y%m%d).log"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"
@@ -244,10 +185,10 @@ else
 fi
 RENEWAL_SCRIPT
     
-    chmod +x "/opt/erp-solution/scripts/renew-ssl.sh"
+    chmod +x "${ERP_DIR}/scripts/renew-ssl.sh"
     
     # Add cron job for daily renewal check
-    (crontab -l 2>/dev/null | grep -v "renew-ssl.sh"; echo "0 3 * * * /opt/erp-solution/scripts/renew-ssl.sh") | crontab -
+    (crontab -l 2>/dev/null | grep -v "renew-ssl.sh"; echo "0 3 * * * ${ERP_DIR}/scripts/renew-ssl.sh") | crontab -
     
     success "Auto-renewal configured (daily at 3 AM)"
 }
@@ -269,14 +210,26 @@ update_nginx_main_config() {
 
 reload_nginx() {
     info "Reloading nginx..."
-    
-    if docker exec erp-nginx nginx -t 2>&1 | tee -a "${LOG_FILE}"; then
-        docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"
-        success "Nginx reloaded successfully"
-    else
-        error "Nginx configuration test failed"
-        exit 1
+    # Validates with `nginx -t` first. Without that check a typo in the
+    # generated block would make the reload fail and, in some setups, leave the
+    # proxy serving a stale or broken config.
+    if ! docker info >/dev/null 2>&1; then
+        warn "Docker daemon not running; cannot reload nginx."
+        warn "Start it and run: docker exec erp-nginx nginx -s reload"
+        return 1
     fi
+    if ! erp_container_exists erp-nginx; then
+        warn "erp-nginx is not running; cannot reload."
+        return 1
+    fi
+    if ! docker exec erp-nginx nginx -t; then
+        error "nginx configuration test failed; not reloading."
+        error "Check ${NGINX_CONF_DIR}/ssl.conf and the certificate paths:"
+        error "  ${SSL_DIR}/live/${DOMAIN}/fullchain.pem"
+        return 1
+    fi
+    erp_reload_nginx erp-nginx || return 1
+    success "Nginx reloaded successfully"
 }
 
 main() {

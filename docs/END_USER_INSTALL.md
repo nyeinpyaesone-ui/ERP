@@ -61,13 +61,24 @@ sudo ./install.sh yourcompany.com admin@yourcompany.com
 ```
 
 **That's it.** The script handles everything:
-- Installs Docker, Docker Compose, Certbot
-- Creates `/opt/erp-solution/` directory structure
-- Generates secure `.env.production` with random passwords
-- Configures Nginx for your domains
-- Obtains Let's Encrypt SSL certificates (auto-renewal configured)
-- Deploys initial blue environment (database migrations + services)
-- Verifies health endpoints
+- Preconfigures the host: missing packages, Docker Engine, the compose plugin,
+  and a started daemon (a report of anything missing is printed as it goes)
+- Warns about ports 80/443 already in use and about low disk, before either
+  turns into a confusing failure later
+- Creates the directory structure the compose file bind-mounts
+- Generates a secure `.env.production` with random passwords (mode 600)
+- Validates the compose configuration and refuses blank or placeholder secrets
+- Pulls the published images, or builds them locally if the registry has no
+  matching tag yet
+- Runs database migrations, then starts the stack and waits for real health
+- Obtains Let's Encrypt certificates when both subdomains already resolve here
+- Verifies the health endpoints through the proxy
+
+To see what the host is missing **without changing anything**, run:
+
+```bash
+sudo ./install.sh --preflight
+```
 
 ---
 
@@ -89,27 +100,39 @@ Enter email for SSL certificates: admin@yourcompany.com
 
 ## What the Installer Does (Step-by-Step)
 
-### 1. System Dependencies
-- Updates apt cache
-- Installs: `curl`, `gnupg2`, `certbot`, `python3-certbot-nginx`
-- Installs Docker (via official script) if missing
-- Installs Docker Compose (plugin or standalone) if missing
+### 1. Host Preconfiguration
+Auto-detected and idempotent, so re-running is safe:
+- Installs missing required packages: `curl`, `ca-certificates`, `openssl`
+- Installs the optional ones when available: `gnupg`, `rsync`, `certbot`
+  (a missing `certbot` disables TLS, it does not abort the install)
+- Installs Docker Engine if the binary is absent, then **starts** the daemon if
+  it is installed but not running
+- Installs the `docker compose` v2 plugin, falling back to the standalone binary
+- Warns if another process already holds port 80 or 443, and if the filesystem
+  holding the install has less than 2 GB free
+
+Use `--skip-deps` to skip provisioning; the script still asserts that
+`openssl` and a running daemon are present, so the failure names the real gap.
 
 ### 2. Directory Structure
-Creates `/opt/erp-solution/` with:
+Creates the directories `docker-compose.prod.yml` bind-mounts, in the
+directory that holds the compose file (the checkout by default; override with
+`--dir=/opt/erp-solution`):
 ```
-/opt/erp-solution/
-├── .env.production          # Generated secrets (600 perms)
+<install>/
+├── .env.production          # Generated secrets (mode 600)
 ├── .active_color            # Blue-green state (blue/green)
 ├── .previous_version        # Rollback version tracking
-├── ssl/
-│   ├── cert.pem             # Fullchain certificate
-│   └── key.pem              # Private key
-├── logs/
-│   └── nginx/               # Nginx access/error logs
+├── ssl/live/<domain>/       # fullchain.pem + privkey.pem
+├── logs/nginx/              # Nginx access/error logs
 ├── backups/                 # Database + config backups
-└── uploads/                 # User file uploads
+└── backend/uploads/         # User file uploads (bind-mounted to /app/uploads)
 ```
+
+The certificate layout matters: the compose file mounts `./ssl` at
+`/etc/nginx/ssl`, and the generated nginx block reads
+`/etc/nginx/ssl/live/<domain>/fullchain.pem`. `scripts/setup-ssl.sh` writes the
+same layout, so a certificate from either script works with the other.
 
 ### 3. Secure Environment File
 Generates `/opt/erp-solution/.env.production` with **cryptographically random** secrets:
@@ -124,45 +147,67 @@ DB_NAME=erp_solution
 REDIS_PASSWORD=<32-char-random>
 
 # Security
-SECRET_KEY=<32-char-random>
-ENVIRONMENT=production
+SECRET_KEY=<64-hex-random>
+ALGORITHM=HS256
+ENVIRONMENT=prod
 
 # Domains (your input)
-API_URL=https://api.yourcompany.com
-WS_URL=wss://api.yourcompany.com
 CORS_ORIGINS=https://app.yourcompany.com
 
 # External services
-OLLAMA_URL=http://ollama:11434
+OLLAMA_BASE_URL=http://ollama:11434
 DOCKER_USER=powerrangeranikg
-VERSION=latest
+VERSION=<detected from the latest git tag>
 ```
 
-> **⚠️ Save these credentials immediately.** They are displayed once at the end of installation and stored in `.env.production` (root-readable only).
+`ENVIRONMENT` is `prod`, not `production`: `Settings` declares it as a
+`Literal["dev","test","prod"]`, and a `production` value raises at import so
+the container never starts.
+
+`install.sh` also verifies before deploying that `DB_PASSWORD`, `REDIS_PASSWORD`,
+`SECRET_KEY` and `CORS_ORIGINS` are set and are not template placeholders.
+Compose otherwise substitutes blank strings, and the backend then fails closed
+at boot with an error that does not mention the missing variable.
+
+> **⚠️ Save these credentials immediately.** They are displayed once at the end of installation and stored in `.env.production` (mode 600).
 
 ### 4. Nginx Configuration
-Updates `nginx/upstream-*.conf` and `nginx.conf` with your domains:
-- `api.yourcompany.com` → proxies to backend (API, WebSocket, health)
-- `app.yourcompany.com` → proxies to frontend
+- Seeds `nginx/upstream-active.conf` from `upstream-blue.conf` when absent, so
+  the `include` in `nginx.conf` resolves
+- Writes the TLS server block to `nginx/ssl.conf` for `api.<yourdomain>`
+- Certificates are referenced by their in-container path, matching the mount
 
 ### 5. SSL Certificates (Let's Encrypt)
-- Stops any existing nginx on host port 80
-- Runs `certbot certonly --standalone` for `api.yourcompany.com` + `app.yourcompany.com`
-- Copies certs to `/opt/erp-solution/ssl/`
-- Creates daily cron job at 3 AM for auto-renewal with nginx reload
+- Requires that `api.<domain>` and `app.<domain>` already resolve to this host
+- Stops `erp-nginx` for the duration of the ACME challenge (it owns port 80 in
+  this stack, so the host's own service has nothing to stop), then restarts it
+- Writes to `ssl/live/api.<domain>/`, and reuses an existing certificate rather
+  than re-requesting one
+- Schedules renewal daily at 03:00 with a deploy hook that copies the renewed
+  files into the mounted layout and reloads nginx
+- On failure it continues on HTTP only and tells you how to retry:
+  `./scripts/setup-ssl.sh api.yourdomain you@example.com`
+- `--skip-ssl` skips this entirely
 
 ### 6. Initial Blue Deployment
-- Pulls PostgreSQL, Redis, Ollama images
-- Starts shared services (DB, cache, AI)
-- Waits for PostgreSQL readiness
-- Runs **Alembic migrations** (creates all 27+ tables)
-- Starts blue backend + frontend + nginx containers
-- Waits for `/api/v1/ready` health endpoint (up to 100 seconds)
+- Pulls the `backend` and `frontend` images; if that fails (no network, or the
+  tag was never published) it **builds them locally** instead, so a fresh server
+  can still come up
+- Starts PostgreSQL, Redis and Ollama, then waits for PostgreSQL readiness
+- Runs **Alembic migrations** (`entrypoint.sh` runs them again on every start;
+  the explicit pass surfaces schema errors in the installer log first)
+- Starts nginx, frontend and backend
+- Polls the container healthcheck rather than sleeping a fixed interval, since
+  the backend entrypoint waits for Postgres/Redis and migrates before serving
 
 ### 7. Health Verification
-Tests external HTTPS endpoints:
-- `https://api.yourcompany.com/api/v1/health`
-- `https://app.yourcompany.com/`
+Probes through the proxy, falling back to localhost:
+- `https://api.yourcompany.com/health`, then `/ready`
+- `http://127.0.0.1/health`
+
+If nothing answers it prints the `compose ps` and `docker logs` commands to run
+by hand, because on a host with no DNS or a firewall this is expected rather
+than a failure.
 
 ---
 

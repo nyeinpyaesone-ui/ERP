@@ -1,18 +1,28 @@
 # Dependencies
 venv/
+.venv/
+node_modules/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
+# The frontend is a separate image built from backend/frontend-react. Without
+# this the context carried frontend-react/node_modules (290MB) into the build.
+frontend-react/
+
 # Test
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .coverage
+coverage.xml
 htmlcov/
 
 # Local dev
 .env
 .env.local
+.env.*
 *.db
 *.sqlite
 test.db
@@ -38,3 +48,6 @@ logs/
 # Build
 dist/
 build/
+
+# Uploads are a runtime volume mount, not image content
+uploads/
