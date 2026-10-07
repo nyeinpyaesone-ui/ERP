@@ -3,18 +3,23 @@
 # Docker image (python:3.11-slim) and CI.  Run `make venv` after changing.
 
 # ── Core ─────────────────────────────────────────────────────────────────────
-fastapi==0.141.1
+fastapi==0.142.2
+# starlette pinned explicitly for local == Docker == CI parity (transitive
+# via fastapi; 1.7.0 drops the anyio.abc testclient deprecation).
+starlette==1.7.0
 uvicorn[standard]==0.52.4
+# SQLAlchemy 2.1.x NOT yet: its postgresql:// default now imports psycopg3,
+# which we cannot verify without a live PostgreSQL (docker daemon down).
 SQLAlchemy==2.0.52
 psycopg2-binary==2.9.13
-alembic==1.13.1
+alembic==1.20.0
 
 # ── Validation / settings ────────────────────────────────────────────────────
 pydantic==2.13.5
 pydantic-settings==2.15.0
 email-validator==2.3.0
 python-multipart==0.0.32
-python-dotenv==1.2.3
+python-dotenv==1.2.4
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
 # PyJWT replaces python-jose (unmaintained; pulled ecdsa with an unfixable
@@ -34,8 +39,12 @@ stripe==8.0.0
 matplotlib==3.11.2
 
 # ── Local dev / test (CI installs these separately) ──────────────────────────
+# httpx2: starlette>=1.6 testclient imports `httpx2 as httpx`; without it
+# TestClient falls back to httpx with a deprecation warning. httpx itself
+# stays (app code: llm_service, webhooks).
+httpx2==2.13.1
 pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
-black==26.5.1
+black==26.10.0
 ruff==0.16.10
