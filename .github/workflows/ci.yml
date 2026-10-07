@@ -70,9 +70,9 @@ jobs:
         run: |
           cd backend/frontend-react && npm ci
 
-      # Frontend lint/tsc steps removed (IMP-P0-4): package.json has no lint
-      # script and the project is JSX without tsconfig, so both steps were
-      # `|| true` no-ops. Real eslint config tracked in IMPROVEMENTS.md.
+      - name: Run ESLint (real; fails on errors — IMP-P0-4/IMP-P2-5)
+        run: |
+          cd backend/frontend-react && npm run lint
 
   test:
     name: Tests
