@@ -5,8 +5,7 @@ import {
   ChevronLeft, Plus, Clock, Zap, Settings, Trash2, Archive,
   Cpu, BarChart3, Wrench, FileText, ArrowRight, Copy, Check
 } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function AIChat() {
   const [messages, setMessages] = useState([]);
@@ -22,7 +21,6 @@ export default function AIChat() {
   const [copied, setCopied] = useState(false);
   const messagesEndRef = useRef(null);
   const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -33,14 +31,14 @@ export default function AIChat() {
 
   const fetchConversations = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/v1/llm/conversations`, axiosConfig);
+      const res = await api.get(`/llm/conversations`);
       setConversations(res.data);
     } catch (e) {}
   };
 
   const fetchModels = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/v1/llm/models`, axiosConfig);
+      const res = await api.get(`/llm/models`);
       setModels(res.data.models || []);
       const defaultModel = res.data.models?.find(m => m.is_default);
       if (defaultModel) setSelectedModel(defaultModel.model_id);
@@ -49,14 +47,14 @@ export default function AIChat() {
 
   const fetchTemplates = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/v1/llm/templates`, axiosConfig);
+      const res = await api.get(`/llm/templates`);
       setTemplates(res.data);
     } catch (e) {}
   };
 
   const loadConversation = async (id) => {
     try {
-      const res = await axios.get(`${API_URL}/api/v1/llm/conversations/${id}`, axiosConfig);
+      const res = await api.get(`/llm/conversations/${id}`);
       const conv = res.data;
       setConversationId(conv.id);
       setMessages(conv.messages.map(m => ({ role: m.role, content: m.content })));
@@ -74,7 +72,7 @@ export default function AIChat() {
     e.stopPropagation();
     if (!confirm('Delete this conversation?')) return;
     try {
-      await axios.delete(`${API_URL}/api/v1/llm/conversations/${id}`, axiosConfig);
+      await api.delete(`/llm/conversations/${id}`);
       if (conversationId === id) newConversation();
       fetchConversations();
     } catch (e) {}
@@ -83,7 +81,7 @@ export default function AIChat() {
   const archiveConversation = async (id, e) => {
     e.stopPropagation();
     try {
-      await axios.put(`${API_URL}/api/v1/llm/conversations/${id}/archive`, {}, axiosConfig);
+      await api.put(`/llm/conversations/${id}/archive`, {});
       if (conversationId === id) newConversation();
       fetchConversations();
     } catch (e) {}
@@ -108,12 +106,12 @@ export default function AIChat() {
 
   const regularResponse = async (userMsg) => {
     try {
-      const res = await axios.post(`${API_URL}/api/v1/llm/chat`, {
+      const res = await api.post(`/llm/chat`, {
         messages: [...messages, { role: 'user', content: userMsg }].map(m => ({ role: m.role, content: m.content })),
         model_id: selectedModel,
         conversation_id: conversationId,
         use_tools: true
-      }, axiosConfig);
+      });
 
       const assistantContent = res.data.message?.content || 'No response';
       setMessages(prev => [...prev, {
@@ -140,7 +138,7 @@ export default function AIChat() {
     setMessages(prev => [...prev, { role: 'assistant', content: '', streaming: true }]);
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/llm/chat/stream`, {
+      const response = await fetch(`/api/v1/llm/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Building2, DollarSign, Plus, Search, Filter, Phone, Mail } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function CRM() {
   const [activeTab, setActiveTab] = useState('contacts');
@@ -11,24 +10,22 @@ export default function CRM() {
   const [deals, setDeals] = useState([]);
   const [pipeline, setPipeline] = useState({});
   const [loading, setLoading] = useState(true);
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => { fetchData(); }, [activeTab]);
   const fetchData = async () => {
     setLoading(true);
     try {
       if (activeTab === 'contacts') {
-        const res = await axios.get(`${API_URL}/api/v1/crm/contacts`, axiosConfig);
+        const res = await api.get(`/crm/contacts`);
         setContacts(res.data);
       } else if (activeTab === 'companies') {
-        const res = await axios.get(`${API_URL}/api/v1/crm/companies`, axiosConfig);
+        const res = await api.get(`/crm/companies`);
         setCompanies(res.data);
       } else if (activeTab === 'deals') {
-        const res = await axios.get(`${API_URL}/api/v1/crm/deals`, axiosConfig);
+        const res = await api.get(`/crm/deals`);
         setDeals(res.data);
       } else if (activeTab === 'pipeline') {
-        const res = await axios.get(`${API_URL}/api/v1/crm/deals/pipeline`, axiosConfig);
+        const res = await api.get(`/crm/deals/pipeline`);
         setPipeline(res.data);
       }
     } catch (e) { console.error(e); }

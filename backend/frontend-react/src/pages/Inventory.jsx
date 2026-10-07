@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Package, AlertTriangle, Plus, ArrowDown, ArrowUp } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function Inventory() {
   const [products, setProducts] = useState([]);
   const [lowStock, setLowStock] = useState([]);
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/v1/inventory/products`, axiosConfig).then(r => setProducts(r.data));
-    axios.get(`${API_URL}/api/v1/inventory/products?low_stock=true`, axiosConfig).then(r => setLowStock(r.data));
+    api.get(`/inventory/products`).then(r => setProducts(r.data));
+    api.get(`/inventory/products?low_stock=true`).then(r => setLowStock(r.data));
   }, []);
 
   return (

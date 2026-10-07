@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import api from '../api/axios';
 
 const AuthContext = createContext(null);
@@ -38,7 +37,6 @@ export function AuthProvider({ children }) {
    */
   const login = useCallback(async (credentials) => {
     const isRegister = 'full_name' in credentials;
-    const tokenUrl = '/auth/login';
 
     let res;
     if (isRegister) {
@@ -49,8 +47,8 @@ export function AuthProvider({ children }) {
         full_name: credentials.full_name
       });
       // Then login with form data
-      res = await axios.post(
-        `${import.meta.env.VITE_API_URL || '/api/v1'}/auth/login`,
+      res = await api.post(
+        '/auth/login',
         new URLSearchParams({
           username: credentials.email,
           password: credentials.password
@@ -59,8 +57,8 @@ export function AuthProvider({ children }) {
       );
     } else {
       // Login uses form data
-      res = await axios.post(
-        `${import.meta.env.VITE_API_URL || '/api/v1'}/auth/login`,
+      res = await api.post(
+        '/auth/login',
         new URLSearchParams({
           username: credentials.username || credentials.email,
           password: credentials.password

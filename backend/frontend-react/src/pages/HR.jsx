@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Building, Briefcase, DollarSign, Plus } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function HR() {
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [activeTab, setActiveTab] = useState('employees');
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/v1/hr/employees`, axiosConfig).then(r => setEmployees(r.data));
-    axios.get(`${API_URL}/api/v1/hr/departments`, axiosConfig).then(r => setDepartments(r.data));
+    api.get(`/hr/employees`).then(r => setEmployees(r.data));
+    api.get(`/hr/departments`).then(r => setDepartments(r.data));
   }, []);
 
   return (

@@ -5,8 +5,7 @@ import {
   Download, CheckCircle, AlertTriangle, Clock, Zap, TrendingUp,
   Database, ArrowLeft, RefreshCw, Settings, MessageSquare, Layers
 } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function LLMManager() {
   const [activeTab, setActiveTab] = useState('models');
@@ -20,8 +19,6 @@ export default function LLMManager() {
   const [success, setSuccess] = useState(null);
   const [pulling, setPulling] = useState(false);
   const navigate = useNavigate();
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => {
     fetchAllData();
@@ -31,10 +28,10 @@ export default function LLMManager() {
     setLoading(true);
     try {
       const [modelsRes, templatesRes, usageRes, convRes] = await Promise.all([
-        axios.get(`${API_URL}/api/v1/llm/models`, axiosConfig),
-        axios.get(`${API_URL}/api/v1/llm/templates`, axiosConfig),
-        axios.get(`${API_URL}/api/v1/llm/analytics/usage?days=30`, axiosConfig),
-        axios.get(`${API_URL}/api/v1/llm/analytics/conversations`, axiosConfig),
+        api.get(`/llm/models`),
+        api.get(`/llm/templates`),
+        api.get(`/llm/analytics/usage?days=30`),
+        api.get(`/llm/analytics/conversations`),
       ]);
       setModels(modelsRes.data.models || []);
       setAvailableModels(modelsRes.data.available_from_provider || []);
@@ -51,7 +48,7 @@ export default function LLMManager() {
   const pullModel = async (modelId) => {
     setPulling(true);
     try {
-      await axios.post(`${API_URL}/api/v1/llm/models/${modelId}/pull`, {}, axiosConfig);
+      await api.post(`/llm/models/${modelId}/pull`, {});
       setSuccess(`Model ${modelId} pulled successfully`);
       fetchAllData();
     } catch (err) {
@@ -64,9 +61,9 @@ export default function LLMManager() {
   const toggleModel = async (modelId) => {
     try {
       const model = models.find(m => m.model_id === modelId);
-      await axios.put(`${API_URL}/api/v1/llm/models/${modelId}`, {
+      await api.put(`/llm/models/${modelId}`, {
         is_active: !model.is_active
-      }, axiosConfig);
+      });
       fetchAllData();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to toggle model');
@@ -75,9 +72,9 @@ export default function LLMManager() {
 
   const setDefault = async (modelId) => {
     try {
-      await axios.put(`${API_URL}/api/v1/llm/models/${modelId}`, {
+      await api.put(`/llm/models/${modelId}`, {
         is_default: true
-      }, axiosConfig);
+      });
       fetchAllData();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to set default');
@@ -87,7 +84,7 @@ export default function LLMManager() {
   const deleteTemplate = async (id) => {
     if (!confirm('Delete this template?')) return;
     try {
-      await axios.delete(`${API_URL}/api/v1/llm/templates/${id}`, axiosConfig);
+      await api.delete(`/llm/templates/${id}`);
       setSuccess('Template deleted');
       fetchAllData();
     } catch (err) {
