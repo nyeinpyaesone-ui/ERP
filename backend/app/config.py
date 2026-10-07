@@ -1,6 +1,8 @@
 import json
 from functools import lru_cache
+from typing import Literal
 
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -8,17 +10,26 @@ class Settings(BaseSettings):
     APP_NAME: str = "ERP SOLUTION System"
     APP_VERSION: str = "1.8.0"
     DEBUG: bool = False
+    ENVIRONMENT: Literal["dev", "test", "prod"] = "dev"
 
     # Database
     DATABASE_URL: str = "postgresql://erp_user:erp_password@localhost:5432/erp_db"
 
+    # SQLAlchemy pool (honored by app.database.get_engine)
+    POOL_SIZE: int = 10
+    POOL_MAX_OVERFLOW: int = 20
+    POOL_RECYCLE: int = 1800
+
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # Security
-    SECRET_KEY: str = "your-super-secret-key-change-in-production"
+    # Security: SecretStr so the value never leaks via repr/logs.
+    # Dev/test default is intentionally weak but flagged; prod refuses to boot
+    # with it (see model validator below) — Twelve-Factor III, fail-closed.
+    SECRET_KEY: SecretStr = SecretStr("your-super-secret-key-change-in-production")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS: plain string in env (comma-separated or JSON array) so that
     # pydantic-settings never attempts JSON decoding at the source layer.
@@ -73,6 +84,28 @@ class Settings(BaseSettings):
     WS_HEARTBEAT_INTERVAL: int = 30
 
     model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore"}
+
+    @model_validator(mode="after")
+    def _fail_closed_in_prod(self) -> "Settings":
+        """Prod must boot with real secrets — refuse the well-known defaults."""
+        if self.ENVIRONMENT == "prod":
+            placeholder = "your-super-secret-key-change-in-production"
+            if self.SECRET_KEY.get_secret_value() == placeholder:
+                raise ValueError(
+                    "SECRET_KEY must be set to a unique value when ENVIRONMENT=prod"
+                )
+            if len(self.SECRET_KEY.get_secret_value()) < 32:
+                raise ValueError("SECRET_KEY must be at least 32 characters in prod")
+            if self.DATABASE_URL.startswith("postgresql://erp_user:erp_password"):
+                raise ValueError("DATABASE_URL must not use the example credentials")
+        return self
+
+    @field_validator("ACCESS_TOKEN_EXPIRE_MINUTES")
+    @classmethod
+    def _positive_ttl(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES must be positive")
+        return v
 
 
 @lru_cache
