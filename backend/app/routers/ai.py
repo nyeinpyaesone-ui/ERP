@@ -5,11 +5,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
 from app.config import settings
 from app.database import get_db
 from app.models import Contact, Deal, Invoice, Product, Project, Task
 from app.services.activity_log import log_activity
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
@@ -44,7 +44,7 @@ async def query_ollama(prompt: str, model: str = None) -> str:
 async def chat(
     message: ChatMessage,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("ai", "create")),
 ):
     # Gather business context
     context_data = {}
@@ -116,7 +116,8 @@ Provide a helpful, data-driven response. If you don't have specific data, say so
 
 @router.get("/insights")
 async def get_ai_insights(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("ai", "read")),
 ):
     from datetime import datetime, timedelta
 
@@ -174,7 +175,7 @@ async def get_ai_insights(
 - Inactive contacts: {len(inactive_contacts)}
 - Low stock products: {len(low_stock)}
 - Total deals: {db.query(Deal).count()}
-- Active projects: {db.query(Project).filter(Project.status == 'active').count()}
+- Active projects: {db.query(Project).filter(Project.status == "active").count()}
 
 Format as JSON with fields: category, priority, message."""
 
@@ -195,7 +196,7 @@ Format as JSON with fields: category, priority, message."""
 async def forecast_revenue(
     months: int = 3,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("ai", "read")),
 ):
     from datetime import datetime, timedelta
 
@@ -255,7 +256,9 @@ async def forecast_revenue(
         "trend": (
             "increasing"
             if avg_growth > 0
-            else "decreasing" if avg_growth < 0 else "stable"
+            else "decreasing"
+            if avg_growth < 0
+            else "stable"
         ),
         "confidence": "medium",
     }

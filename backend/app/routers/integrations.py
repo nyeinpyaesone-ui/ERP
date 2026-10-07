@@ -10,9 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
 from app.database import get_db
 from app.models import Integration, Webhook, WebhookDelivery
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
@@ -34,7 +34,7 @@ class WebhookCreate(BaseModel):
 def create_integration(
     data: IntegrationCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("integrations", "create")),
 ):
     integration = Integration(**data.dict(), created_by=current_user.id)
     db.add(integration)
@@ -45,7 +45,8 @@ def create_integration(
 
 @router.get("/integrations")
 def list_integrations(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("integrations", "read")),
 ):
     return db.query(Integration).all()
 
@@ -54,7 +55,7 @@ def list_integrations(
 def create_webhook(
     data: WebhookCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("webhooks", "create")),
 ):
     webhook = Webhook(**data.dict(), created_by=current_user.id)
     db.add(webhook)
@@ -65,7 +66,8 @@ def create_webhook(
 
 @router.get("/webhooks")
 def list_webhooks(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("webhooks", "read")),
 ):
     return db.query(Webhook).all()
 
@@ -74,7 +76,7 @@ def list_webhooks(
 async def test_webhook(
     webhook_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("webhooks", "test")),
 ):
     """Send a test event and commit and return its delivery record.
 
@@ -126,7 +128,7 @@ async def test_webhook(
 def get_deliveries(
     webhook_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("webhooks", "read")),
 ):
     return (
         db.query(WebhookDelivery)

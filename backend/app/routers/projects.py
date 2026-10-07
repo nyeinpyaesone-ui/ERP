@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
 from app.database import get_db
 from app.models import Project, Task
 from app.services.activity_log import log_activity
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
@@ -39,7 +39,7 @@ class TaskCreate(BaseModel):
 def create_project(
     data: ProjectCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("projects", "create")),
 ):
     project = Project(**data.dict(), manager_id=current_user.id)
     db.add(project)
@@ -59,7 +59,7 @@ def create_project(
 def list_projects(
     status: str | None = None,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("projects", "read")),
 ):
     query = db.query(Project)
     if status:
@@ -71,7 +71,7 @@ def list_projects(
 def get_project(
     project_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("projects", "read")),
 ):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -84,7 +84,7 @@ def update_project(
     project_id: int,
     data: ProjectCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("projects", "update")),
 ):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -101,7 +101,7 @@ def update_project(
 def create_task(
     data: TaskCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("tasks", "create")),
 ):
     project = db.query(Project).filter(Project.id == data.project_id).first()
     if not project:
@@ -125,7 +125,7 @@ def create_task(
 def list_project_tasks(
     project_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("tasks", "read")),
 ):
     return db.query(Task).filter(Task.project_id == project_id).all()
 
@@ -135,7 +135,7 @@ def update_task(
     task_id: int,
     data: dict,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("tasks", "update")),
 ):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
@@ -151,7 +151,8 @@ def update_task(
 
 @router.get("/dashboard")
 def projects_dashboard(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("reports", "read")),
 ):
     total_projects = db.query(Project).count()
     active_projects = db.query(Project).filter(Project.status == "active").count()

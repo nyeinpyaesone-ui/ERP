@@ -5,9 +5,9 @@ from datetime import date
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
 from app.database import get_db
 from app.models import Deal, Invoice, Product
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
@@ -17,7 +17,7 @@ def revenue_report(
     start_date: date | None = None,
     end_date: date | None = None,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("reports", "read")),
 ):
     from sqlalchemy import extract, func
 
@@ -61,7 +61,8 @@ def revenue_report(
 
 @router.get("/pipeline")
 def pipeline_report(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("reports", "read")),
 ):
     stages = [
         "prospect",
@@ -83,7 +84,8 @@ def pipeline_report(
 
 @router.get("/inventory")
 def inventory_report(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("reports", "read")),
 ):
     products = db.query(Product).all()
     total_value = sum(p.quantity_in_stock * p.unit_price for p in products)
@@ -103,7 +105,8 @@ def inventory_report(
 
 @router.get("/chart/revenue")
 def revenue_chart(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("reports", "read")),
 ):
     try:
         import matplotlib

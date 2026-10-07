@@ -100,6 +100,59 @@ def test_permission_consistency():
     assert len(all_calls) > 0, "No require_permission() calls found in routers"
 
 
+# Routers that must enforce catalogue permissions on EVERY endpoint.
+# Bare get_current_user (any-authenticated) is banned here — new routes in
+# these files must declare require_permission(...).
+# auth.py is intentionally absent: GET /auth/me is the self-read endpoint.
+CATALOGUE_ENFORCED = (
+    "crm.py",
+    "hr.py",
+    "inventory.py",
+    "finance.py",
+    "documents.py",
+    "projects.py",
+    "reports.py",
+    "analytics.py",
+    "ai.py",
+    "integrations.py",
+)
+
+
+def test_catalogue_enforced_routers_never_use_bare_auth():
+    """No endpoint in ENFORCED routers may depend on bare get_current_user."""
+    routers_dir = Path(__file__).parent.parent / "routers"
+    errors = []
+    for name in CATALOGUE_ENFORCED:
+        filepath = routers_dir / name
+        if not filepath.exists():
+            errors.append(f"{name}: router file missing")
+            continue
+        try:
+            tree = ast.parse(
+                filepath.read_text(encoding="utf-8"), filename=str(filepath)
+            )
+        except (SyntaxError, UnicodeDecodeError) as e:
+            errors.append(f"{name}: cannot parse ({e})")
+            continue
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "Depends"
+                and node.args
+                and isinstance(node.args[0], ast.Name)
+                and node.args[0].id == "get_current_user"
+            ):
+                errors.append(f"{name}:{node.lineno}: bare get_current_user dependency")
+
+    if errors:
+        raise AssertionError(
+            "Catalogue enforcement gap (use require_permission instead):\n"
+            + "\n".join(errors)
+        )
+
+
 if __name__ == "__main__":
     test_permission_consistency()
+    test_catalogue_enforced_routers_never_use_bare_auth()
     print("✓ All require_permission() calls are valid per catalogue")
