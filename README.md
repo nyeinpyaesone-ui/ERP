@@ -8,7 +8,7 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-ready-blue.svg)](https://kubernetes.io/)
 
-> Enterprise-grade AI-powered ERP system with 12 modules (274 files at tag `v1.0.0`; 259 files at current `HEAD`), and full CI/CD pipeline.
+> Enterprise-grade AI-powered ERP system with 12 modules (274 files at tag `v1.0.0`; 273 files at current `HEAD`), and full CI/CD pipeline.
 
 ## 🏗️ Platform Overview
 
@@ -27,7 +27,7 @@
 | Legacy v2.1 | v2.1 | 31 | ✅ |
 | Legacy v1.8 | v1.8 | 29 | ✅ |
 
-**Tag `v1.0.0`: 274 tracked files, 3 commits; current `HEAD` (`main`): 259 files, 64 commits — production-ready**
+**Tag `v1.0.0`: 274 tracked files, 3 commits; current `HEAD` (`main`): 273 files, 80 commits — production-ready**
 
 > Note: the module-file column above sums to 279; `274` is the total tracked-file count at tag `v1.0.0`, not the column sum.
 

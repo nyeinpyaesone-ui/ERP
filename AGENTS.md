@@ -85,6 +85,9 @@ cd backend && source venv/bin/activate && alembic revision --autogenerate -m "in
 | Backend won't start | Start postgres/redis first: `docker compose up -d postgres redis` |
 | Alembic "target database not up to date" | Run `alembic upgrade head` or create 001_initial migration |
 | CI builds broken frontend | Already fixed — `ci.yml` builds `backend/frontend-react`; do not repoint it |
+| Trivy reports no findings | It scanned `sha-<40>` while `metadata-action` pushes `sha-<7>`; `security` now consumes `needs.docker-*.outputs.image_tag` |
+| Action version bump needed | Workflows pin `uses:` to a 40-char SHA + `# vX.Y.Z`; Dependabot updates those natively |
+| Container runtime won't start here | `/proc/self` reports uid 0 → `newuidmap` fails for rootlesskit/podman; use native PG18 + Redis binaries |
 | `npx: not found` in Makefile | npm/npx 10.9.2 should be on PATH (`~/.local/bin`); else use `node /tmp/opencode/npm10/package/bin/npm-cli.js …` |
 | pytest `ModuleNotFoundError: app` | `pythonpath` must be in `pytest.ini`; `pyproject.toml` `[tool.pytest.ini_options]` is ignored |
 | Postgres MCP queries fail | `POSTGRES_MCP_URL` unset **and** Postgres not running. `export POSTGRES_MCP_URL=...` then `docker compose up -d postgres` |
@@ -150,4 +153,5 @@ state there — cross-link, never duplicate.
 - `backend/app/permissions_catalogue.py` — Permission source of truth
 - `scripts/deploy-blue-green.sh` — New deploy automation
 - `scripts/mcp-postgres.sh` — Postgres MCP wrapper (reads `POSTGRES_MCP_URL`)
-- `.github/workflows/ci.yml` — Current CI (Gitleaks secret gate first; backend ruff+black enforced, mypy advisory; frontend real eslint enforced)
+- `.github/workflows/ci.yml` — Current CI (Gitleaks secret gate first; backend ruff+black enforced, mypy advisory; frontend real eslint enforced). All actions SHA-pinned with `concurrency` + `timeout-minutes`.
+- `.github/workflows/release.yml` — Tag or manual dispatch → verify pushed images → publish GitHub Release from CHANGELOG.md

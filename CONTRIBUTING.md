@@ -50,7 +50,10 @@ Example: `feat: add inventory forecasting module`
 
 - Python: PEP 8, type hints, docstrings
 - TypeScript: Strict mode, functional components
-- Tests: 80%+ coverage target
+- Tests: coverage floor is enforced at 58% by `fail_under` in
+  `backend/pyproject.toml` (the single source of truth; CI no longer passes a
+  conflicting `--cov-fail-under`). Actual is ~58.2%. Raise the floor as coverage
+  grows — do not quote aspirational targets.
 
 
 ## Contact

@@ -4,7 +4,7 @@ Durable cross-session state. Companion to [`AGENTS.md`](../AGENTS.md)
 (AGENTS.md = **how the repo works**; this file = **what is true right now**).
 Append-only ledger; never store secrets (env var *names* only).
 
-**Last verified:** 2026-10-08 (session: fix-everything sweep + B1 single-client)
+**Last verified:** 2026-10-08 (session: CI/CD hardening — pins, Trivy fix, release workflow)
 
 ---
 
@@ -14,14 +14,17 @@ Append-only ledger; never store secrets (env var *names* only).
 |------|-------|--------|
 | Git HEAD | `80bf5c4a` docs sync; session landed `b2df79fd`→`7014a496` + docs (run `git log -10`) | `git log` |
 | Worktree | **Clean** (after this session's commit series) | `git status --short` |
+| Tracked files | 273 at HEAD; 274 at tag `v1.0.0` | `git ls-files \\| wc -l` |
 | Node | v22.22.1 at `/usr/bin/node` | `node --version` |
 | npm / npx | **10.9.2 on PATH** at `/home/admin/.local/bin` | `which npm npx` |
 | npm fallback | `/tmp/opencode/npm10/…` volatile — re-bootstrap if gone | `ls` |
 | Python | 3.14.4 (venv) — runs 285 tests; Docker image is 3.11-slim | `python --version` |
 | Alembic chain | **001 → 008** (offline `--sql` regenerates 47 DDL stmts under alembic 1.20) | `alembic upgrade head --sql` |
 | Frontend (canonical) | `backend/frontend-react` — scripts: `dev`, `build`, `preview`, `test`, `test:watch`; **105 vitest tests** | `package.json`, `npm run test` |
-| CI workflows | `ci.yml`, `codeql.yml`, `opencode.yml`, `snyk-container.yml` | `ls .github/workflows` |
+| CI workflows | `ci.yml`, `codeql.yml`, `opencode.yml`, `snyk-container.yml`, `release.yml` | `ls .github/workflows` |
 | Docker daemon | **Down** — `docker compose` v2.40.3 present, but socket missing; start needs interactive sudo | `docker ps` |
+| Podman 5.7.0 | Present but **unusable** — rootless setup dies in `newuidmap` (D-013) | `podman info` |
+| Native PG18 / Redis | `/usr/lib/postgresql/18/bin/*` + `/usr/bin/redis-server` available; neither running | `which postgres redis-server` |
 | gh CLI | Installed, **not authenticated** — secrets/PR operations unavailable | `gh auth status` |
 
 ## 2. Decisions ledger
@@ -36,6 +39,11 @@ Append-only ledger; never store secrets (env var *names* only).
 | D-006 | Commit style = Conventional Commits (`feat:`/`fix:`/`docs:`/…) | CONTRIBUTING.md |
 | D-007 | **SQLAlchemy pinned 2.0.52** until a live PostgreSQL can verify the 2.1 psycopg3 path | IMP-P1-7; 2.1 `postgresql://`→psycopg unverifiable with docker daemon down |
 | D-008 | **Single API client**: pages/contexts must use `src/api/axios`; enforced by `single-client.test.js` (twin of backend AST gate) | B1; tokens/401 handling live only in the interceptor |
+| D-009 | **Every workflow action is pinned to a 40-char commit SHA** with a trailing `# vX.Y.Z` comment; Dependabot updates SHA pins natively | Supply-chain: `trivy-action@master` + `chrnorm/*@releases/v1` were mutable. Verified 14/14 SHAs against each action's release page |
+| D-010 | **Coverage floor lives only in `backend/pyproject.toml`** (`fail_under = 58`); CI passes no `--cov-fail-under` | Two sources of truth had drifted (CI 58 vs an 80% claim in CONTRIBUTING) |
+| D-011 | **PostgreSQL service container in CI is required** (backs `alembic upgrade head`); Redis is intentionally absent | Tests mock `redis.from_url`; `token_store` fails open. Removing PG breaks migrations |
+| D-012 | **Deploy host verification uses `STAGING_KNOWN_HOSTS` / `PRODUCTION_KNOWN_HOSTS` secrets**; `ssh-keyscan` is banned | `ssh-keyscan` is unauthenticated/MITM-able. Empty secret must fail the deploy |
+| D-013 | **Container runtime cannot run on this host.** Native PG18/Redis binaries are the only viable local path | `/proc/self` reports uid 0 → `newuidmap` fails for both rootlesskit and podman; `sudo` needs an interactive password |
 
 ## 3. Progress log
 
@@ -86,16 +94,43 @@ Append-only ledger; never store secrets (env var *names* only).
   frontend calls ↔ 98 backend routes exact match; AIChat stream token bug
   fixed (`lastContent`→`lastMsg`, `8b3bf6de`); real eslint 10 flat config +
   `npm run lint` + CI step (`fe239e9f`); `make test` green (ledger ✅).
+- **Done (2026-10-08 CI/CD upgrade):** fixed the Trivy scan bug — it referenced
+  `sha-<40-char>` while `metadata-action` pushes `sha-<short7>`, so `security`
+  scanned a tag that was never published; now consumes
+  `needs.docker-*.outputs.image_tag`. Deleted the dead `frontend-dist`
+  artifact round-trip (`.dockerignore` excludes `dist/`, so the download was
+  discarded by the Docker build context). Removed the unused Redis service
+  container (kept Postgres — `alembic upgrade head` needs it) and the unused
+  `statuses: write` permission. SHA-pinned + upgraded **all 5 workflows**
+  (14/14 SHAs verified against release pages), added `concurrency` +
+  `timeout-minutes` everywhere, made mypy advisory via `continue-on-error`,
+  dropped CI's duplicate `--cov-fail-under`, split the colliding
+  `snyk.sarif` filename per job, replaced `ssh-keyscan` with pinned
+  `known_hosts` secrets, guarded `opencode.yml` against fork commenters
+  (`id-token: write` + API-key secret removed). Frontend Dockerfile now
+  `npm ci`s the lockfile (was `npm install` without it → non-reproducible
+  images). Dependabot gained the `docker` ecosystem + `groups:` to collapse
+  the 37-branch backlog. New `release.yml` (tag or dispatch → verify images →
+  publish GitHub Release from CHANGELOG.md). Compose: dropped obsolete
+  `version:` and the never-read `REACT_APP_API_URL`. Hygiene: 252MB
+  heapsnapshots + empty `run/ logs/ backups/ ssl/` deleted, tag `list` deleted,
+  backup manifest untracked, `.env` files chmod 600, stray tag and 9 dead
+  local Dependabot branches removed, `bcrypt` exact-pinned, README/CONTRIBUTING
+  counts corrected. Verified: pytest 285, vitest 105/105, ruff, black, eslint
+  0 errors, vite build, all 5 workflows parse with zero unpinned actions.
 
 ## 4. Open threads
 
 | ID | Thread | Next action |
 |----|--------|-------------|
 | T-003 | Alembic 001–008 **never applied to live PostgreSQL** — blocked: docker daemon down, start needs interactive sudo | `sudo systemctl start docker` → `docker compose up -d postgres redis` → `alembic upgrade head` |
+| T-011 | **CI deploy jobs need `STAGING_KNOWN_HOSTS` + `PRODUCTION_KNOWN_HOSTS` secrets** (new in D-012) or they fail closed | Populate with `ssh-keyscan -H <host>` once, then pin. See docs/GITHUB_SECRETS.md |
+| T-012 | **Container builds unverified** — no runtime on this host, so `docker build` for backend/frontend and the frontend `npm ci` image path are untested | First CI run on the pushed commit will exercise them; watch the `docker-*` jobs |
+| T-013 | Codespaces unusable: `api.github.com` TLS handshake timeout (0/3); `gh` unauthenticated | SHAs were resolved by scraping `/releases/tag/<version>` HTML instead |
 | T-004 | GitHub secrets pending: `DOCKER_USER`, `DOCKER_PAT_BACKEND/FRONTEND`; Docker Hub images empty; `gh` unauthenticated | `gh auth login` → STATUS_CHECKLIST.md → docs/GITHUB_SECRETS.md |
 | T-005 | Production server not provisioned (`.env.production`, services) | docs/END_USER_INSTALL.md |
-| T-007 | **Commits not pushed**: `bc2e0224`…`80bf5c4a` + docs sync local only; 37 Dependabot branches on remote | `git push origin main` when asked |
-| T-008 | GitHub reports 106 Dependabot vulnerabilities (9 critical) on default branch | Dependabot PR triage; batch mobile ones with MAP-6 |
+| T-007 | ~~Commits not pushed~~ **resolved this session** — `git push origin main` succeeded; `main` in sync with `origin/main` | none (closed) |
+| T-008 | GitHub reports 106 Dependabot vulnerabilities (9 critical) on default branch | `groups:` now batches them; close stale PRs for the 9 deleted branches |
 | T-009 | Frontend 2 moderate prod vulns remain — need breaking majors (react 19 / router 7 / tailwind 4) | batch upgrade epic after B1 |
 | T-010 | `backend/.env` created (random SECRET_KEY, gitignored) — local dev only; Docker/CI use their own env | none (informational) |
 
@@ -103,15 +138,21 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | Check | Result | When |
 |-------|--------|------|
-| `pytest` (backend) | ✅ 285 passed, 6 warnings, 0 deprecations | 2026-10-08 |
+| `pytest` (backend) | ✅ 285 passed, 6 warnings | 2026-10-08 |
 | backend `ruff check` + `black --check` | ✅ clean (67 files) | 2026-10-08 |
+| coverage (`coverage report`) | ✅ 58.21% (floor 58 from pyproject) | 2026-10-08 |
 | `backend/frontend-react` vitest | ✅ 105/105 (incl. single-client gate) | 2026-10-08 |
-| `backend/frontend-react` build | ✅ vite + PWA sw generated | 2026-10-08 |
+| `backend/frontend-react` build | ✅ vite + PWA sw (6 entries, 838 KiB) | 2026-10-08 |
 | `backend/frontend-react` lint (eslint 10) | ✅ 0 errors / 127 warnings; CI enforces | 2026-10-08 |
-| `make test` (backend + frontend) | ✅ pytest 285 + vitest 105 both green | 2026-10-08 |
+| all 5 workflows: YAML parse + pin audit | ✅ 0 unpinned, concurrency + timeout everywhere | 2026-10-08 |
+| `docker compose config` | ✅ valid (no `version:` warning) | 2026-10-08 |
+| `npm ci` from lockfile (throwaway copy) | ✅ exit 0, 761 packages resolved | 2026-10-08 |
+| `requirements.txt` pin audit | ✅ 24/24 exact (`==`); bcrypt now `==4.3.0` | 2026-10-08 |
 | `alembic upgrade head --sql` (offline) | ✅ 47 DDL stmts to 008 | 2026-10-08 |
-| `alembic upgrade head` vs live DB | ⬜ not run — docker daemon down | — |
-| Full suite w/ `make test` | ⬜ not run this session (pytest used directly) | — |
+| `alembic upgrade head` vs live DB | ⬜ not run — no container runtime (D-013) | — |
+| `docker build` backend + frontend | ⬜ not run — no container runtime (D-013) | — |
+| Live CI run on GitHub | ⬜ not run — commits pushed only after this session | — |
+| Codespaces as a fallback runtime | ⬜ unavailable — `api.github.com` TLS timeout | — |
 
 > Rule: mark ⬜/⏳ honestly. Never upgrade a claim to ✅ without tool output.
 
