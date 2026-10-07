@@ -4,7 +4,7 @@ Durable cross-session state. Companion to [`AGENTS.md`](../AGENTS.md)
 (AGENTS.md = **how the repo works**; this file = **what is true right now**).
 Append-only ledger; never store secrets (env var *names* only).
 
-**Last verified:** 2026-10-03 (session: agent-memory-profile creation)
+**Last verified:** 2026-10-08 (session: fix-everything sweep + B1 single-client)
 
 ---
 
@@ -12,16 +12,17 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | Fact | Value | Source |
 |------|-------|--------|
-| Git HEAD | `328ad9d7` "chore: consolidate pycache ignores, track .dockerignore files" | `git log` |
-| Worktree | **Dirty** — ≥12 modified files (see §4) | `git status --short` |
+| Git HEAD | `80bf5c4a` docs sync; session landed `b2df79fd`→`7014a496` + docs (run `git log -10`) | `git log` |
+| Worktree | **Clean** (after this session's commit series) | `git status --short` |
 | Node | v22.22.1 at `/usr/bin/node` | `node --version` |
-| npm / npx | **10.9.2 NOW ON PATH** at `/home/admin/.local/bin` | `which npm npx` |
-| npm fallback | `/tmp/opencode/npm10/package/bin/npm-cli.js` still exists (volatile `/tmp` — re-bootstrap if gone) | `ls` |
-| Python | 3.14.4 system; `backend/venv/` present (alembic, black, celery in bin) | `python3 --version`, `ls venv/bin` |
-| Alembic chain | **001 → 006** (`006_inventory_payment_setting_columns.py` added) | `ls alembic/versions/` |
-| Frontend (canonical) | `backend/frontend-react` — scripts: `dev`, `build`, `preview`, `test` (vitest), `test:watch` | `package.json` |
-| CI workflows | `ci.yml`, `codeql.yml`, `snyk-container.yml` | `ls .github/workflows` |
-| Profile files | No pre-existing AGENTS PROFILE/memory.md before 2026-10-03 | `find -iname` |
+| npm / npx | **10.9.2 on PATH** at `/home/admin/.local/bin` | `which npm npx` |
+| npm fallback | `/tmp/opencode/npm10/…` volatile — re-bootstrap if gone | `ls` |
+| Python | 3.14.4 (venv) — runs 285 tests; Docker image is 3.11-slim | `python --version` |
+| Alembic chain | **001 → 008** (offline `--sql` regenerates 47 DDL stmts under alembic 1.20) | `alembic upgrade head --sql` |
+| Frontend (canonical) | `backend/frontend-react` — scripts: `dev`, `build`, `preview`, `test`, `test:watch`; **105 vitest tests** | `package.json`, `npm run test` |
+| CI workflows | `ci.yml`, `codeql.yml`, `opencode.yml`, `snyk-container.yml` | `ls .github/workflows` |
+| Docker daemon | **Down** — `docker compose` v2.40.3 present, but socket missing; start needs interactive sudo | `docker ps` |
+| gh CLI | Installed, **not authenticated** — secrets/PR operations unavailable | `gh auth status` |
 
 ## 2. Decisions ledger
 
@@ -33,6 +34,8 @@ Append-only ledger; never store secrets (env var *names* only).
 | D-004 | Blue-green (`scripts/deploy-blue-green.sh`) is the deploy path; root `deploy.sh` is legacy pending replacement | IMP-P1-2 |
 | D-005 | Profile load path = `AGENTS.md` + `AGENTS PROFILE/MEMORY.md` only; other profile files on demand | Context economy; see `README.md → Load order` |
 | D-006 | Commit style = Conventional Commits (`feat:`/`fix:`/`docs:`/…) | CONTRIBUTING.md |
+| D-007 | **SQLAlchemy pinned 2.0.52** until a live PostgreSQL can verify the 2.1 psycopg3 path | IMP-P1-7; 2.1 `postgresql://`→psycopg unverifiable with docker daemon down |
+| D-008 | **Single API client**: pages/contexts must use `src/api/axios`; enforced by `single-client.test.js` (twin of backend AST gate) | B1; tokens/401 handling live only in the interceptor |
 
 ## 3. Progress log
 
@@ -62,27 +65,47 @@ Append-only ledger; never store secrets (env var *names* only).
   Mobile: no lockfile, lock-only resolve fails on Expo peers — left pinned.
   Committed `7f21f48f` (4 files) + pushed to origin/main. Validated: pytest 256,
   ruff/black, vitest 60/60, vite build green.
+- **Done (2026-10-04 INT-1 + Slice A):** docs/profile tracked `bc2e0224`;
+  A1 twelve-factory config + `create_app` factory `b2df79fd`; A2 refresh-token
+  rotation + jti denylist + auth schemas `26363420`; A3 `require_permission`
+  over projects/ai/reports/analytics/integrations + AST gate `01c60370`
+  (256→285 tests, coverage 58.84%).
+- **Done (2026-10-08 fix-everything sweep):** datetime.utcnow/local-now →
+  tz-aware UTC across 13 files (`2a6809bb`, 0 deprecation warnings — note: this
+  commit also swept the staged root `package.json` deletion); deps fastapi
+  0.142.2/starlette 1.7.0/alembic 1.20/black 26.10/dotenv 1.2.4/httpx2 2.13.1
+  + `declarative_base` 2.0-style (`0a9326cf`); CI no-op lint+tsc removed
+  (`22b44f08`); frontend lockfile audit-fix + vite 6.4.4 (`b6b079c3`); **B1
+  single-client migration** 16 files + enforcement test (`7014a496`, vitest
+  105/105 + build); AGENTS.md facts synced (`80bf5c4a`). Hygiene: 223MB
+  heapsnapshots purged (scripts/ = 119K), stale stash@{0} triaged & dropped
+  (all hunks superseded; mobile-ci templates noted for IMP-P2-3), backend/.env
+  created from example with random SECRET_KEY (gitignored). SQLAlchemy 2.1
+  upgrade attempted → reverted (D-007). **Not pushed** (ask-gate).
 
 ## 4. Open threads
 
 | ID | Thread | Next action |
 |----|--------|-------------|
-| T-001 | **Uncommitted work**: `ci.yml`, `permissions_catalogue.py`, 6 test files, `frontend-react/src/App.jsx`, `pytest.ini`, `pyproject.toml`, lockfile modified | Review diff → run tests → commit with Conventional Commit (only if user asks) |
-| T-002 | **Drift vs AGENTS.md**: (a) "npx absent" — now false, npm 10.9.2 on PATH; (b) "Alembic 001-005" — now 001-006 | Correct AGENTS.md after confirming `make test` behavior with new PATH |
-| T-003 | Alembic 001-006 **never applied to live PostgreSQL** | `docker-compose up -d postgres redis` → `alembic upgrade head` |
-| T-004 | GitHub secrets pending: `DOCKER_USER`, `DOCKER_PAT_BACKEND`, `DOCKER_PAT_FRONTEND`; Docker Hub images empty | STATUS_CHECKLIST.md → docs/GITHUB_SECRETS.md |
+| T-003 | Alembic 001–008 **never applied to live PostgreSQL** — blocked: docker daemon down, start needs interactive sudo | `sudo systemctl start docker` → `docker compose up -d postgres redis` → `alembic upgrade head` |
+| T-004 | GitHub secrets pending: `DOCKER_USER`, `DOCKER_PAT_BACKEND/FRONTEND`; Docker Hub images empty; `gh` unauthenticated | `gh auth login` → STATUS_CHECKLIST.md → docs/GITHUB_SECRETS.md |
 | T-005 | Production server not provisioned (`.env.production`, services) | docs/END_USER_INSTALL.md |
-| T-006 | Root `package.json` has **no scripts**, only dep `npx@10.2.2` (odd); `scripts/*.heapsnapshot` ≈233 MB present (gitignored) | Cleanup task IMP-P1-3 |
+| T-007 | **Commits not pushed**: `bc2e0224`…`80bf5c4a` + docs sync local only; 37 Dependabot branches on remote | `git push origin main` when asked |
+| T-008 | GitHub reports 106 Dependabot vulnerabilities (9 critical) on default branch | Dependabot PR triage; batch mobile ones with MAP-6 |
+| T-009 | Frontend 2 moderate prod vulns remain — need breaking majors (react 19 / router 7 / tailwind 4) | batch upgrade epic after B1 |
+| T-010 | `backend/.env` created (random SECRET_KEY, gitignored) — local dev only; Docker/CI use their own env | none (informational) |
 
 ## 5. Verification ledger
 
 | Check | Result | When |
 |-------|--------|------|
-| `pytest` (backend) | ⬜ not run this session | — |
-| `backend/frontend-react` build | ⬜ not run this session | — |
-| `alembic upgrade head` vs live DB | ⬜ not run (DB down) | — |
-| File/dir existence checks (§1) | ✅ via `ls`/`git`/`node -e` | 2026-10-03 |
-| Prior-session claim: 3 backend tests pass | ⏳ inherited from AGENTS.md, re-verify before trusting | — |
+| `pytest` (backend) | ✅ 285 passed, 6 warnings, 0 deprecations | 2026-10-08 |
+| backend `ruff check` + `black --check` | ✅ clean (67 files) | 2026-10-08 |
+| `backend/frontend-react` vitest | ✅ 105/105 (incl. single-client gate) | 2026-10-08 |
+| `backend/frontend-react` build | ✅ vite + PWA sw generated | 2026-10-08 |
+| `alembic upgrade head --sql` (offline) | ✅ 47 DDL stmts to 008 | 2026-10-08 |
+| `alembic upgrade head` vs live DB | ⬜ not run — docker daemon down | — |
+| Full suite w/ `make test` | ⬜ not run this session (pytest used directly) | — |
 
 > Rule: mark ⬜/⏳ honestly. Never upgrade a claim to ✅ without tool output.
 
@@ -91,7 +114,7 @@ Append-only ledger; never store secrets (env var *names* only).
 - Required env **names** (values in `.env`, never here): `DATABASE_URL`, `REDIS_URL`,
   `SECRET_KEY`, `ENVIRONMENT`, `OLLAMA_BASE_URL`, `STRIPE_SECRET_KEY`, `CORS_ORIGINS`,
   `POSTGRES_MCP_URL` (MCP only).
-- Services must be up first: `docker-compose up -d postgres redis`.
+- Services must be up first: `docker compose up -d postgres redis` (compose v2 plugin; daemon must be running).
 - OpenCode: project `opencode.json` (permissions, watcher ignores, 4 MCP servers);
   global `~/.config/opencode/opencode.jsonc`.
 - MCP: `postgres` (`scripts/mcp-postgres.sh`, exits 1 if `POSTGRES_MCP_URL` unset),
