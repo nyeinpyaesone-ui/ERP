@@ -319,7 +319,7 @@ jobs:
           auto_inactive: true
 
       - name: Set deployment status to in_progress
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.STAGING_DOMAIN }}
@@ -378,7 +378,7 @@ jobs:
 
       - name: Set deployment status to success
         if: success()
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.STAGING_DOMAIN }}
@@ -387,7 +387,7 @@ jobs:
 
       - name: Set deployment status to failure
         if: failure()
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.STAGING_DOMAIN }}
@@ -418,7 +418,7 @@ jobs:
           auto_inactive: true
 
       - name: Set deployment status to in_progress
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.PRODUCTION_DOMAIN }}
@@ -458,7 +458,7 @@ jobs:
 
       - name: Set deployment status to success
         if: success()
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.PRODUCTION_DOMAIN }}
@@ -467,7 +467,7 @@ jobs:
 
       - name: Set deployment status to failure
         if: failure()
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.PRODUCTION_DOMAIN }}
