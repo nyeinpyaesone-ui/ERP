@@ -2,54 +2,34 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from app.auth import (
     create_access_token,
+    create_refresh_token,
+    decode_token,
     get_current_user,
     get_password_hash,
+    oauth2_scheme,
     verify_password,
 )
 from app.database import get_db
 from app.models import Role, User
+from app.schemas.auth import (
+    LogoutResponse,
+    Token,
+    TokenRefreshRequest,
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+)
+from app.services import token_store
 from app.services.activity_log import log_activity
 from app.services.permissions import require_permission
 
 router = APIRouter()
 
 ALLOWED_ROLES = {"user", "admin"}  # superadmin only via require_superadmin
-
-
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
-    full_name: str
-
-
-class UserResponse(BaseModel):
-    id: int
-    email: str
-    full_name: str
-    role: str
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user: UserResponse
-
-
-class UserUpdate(BaseModel):
-    email: EmailStr | None = None
-    full_name: str | None = None
-    is_active: bool | None = None
-    roles: list[str] | None = None  # Role names to assign
 
 
 @router.post("/register", response_model=UserResponse)
@@ -109,11 +89,69 @@ def login(
     db.commit()
 
     token = create_access_token({"sub": str(user.id), "role": user.role})
+    refresh = create_refresh_token(user.id)
     log_activity(
         db, user_id=user.id, action="user_login", entity_type="user", entity_id=user.id
     )
 
-    return {"access_token": token, "token_type": "bearer", "user": user}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "refresh_token": refresh,
+        "user": user,
+    }
+
+
+@router.post("/refresh", response_model=Token)
+def refresh_tokens(body: TokenRefreshRequest, db: Session = Depends(get_db)):
+    """Exchange a refresh token for a fresh access/refresh pair (rotation).
+
+    The presented refresh jti is denylisted immediately so a stolen refresh
+    token cannot be replayed after one use. Raises 401 for wrong token type,
+    revoked token, unknown, or disabled user.
+    """
+    claims = decode_token(body.refresh_token, expected_type="refresh")
+    user = db.query(User).filter(User.id == int(claims["sub"])).first()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Rotate: revoke the refresh token that was just spent.
+    jti = claims.get("jti")
+    exp = claims.get("exp")
+    if jti and exp:
+        ttl = int(exp - datetime.utcnow().timestamp())
+        token_store.revoke(jti, ttl)
+
+    return {
+        "access_token": create_access_token({"sub": str(user.id), "role": user.role}),
+        "token_type": "bearer",
+        "refresh_token": create_refresh_token(user.id),
+        "user": user,
+    }
+
+
+@router.post("/logout", response_model=LogoutResponse)
+def logout(
+    token: str = Depends(oauth2_scheme),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Denylist the presented access token's jti until its natural expiry."""
+    claims = decode_token(token, expected_type="access")
+    jti = claims.get("jti")
+    exp = claims.get("exp")
+    revoked = False
+    if jti and exp:
+        ttl = int(exp - datetime.utcnow().timestamp())
+        revoked = token_store.revoke(jti, ttl)
+    log_activity(
+        db,
+        user_id=current_user.id,
+        action="user_logout",
+        entity_type="user",
+        entity_id=current_user.id,
+    )
+    return {"detail": "Logged out", "revoked": revoked}
 
 
 @router.get("/me", response_model=UserResponse)
@@ -132,7 +170,7 @@ def list_users(
     return db.query(User).offset(skip).limit(limit).all()
 
 
-@router.put("/users/{user_id}")
+@router.put("/users/{user_id}", response_model=UserResponse)
 def update_user(
     user_id: int,
     user_data: UserUpdate,

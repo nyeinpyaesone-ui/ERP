@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from uuid import uuid4
 
 import jwt
 from fastapi import Depends, HTTPException
@@ -9,9 +10,13 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models import User
+from app.services import token_store
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
+_ACCESS = "access"
+_REFRESH = "refresh"
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -22,20 +27,54 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
+def _sign(claims: dict) -> str:
+    return jwt.encode(
+        claims, settings.SECRET_KEY.get_secret_value(), algorithm=settings.ALGORITHM
+    )
+
+
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (
+    now = datetime.utcnow()
+    expire = now + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    to_encode.update({"exp": expire, "iat": now, "jti": uuid4().hex, "type": _ACCESS})
+    return _sign(to_encode)
 
 
-def decode_token(token: str) -> dict:
+def create_refresh_token(user_id: int | str) -> str:
+    """Long-lived, single-use-per-rotation refresh token."""
+    now = datetime.utcnow()
+    return _sign(
+        {
+            "sub": str(user_id),
+            "exp": now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+            "iat": now,
+            "jti": uuid4().hex,
+            "type": _REFRESH,
+        }
+    )
+
+
+def decode_token(token: str, expected_type: str | None = _ACCESS) -> dict:
     try:
-        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        claims = jwt.decode(
+            token,
+            settings.SECRET_KEY.get_secret_value(),
+            algorithms=[settings.ALGORITHM],
+        )
     except jwt.PyJWTError as err:
         raise HTTPException(status_code=401, detail="Invalid token") from err
+
+    token_type = claims.get("type", _ACCESS)
+    if expected_type is not None and token_type != expected_type:
+        raise HTTPException(status_code=401, detail="Invalid token type")
+
+    jti = claims.get("jti")
+    if jti and token_store.is_revoked(jti):
+        raise HTTPException(status_code=401, detail="Token has been revoked")
+    return claims
 
 
 async def get_current_user(
