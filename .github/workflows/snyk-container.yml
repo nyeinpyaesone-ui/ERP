@@ -12,14 +12,19 @@ permissions:
   contents: read
   security-events: write
 
+concurrency:
+  group: snyk-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   snyk-backend:
     permissions:
       contents: read
       security-events: write
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build backend Docker image
         run: |
           docker build -t ${{ vars.DOCKER_USER }}/erp-solution-backend:test ./backend
@@ -30,19 +35,21 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: ${{ vars.DOCKER_USER }}/erp-solution-backend:test
-          args: --file=backend/Dockerfile
+          args: --file=backend/Dockerfile --sarif-file-output=snyk-backend.sarif
       - name: Upload backend result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
-          sarif_file: snyk.sarif
+          sarif_file: snyk-backend.sarif
+          category: snyk-backend
 
   snyk-frontend:
     permissions:
       contents: read
       security-events: write
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build frontend Docker image
         run: |
           docker build -t ${{ vars.DOCKER_USER }}/erp-solution-frontend:test ./backend/frontend-react
@@ -53,8 +60,9 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: ${{ vars.DOCKER_USER }}/erp-solution-frontend:test
-          args: --file=backend/frontend-react/Dockerfile
+          args: --file=backend/frontend-react/Dockerfile --sarif-file-output=snyk-frontend.sarif
       - name: Upload frontend result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
-          sarif_file: snyk.sarif
+          sarif_file: snyk-frontend.sarif
+          category: snyk-frontend

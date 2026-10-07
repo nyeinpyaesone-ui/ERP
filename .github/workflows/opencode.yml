@@ -6,22 +6,38 @@ on:
   pull_request_review_comment:
     types: [created]
 
+concurrency:
+  group: opencode-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   opencode:
-    if: |
-      contains(github.event.comment.body, ' /oc') ||
-      startsWith(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, ' /opencode') ||
-      startsWith(github.event.comment.body, '/opencode')
+    # Guard against untrusted input: this job holds OPENCODE_API_KEY, so only
+    # interactors with write access may trigger it. Without the association
+    # check, any outside commenter (including a fork PR author) could invoke
+    # the model and spend the key. Note the parentheses — bare `A && B || C`
+    # would bind as `(A && B) || C` and leak the trigger to any commenter who
+    # posts a bare "/oc".
+    if: >-
+      ${{
+        (github.event.comment.user.type == 'User')
+        && (contains(github.event.comment.body, ' /oc')
+          || startsWith(github.event.comment.body, '/oc')
+          || contains(github.event.comment.body, ' /opencode')
+          || startsWith(github.event.comment.body, '/opencode'))
+        && (contains(github.event.comment.author_association, 'MEMBER')
+          || contains(github.event.comment.author_association, 'OWNER')
+          || contains(github.event.comment.author_association, 'COLLABORATOR'))
+      }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
-      id-token: write
       contents: read
       pull-requests: read
       issues: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
