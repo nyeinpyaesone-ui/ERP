@@ -50,7 +50,7 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-erp}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-erp_solution}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
-      ENVIRONMENT: production
+      ENVIRONMENT: prod
       OLLAMA_BASE_URL: http://ollama:11434
       CORS_ORIGINS: ${CORS_ORIGINS}
     volumes:
@@ -81,7 +81,7 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-erp}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-erp_solution}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
-      ENVIRONMENT: production
+      ENVIRONMENT: prod
       OLLAMA_BASE_URL: http://ollama:11434
       CORS_ORIGINS: ${CORS_ORIGINS}
     volumes:

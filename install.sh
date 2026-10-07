@@ -161,7 +161,7 @@ REDIS_PASSWORD=${redis_password}
 
 # Security
 SECRET_KEY=${secret_key}
-ENVIRONMENT=production
+ENVIRONMENT=prod
 
 # Domain Configuration
 API_URL=https://${api_domain}
