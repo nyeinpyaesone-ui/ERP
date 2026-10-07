@@ -12,8 +12,8 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | Fact | Value | Source |
 |------|-------|--------|
-| Git HEAD | `80bf5c4a` docs sync; session landed `b2df79fd`→`7014a496` + docs (run `git log -10`) | `git log` |
-| Worktree | **Clean** (after this session's commit series) | `git status --short` |
+| Git HEAD | `0650937c` fix(prod) ENVIRONMENT=prod; session landed `adc23ccc`→`0650937c` + env fixes (run `git log -10`) | `git log` |
+| Worktree | **Clean**, `main` in sync with `origin/main` (0/0) | `git status --short` |
 | Tracked files | 273 at HEAD; 274 at tag `v1.0.0` | `git ls-files \\| wc -l` |
 | Node | v22.22.1 at `/usr/bin/node` | `node --version` |
 | npm / npx | **10.9.2 on PATH** at `/home/admin/.local/bin` | `which npm npx` |
@@ -44,6 +44,8 @@ Append-only ledger; never store secrets (env var *names* only).
 | D-011 | **PostgreSQL service container in CI is required** (backs `alembic upgrade head`); Redis is intentionally absent | Tests mock `redis.from_url`; `token_store` fails open. Removing PG breaks migrations |
 | D-012 | **Deploy host verification uses `STAGING_KNOWN_HOSTS` / `PRODUCTION_KNOWN_HOSTS` secrets**; `ssh-keyscan` is banned | `ssh-keyscan` is unauthenticated/MITM-able. Empty secret must fail the deploy |
 | D-013 | **Container runtime cannot run on this host.** Native PG18/Redis binaries are the only viable local path | `/proc/self` reports uid 0 → `newuidmap` fails for both rootlesskit and podman; `sudo` needs an interactive password |
+| D-014 | **`ENVIRONMENT` accepts exactly `dev` \| `test` \| `prod`** — never `production`. This is not configurable | `Settings` uses a `Literal`; a bad value raises at import. Only surfaces on a real deploy, since CI/dev use `dev` |
+| D-015 | **`.env.example` is generated from `backend/app/config.py`**, not hand-maintained. Every key must be a real `Settings` field or an explicit `docker-compose.yml` interpolation | `extra="ignore"` meant 14 dead keys loaded as no-ops while 12 real ones silently fell back to defaults |
 
 ## 3. Progress log
 
@@ -118,6 +120,24 @@ Append-only ledger; never store secrets (env var *names* only).
   local Dependabot branches removed, `bcrypt` exact-pinned, README/CONTRIBUTING
   counts corrected. Verified: pytest 285, vitest 105/105, ruff, black, eslint
   0 errors, vite build, all 5 workflows parse with zero unpinned actions.
+- **Done (2026-10-08 env/prod correctness):** found and fixed a
+  **production-blocking** bug — `ENVIRONMENT` is `Literal["dev","test","prod"]`
+  yet `docker-compose.prod.yml` hardcoded `production` in both backend
+  services, and `install.sh` / `setup-production.sh` /
+  `.env.production.template` all generated it, so the documented production
+  deploy could never boot (D-014). Also rebuilt `.env.example` from
+  `config.py`: the old file set `ENVIRONMENT=development` (raises at import)
+  and carried 14 keys the app never reads while omitting 12 it requires
+  (D-015); now 30 keys, verified 0 unread / 0 missing. Fixed
+  `JWT_ALGORITHM`→`ALGORITHM`, added the `DOCKER_USER`/`VERSION` keys that
+  compose interpolates, moved `API_URL`/`WS_URL`/`SENTRY_DSN` under a "NOT
+  read" heading. Rebuilt `docs/GITHUB_SECRETS.md` from the workflows (it
+  documented `DOCKER_USERNAME`/`KUBE_CONFIG` that nothing reads; now all 11
+  secrets + 3 variables, checked 14/14). Deleted the stray `list` tag from the
+  remote. 8 commits pushed, `main` in sync with `origin/main`.
+- **Deferred (requested, not started):** "/compact the whole repo, remodify
+  easy to reuse this ERP for client UI/UX" — no scoping or file list agreed
+  with the user before the session closed. Treat as an open thread, not work.
 
 ## 4. Open threads
 
@@ -133,6 +153,7 @@ Append-only ledger; never store secrets (env var *names* only).
 | T-008 | GitHub reports 106 Dependabot vulnerabilities (9 critical) on default branch | `groups:` now batches them; close stale PRs for the 9 deleted branches |
 | T-009 | Frontend 2 moderate prod vulns remain — need breaking majors (react 19 / router 7 / tailwind 4) | batch upgrade epic after B1 |
 | T-010 | `backend/.env` created (random SECRET_KEY, gitignored) — local dev only; Docker/CI use their own env | none (informational) |
+| T-014 | **"Compact the whole repo, make it easy to reuse for client UI/UX"** — requested late in the session, no scope agreed | Needs an agreed target: which of the 12 modules to keep, and whether "reusable" means a theming layer, a template scaffold, or stripping the dead Legacy v1.8/v2.1 trees |
 
 ## 5. Verification ledger
 
@@ -153,6 +174,10 @@ Append-only ledger; never store secrets (env var *names* only).
 | `docker build` backend + frontend | ⬜ not run — no container runtime (D-013) | — |
 | Live CI run on GitHub | ⬜ not run — commits pushed only after this session | — |
 | Codespaces as a fallback runtime | ⬜ unavailable — `api.github.com` TLS timeout | — |
+| `.env.example` vs `config.py` field audit | ✅ 30 keys, 0 unread, 0 missing (script-checked) | 2026-10-08 |
+| prod fail-closed matrix (placeholder/short key, example DB) | ✅ all three refuse; real key + real DB boots | 2026-10-08 |
+| `.env.production.template` vs compose interpolations | ✅ 8/8 vars present | 2026-10-08 |
+| `install.sh` + `setup-production.sh` shell syntax | ✅ `bash -n` clean | 2026-10-08 |
 
 > Rule: mark ⬜/⏳ honestly. Never upgrade a claim to ✅ without tool output.
 
