@@ -1,4 +1,5 @@
 import json
+from datetime import UTC
 
 import httpx
 from fastapi import APIRouter, Depends
@@ -122,14 +123,14 @@ async def get_ai_insights(
     from datetime import datetime, timedelta
 
     # Revenue insights
-    last_month = datetime.now() - timedelta(days=30)
+    last_month = datetime.now(UTC) - timedelta(days=30)
     invoices = db.query(Invoice).filter(Invoice.created_at >= last_month).all()
     revenue = sum(i.total or 0 for i in invoices)
 
     # Churn risk
     inactive_contacts = (
         db.query(Contact)
-        .filter(Contact.last_activity < datetime.now() - timedelta(days=90))
+        .filter(Contact.last_activity < datetime.now(UTC) - timedelta(days=90))
         .all()
     )
 
@@ -203,7 +204,7 @@ async def forecast_revenue(
     from sqlalchemy import func
 
     # Get last 6 months of paid invoices
-    end_date = datetime.now()
+    end_date = datetime.now(UTC)
     start_date = end_date - timedelta(days=180)
 
     monthly_data = (
@@ -256,9 +257,7 @@ async def forecast_revenue(
         "trend": (
             "increasing"
             if avg_growth > 0
-            else "decreasing"
-            if avg_growth < 0
-            else "stable"
+            else "decreasing" if avg_growth < 0 else "stable"
         ),
         "confidence": "medium",
     }

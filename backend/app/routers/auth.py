@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
@@ -85,7 +85,7 @@ def login(
     if not user.is_active:
         raise HTTPException(status_code=401, detail="Account disabled")
 
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(UTC)
     db.commit()
 
     token = create_access_token({"sub": str(user.id), "role": user.role})
@@ -119,7 +119,7 @@ def refresh_tokens(body: TokenRefreshRequest, db: Session = Depends(get_db)):
     jti = claims.get("jti")
     exp = claims.get("exp")
     if jti and exp:
-        ttl = int(exp - datetime.utcnow().timestamp())
+        ttl = int(exp - datetime.now(UTC).timestamp())
         token_store.revoke(jti, ttl)
 
     return {
@@ -142,7 +142,7 @@ def logout(
     exp = claims.get("exp")
     revoked = False
     if jti and exp:
-        ttl = int(exp - datetime.utcnow().timestamp())
+        ttl = int(exp - datetime.now(UTC).timestamp())
         revoked = token_store.revoke(jti, ttl)
     log_activity(
         db,

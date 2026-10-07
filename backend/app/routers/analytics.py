@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import extract, func
@@ -112,7 +112,7 @@ def get_monthly_trends(
     current_user=Depends(require_permission("analytics", "read")),
 ):
     months_back = 6
-    start_date = datetime.now() - timedelta(days=30 * months_back)
+    start_date = datetime.now(UTC) - timedelta(days=30 * months_back)
 
     revenue_by_month = (
         db.query(

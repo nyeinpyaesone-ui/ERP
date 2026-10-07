@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -99,7 +99,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                     invoice_id=invoice.id,
                     amount=amount,
                     payment_method="stripe",
-                    payment_date=datetime.now().date(),
+                    payment_date=datetime.now(UTC).date(),
                     stripe_payment_intent_id=intent["id"],
                     stripe_charge_id=(
                         intent["charges"]["data"][0]["id"]

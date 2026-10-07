@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import jwt
@@ -35,7 +35,7 @@ def _sign(claims: dict) -> str:
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     expire = now + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
@@ -45,7 +45,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 def create_refresh_token(user_id: int | str) -> str:
     """Long-lived, single-use-per-rotation refresh token."""
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     return _sign(
         {
             "sub": str(user_id),

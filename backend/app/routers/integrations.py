@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 import hmac
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -93,7 +93,7 @@ async def test_webhook(
 
     payload = {
         "event": "test",
-        "timestamp": str(datetime.now()),
+        "timestamp": str(datetime.now(UTC)),
         "data": {"message": "Test webhook delivery"},
     }
 

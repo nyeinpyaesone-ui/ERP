@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, text
@@ -59,7 +59,7 @@ class SearchService:
             existing.title = title
             existing.content = content
             existing.meta_data = metadata or {}
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(UTC)
         else:
             index = SearchIndex(
                 entity_type=entity_type,
@@ -208,7 +208,7 @@ class SearchService:
         Results are ordered newest-update first with 200-character previews.
         Database errors, including invalid tsquery syntax, propagate.
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
 
         base_query = self.db.query(SearchIndex)
 
@@ -258,7 +258,7 @@ class SearchService:
                 }
             )
 
-        execution_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+        execution_time = (datetime.now(UTC) - start_time).total_seconds() * 1000
         return formatted, total, execution_time
 
     def get_facets(
@@ -376,7 +376,7 @@ class SearchService:
 
         if existing:
             existing.count += 1
-            existing.last_used = datetime.utcnow()
+            existing.last_used = datetime.now(UTC)
         else:
             suggestion = SearchSuggestion(
                 query=query.lower().strip(), entity_type=entity_type, count=1
@@ -419,7 +419,7 @@ class SearchService:
         """
         from datetime import datetime, timedelta
 
-        start_date = datetime.utcnow() - timedelta(days=days)
+        start_date = datetime.now(UTC) - timedelta(days=days)
 
         total_queries = (
             self.db.query(SearchQuery)

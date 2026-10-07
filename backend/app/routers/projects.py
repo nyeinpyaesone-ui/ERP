@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -91,7 +91,7 @@ def update_project(
         raise HTTPException(status_code=404, detail="Project not found")
     for key, value in data.dict().items():
         setattr(project, key, value)
-    project.updated_at = datetime.utcnow()
+    project.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(project)
     return project
@@ -143,7 +143,7 @@ def update_task(
     for key, value in data.items():
         if hasattr(task, key):
             setattr(task, key, value)
-    task.updated_at = datetime.utcnow()
+    task.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(task)
     return task
