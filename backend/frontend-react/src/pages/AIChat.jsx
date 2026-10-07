@@ -181,7 +181,7 @@ export default function AIChat() {
                   const lastMsg = newMessages[newMessages.length - 1];
                   if (lastMsg.streaming) {
                     delete lastMsg.streaming;
-                    lastContent.tokens = data.total_tokens;
+                    lastMsg.tokens = data.total_tokens;
                   }
                   return newMessages;
                 });
