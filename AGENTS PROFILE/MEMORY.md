@@ -169,8 +169,22 @@ Append-only ledger; never store secrets (env var *names* only).
   CodeQL 38116547575 = success. First verified full pass: gitleaks, quality,
   tests (285 + **alembic 001→008 on a live postgres:15** — GIN fix
   proven), frontend build, **both Docker images built in CI**. Trivy +
-  deploy jobs correctly skipped (fail-closed: `can_push=false`, no
+  deploy jobs correctly skipped (  fail-closed: `can_push=false`, no
   `DOCKER_PAT_*` secrets — T-004).
+- **Done (2026-10-11 integration audit + drift sweep):** audited every
+  third-party integration's wiring (config → code → compose → docs):
+  Stripe (payments.py, fail-closed 400) — modernized `stripe.error.*` to
+  top-level `stripe.StripeError`/`stripe.SignatureVerificationError` (v8
+  deprecation); Ollama (llm_service, 10/120s httpx timeouts) — wired;
+  SMTP_* — **declared but unwired** (no mail service exists); SENTRY_DSN /
+  OPENAI_API_KEY / AWS_* — **not read** (no SDKs); uploads = local
+  UPLOAD_DIR; frontend reads only `VITE_API_URL` (default `/api/v1`), now
+  documented in new `backend/frontend-react/.env.example`. T-015 drift
+  sweep: README/STATUS counts (272 files/103 commits), infra row fixed
+  (no ES/S3 in repo; Ollama/Docker/GHA are real), 56 v1 `docker-compose`
+  CLI refs → v2, AGENTS.md 16→20 routers, profile chain/lint/coverage
+  claims corrected, GITHUB_SECRETS §3 rebuilt from actual Settings.
+  Verified: pytest 285, ruff+black clean, 0 v1 compose refs left.
 
 ## 4. Open threads
 
@@ -187,7 +201,7 @@ Append-only ledger; never store secrets (env var *names* only).
 | T-009 | Frontend moderate prod vulns remain — need breaking majors (react 19 / router 7 / tailwind 4, vite 7/8 in PRs) | batch upgrade epic after B1 |
 | T-010 | `backend/.env` created (random SECRET_KEY, gitignored) — local dev only; Docker/CI use their own env | none (informational) |
 | T-014 | **"Compact the whole repo, make it easy to reuse for client UI/UX"** — requested late in a prior session, no scope agreed | Needs an agreed target: which of the 12 modules to keep, and whether "reusable" means a theming layer, a template scaffold, or stripping the dead Legacy v1.8/v2.1 trees |
-| T-015 | **Doc-drift batch**: README claims 273 files/80 commits (actual 272/94+), STATUS_CHECKLIST 259/64, ~10 docs still use `docker-compose` v1 CLI, AGENTS.md says "16 API routers" (actual 20), profile TOOLS/HEARTBEATS/SKILLS say migration chain 001–006 + "strict TS" + 80% coverage claim (actual 008, no tsconfig, floor 58) | One docs-sweep pass; AGENTS.md + profile files main-agent-owned |
+| T-015 | ~~Doc-drift batch~~ **resolved 2026-10-11** — README counts + infra row (ES/S3 → Ollama/Docker/GHA), STATUS_CHECKLIST 259/64→272/103, 56 `docker-compose ` v1 CLI refs → v2 across 10 docs, AGENTS.md 16→20 routers, profile 001–006→001–008 / strict-TS→eslint / 80%→58% claims, GITHUB_SECRETS §3 rewritten to actual `Settings` wiring (SMTP reserved-unwired, SENTRY/OPENAI/AWS not read) | Re-open if new drift appears; keep AGENTS.md + profiles in the same sweep |
 | T-016 | `STAGING_DOMAIN` / `PRODUCTION_DOMAIN` repository variables **unset** — deploy jobs' GitHub-Deployment target_url renders empty | `gh variable set STAGING_DOMAIN --body …` once real hostnames exist |
 
 ## 5. Verification ledger
