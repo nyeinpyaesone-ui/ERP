@@ -202,6 +202,13 @@ Append-only ledger; never store secrets (env var *names* only).
   findings on PR #135" runs were dynamic workflows on the junk branch, not repo
   CI. Still open (cannot fix without user inputs): deploy secrets T-004, domain
   vars T-016, vuln epics T-008/T-009.
+- **Done (2026-10-11 scripts/ restore):** at ~23:26 all 14 tracked `scripts/*.sh`
+  vanished from the worktree and an **empty nested `git init`** appeared at
+  `scripts/.git` (branch `master`, 0 commits, no remotes). Restored all files
+  with `git restore scripts/` (byte-identical to HEAD, modes intact), removed
+  the nested `.git`; `git status` clean afterward. Nothing lost — the nested
+  repo held zero commits. Likely the same qwen-chat task bot that opened junk
+  PR #135 (see T-019).
 
 ## 4. Open threads
 
@@ -222,6 +229,7 @@ Append-only ledger; never store secrets (env var *names* only).
 | T-016 | `STAGING_DOMAIN` / `PRODUCTION_DOMAIN` repository variables **unset** — deploy jobs' GitHub-Deployment target_url renders empty | `gh variable set STAGING_DOMAIN --body …` once real hostnames exist |
 | T-017 | ~~junk PR #135 open~~ **resolved 2026-10-11** — closed on user approval, head `secure-github-env-setup-92546` + base `ci-cd-pipeline-basics-cf366` deleted. Same class as #85 (qwen-chat task bot, +25.7k/−18.3k, re-added deleted `frontend/`) | Re-open if another task-bot PR appears; treat >20k-line CONFLICTING diffs as junk by default |
 | T-018 | ~~README/STATUS doc counts stale~~ **resolved 2026-10-11** — README.md + STATUS_CHECKLIST.md + AGENTS.md + docs/TESTING.md updated 272→**273** files / 103→**107** commits / 58.21→**58.89%** | Keep counts in the same sweep as any MEMORY §1 change |
+| T-019 | **qwen-chat task bot may be operating on this host** — same actor opened junk PR #135 (~14:52Z) and likely left an empty `git init` in `scripts/` that wiped 14 tracked scripts (~23:26). Files restored; watch for more local interference | Identify what automation/token that task uses (PR body says "task 0c24ebdf-…"); consider disabling it. Check `git status` before/after any future long background job |
 
 ## 5. Verification ledger
 
