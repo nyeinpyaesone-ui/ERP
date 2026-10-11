@@ -160,6 +160,23 @@ Append-only ledger; never store secrets (env var *names* only).
   token (workflow removed). Local env audited: `.env` 22 keys +
   `backend/.env` 23 keys, all compose `:?` vars set, ENVIRONMENT=dev both,
   gitignored — nothing to change.
+- **Done (2026-10-12 harness report):** filed upstream issue for this host's
+  service-restart aborts — anomalyco/opencode#54567 ("silent service restart
+  mid-session aborts tool calls with 'location shut down'"; diagnostics:
+  v2.0.26 latest, proot aarch64, no plugins; dmesg unreadable so OOM cause
+  unconfirmed). Note: `opencode-ai/opencode` is archived — issues live at
+  `anomalyco/opencode` now.
+- **Done (2026-10-12 code fixes):** Makefile — portable npm (PATH first,
+  volatile `/tmp/opencode/npm10` fallback), `make lint` now activates the venv
+  (black was missing from system PATH and half-failed into `|| true`), dead
+  `tsc` step dropped (no tsconfig), eslint failures no longer swallowed
+  (verified green: 0 errors/127 warnings); new `make guard` →
+  `scripts/repo-guard.sh` fails on nested `.git` / missing tracked files /
+  empty `scripts/*.sh` (T-019 class). All pushed (`be57ca36`).
+- **Done (2026-10-12 Trivy CI fix, via subagent):** Security Scan failed on
+  the first run that actually pushed images — `docker/metadata-action`
+  `tags` is one ref per line but trivy-action passes `image-ref` as ONE
+  argument; fixed to a single-line ref (`46055158`).
 - **Done (2026-10-11 push + first green CI):** pushed 9 commits on user
   approval (`3cce8346..bedd042e`), then fixed the one test failure the push
   exposed — fresh checkouts lack `backend/static/` (empty dirs are invisible
