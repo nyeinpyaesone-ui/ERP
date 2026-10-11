@@ -26,7 +26,7 @@
 ├── scripts/lib.sh          # Shared shell helpers (compose/env/ssl detection)
 ├── scripts/                # deploy-blue-green.sh, backup.sh (created during fixes)
 ├── nginx/                  # nginx.conf, upstream configs (created during fixes)
-└── .github/workflows/      # CI (Gitleaks gate, advisory lint), CodeQL, Snyk
+└── .github/workflows/      # CI (Gitleaks gate, quality gates, Trivy), CodeQL, release
 ```
 
 ## Critical Context

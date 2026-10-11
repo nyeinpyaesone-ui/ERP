@@ -141,10 +141,10 @@ There is no `deploy-*`, `rollback` or `logs-*` target — deployment runs from
 
 ### Using GitHub Actions
 
-There is no deploy workflow. `.github/workflows/` holds `ci.yml` (test/lint
-gate), `codeql.yml` and `snyk-container.yml` — none of them deploy. Pushes to
-`main` run CI only, and tags release nothing. Deployment is manual, via
-`./scripts/deploy-blue-green.sh`.
+There is no standalone deploy workflow. `.github/workflows/` holds `ci.yml`
+(gates + blue-green deploy jobs, skipped until the SSH/Docker secrets exist),
+`codeql.yml` and `release.yml` — deploys run from `ci.yml` when configured,
+otherwise deployment is manual via `./scripts/deploy-blue-green.sh`.
 
 ## Blue-Green Deployment Details
 

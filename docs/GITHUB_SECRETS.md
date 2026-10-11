@@ -52,13 +52,11 @@ Then add them as secrets (see §4). Rotate if a host key ever changes.
 
 ### Security scanning
 
-| Secret | Used by | Notes |
-|--------|---------|-------|
-| `SNYK_TOKEN` | `snyk-container.yml` | <https://snyk.io> → account settings |
-
-`SNYK_TOKEN` steps are `continue-on-error: true`, so a missing token degrades
-to "no findings reported" rather than a red build. Treat an empty token as an
-absent scanner, not a clean result.
+No secret is needed. Container scanning runs via **Trivy** inside `ci.yml`
+(the `security` job, gated on the Docker Hub push capability) and uploads
+SARIF to GitHub code scanning. The former `snyk-container.yml` workflow and
+its `SNYK_TOKEN` dependency were removed — Trivy is the only container
+scanner.
 
 ### Automation
 
@@ -73,7 +71,7 @@ Variables are not secret — they are safe to read in logs and to use in
 
 | Variable | Used by | Value |
 |----------|---------|-------|
-| `DOCKER_USER` | `ci.yml`, `snyk-container.yml`, `release.yml` | Docker Hub namespace, e.g. `powerrangeranikg` |
+| `DOCKER_USER` | `ci.yml`, `release.yml` | Docker Hub namespace, e.g. `powerrangeranikg` |
 | `STAGING_DOMAIN` | `deploy-staging` | Staging hostname for deployment links |
 | `PRODUCTION_DOMAIN` | `deploy-production` | Production hostname for deployment links |
 

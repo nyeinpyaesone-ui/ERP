@@ -166,7 +166,7 @@ resources:
 - [ ] Enable 2FA for all admin accounts
 - [ ] Set up WAF (Cloudflare/AWS WAF)
 - [ ] Regular security audits
-- [ ] Dependency scanning (Snyk/Dependabot)
+- [ ] Dependency scanning (Trivy in CI / Dependabot)
 - [ ] Secrets rotation (monthly)
 - [ ] Network segmentation (VPC)
 - [ ] Backup encryption
