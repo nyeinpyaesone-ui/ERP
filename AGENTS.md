@@ -130,6 +130,11 @@ CORS_ORIGINS=https://app.domain.com
 - `~/.config/opencode/opencode.jsonc` (global) — `share: disabled`, compaction, `mcp_timeout`
 - MCP servers: `postgres` (via `scripts/mcp-postgres.sh`), `filesystem`, `playwright`, `sequential-thinking`
 - `POSTGRES_MCP_URL` must be exported for the Postgres MCP server; wrapper exits 1 if unset
+- Project skills (auto-discovered from `.opencode/skills/`): `@erp-backend` (app factory,
+  20 router mounts, test/lint battery, pitfalls), `@erp-frontend` (single-client rule,
+  env contract, build/test), `@erp-ops` (CI job graph, can_push/can_deploy secrets
+  contract, Trivy specifics, deploy checklist). Load with `@skill-id` when working
+  those areas; keep them updated when the micro-details change.
 
 ## Agent Profile
 

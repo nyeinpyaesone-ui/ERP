@@ -185,6 +185,15 @@ Append-only ledger; never store secrets (env var *names* only).
   6 moderate)** — replaces the stale 96/10/50 in T-008. One Dependabot PR
   (`dependabot/github_actions/github-actions-a79bd13708`, run 38161704324)
   is red on Gitleaks — triage with T-009, not on main.
+- **Done (2026-10-12 project skills):** created `.opencode/skills/` with
+  `@erp-backend` (factory + 20 ROUTER_MOUNTS, auth/RBAC, alembic, test/lint
+  battery + pitfalls), `@erp-frontend` (D-001/D-008 rules, env contract,
+  npm-wrapper trap), `@erp-ops` (CI job graph, can_push/can_deploy exact
+  secret names, Trivy single-line-ref, deploy checklist) — auto-discovered,
+  pointed to from AGENTS.md. T-009 triage started: vite 6.4.4/esbuild
+  0.25.12 alerts are STALE (installed already past fix); real work =
+  vitest 1.6.1→3.2.6 (dev-only, 3 criticals via tinypool) then
+  react-router 6.30.6→7 + postcss-selector-parser 6→7 (tailwind 3 chain).
 - **Done (2026-10-11 push + first green CI):** pushed 9 commits on user
   approval (`3cce8346..bedd042e`), then fixed the one test failure the push
   exposed — fresh checkouts lack `backend/static/` (empty dirs are invisible
