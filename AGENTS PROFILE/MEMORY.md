@@ -12,7 +12,7 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | Fact | Value | Source |
 |------|-------|--------|
-| Git HEAD | `59156a96` static-dir CI fix; **in sync with `origin/main`** (pushed `bb7295f2`…`59156a96` = 10 commits) | `git status -sb`, `git push` |
+| Git HEAD | `42bd0e94` integration-audit sweep; **in sync with `origin/main`** | `git status -sb` |
 | Worktree | **Clean** (0 dirty) | `git status --porcelain` |
 | Tracked files | **272** (was 275; removed orphan package-lock.json + docker-build-push.sh, snyk workflow) | `git ls-files \| wc -l` |
 | Node | v22.22.1 at `/usr/bin/node` | `node --version` |
@@ -185,6 +185,9 @@ Append-only ledger; never store secrets (env var *names* only).
   CLI refs → v2, AGENTS.md 16→20 routers, profile chain/lint/coverage
   claims corrected, GITHUB_SECRETS §3 rebuilt from actual Settings.
   Verified: pytest 285, ruff+black clean, 0 v1 compose refs left.
+- **Done (2026-10-11 continue):** pushed the 3 audit commits
+  (`863009d7`…`42bd0e94`) on user continue; CI 38119431811 = success,
+  CodeQL = success — second consecutive green full pipeline.
 
 ## 4. Open threads
 
@@ -234,6 +237,7 @@ Append-only ledger; never store secrets (env var *names* only).
 | GitHub environments `staging`/`production` | ✅ created; policies branch `main` / tag `v*`; orphan `Docker` deleted | 2026-10-11 |
 | `gh auth status` | ✅ authenticated `nyeinpyaesone-ui` | 2026-10-11 |
 | **CI run 38116547621 (main, `59156a96`)** | ✅ **success** — gitleaks, quality, tests, frontend build, both Docker images built | 2026-10-11 |
+| **CI run 38119431811 + CodeQL (main, `42bd0e94`)** | ✅ both success — integration audit + drift sweep push re-verified everything | 2026-10-11 |
 | CodeQL run 38116547575 | ✅ success (dup-key fix proven; python/js/actions analyzes green) | 2026-10-11 |
 | `alembic upgrade head` vs live DB | ✅ in CI — 001→008 applied to postgres:15 (8 "Running upgrade" lines) | 2026-10-11 |
 | CI pytest / vitest | ✅ 285 passed / 105 passed (with `backend/static/` absent → makedirs fix `59156a96`) | 2026-10-11 |
