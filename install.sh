@@ -542,7 +542,16 @@ BANNER
     echo -e "${ERP_NC}"
 
     ERP_USER_NAME="${SUDO_USER:-root}"
-    check_root
+    # On Termux/proot hosts Docker provisioning is skipped entirely (see
+    # erp_detect_runtime_class), so root is not required for --preflight's
+    # native-mode report. A real install still dies later at erp_require_docker
+    # with explicit guidance.
+    erp_detect_runtime_class
+    if [ "${ERP_RUNTIME_CLASS}" = "proot-termux" ]; then
+        erp_warn "Runtime class: proot-termux — Docker provisioning will be skipped (native-mode report only)"
+    else
+        check_root
+    fi
     check_compose_file
     erp_require_openssl
 
