@@ -35,14 +35,16 @@ npm run web
 
 ## Coverage
 
-CI enforces `--cov-fail-under=58` (see `.github/workflows/ci.yml` and
-`backend/pyproject.toml`). That number is a ratchet: it is the measured floor,
-raised as coverage grows — it was never a goal of 80, which the suite could not
-reach.
+CI enforces a floor of 58% declared once in `backend/pyproject.toml`
+(`[tool.coverage.report] fail_under = 58`). CI does **not** pass
+`--cov-fail-under` — the earlier duplicate flag is gone, so the two cannot
+drift apart. That number is a ratchet: it is the measured floor, raised as
+coverage grows — it was never a goal of 80, which the suite could not reach.
+Measured on the current suite: **58.21%**.
 
 | Module | Measured | Aspiration |
 |--------|----------|------------|
-| Backend API | 58.3% | 85% |
+| Backend API | 58.21% | 85% |
 | Frontend Components | (no threshold) | 80% |
 | Mobile Screens | (untested) | 75% |
 
