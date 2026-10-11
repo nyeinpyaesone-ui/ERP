@@ -12,7 +12,7 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | Fact | Value | Source |
 |------|-------|--------|
-| Git HEAD | `3daa791b` docs Termux/env; **8 commits ahead of origin/main** (`bb7295f2`…`3daa791b` unpushed) | `git log`, `git rev-list` |
+| Git HEAD | `59156a96` static-dir CI fix; **in sync with `origin/main`** (pushed `bb7295f2`…`59156a96` = 10 commits) | `git status -sb`, `git push` |
 | Worktree | **Clean** (0 dirty) | `git status --porcelain` |
 | Tracked files | **272** (was 275; removed orphan package-lock.json + docker-build-push.sh, snyk workflow) | `git ls-files \| wc -l` |
 | Node | v22.22.1 at `/usr/bin/node` | `node --version` |
@@ -160,18 +160,29 @@ Append-only ledger; never store secrets (env var *names* only).
   token (workflow removed). Local env audited: `.env` 22 keys +
   `backend/.env` 23 keys, all compose `:?` vars set, ENVIRONMENT=dev both,
   gitignored — nothing to change.
+- **Done (2026-10-11 push + first green CI):** pushed 9 commits on user
+  approval (`3cce8346..bedd042e`), then fixed the one test failure the push
+  exposed — fresh checkouts lack `backend/static/` (empty dirs are invisible
+  to git) so `StaticFiles(directory="static")` raised on import and both
+  health tests errored (283 passed, 2 errors). `os.makedirs(exist_ok=True)`
+  before the mount (`59156a96`), pushed. **CI run 38116547621 = success**,
+  CodeQL 38116547575 = success. First verified full pass: gitleaks, quality,
+  tests (285 + **alembic 001→008 on a live postgres:15** — GIN fix
+  proven), frontend build, **both Docker images built in CI**. Trivy +
+  deploy jobs correctly skipped (fail-closed: `can_push=false`, no
+  `DOCKER_PAT_*` secrets — T-004).
 
 ## 4. Open threads
 
 | ID | Thread | Next action |
 |----|--------|-------------|
-| T-003 | Alembic 001–008 never applied to a **persistent live** PostgreSQL. Mitigated: since `3cce8346` the CI test job runs `alembic upgrade head` against a fresh postgres:15 service on every push (GIN fix `bb7295f2` unpushed, so CI currently fails there) | Push `bb7295f2` → CI exercises chain; locally: native PG18 binaries exist on this host — init a cluster and run upgrade head |
+| T-003 | ~~never applied to live PG~~ **resolved in CI 2026-10-11** — run 38116547621 applied `alembic upgrade head` 001→008 on a real postgres:15 service. Still not applied to a *persistent* local DB | Optional: native PG18 cluster for local persistent DB; CI covers every push |
 | T-011 | **CI deploy jobs need `STAGING_KNOWN_HOSTS` + `PRODUCTION_KNOWN_HOSTS` secrets** (D-012) or they fail closed | Populate with `ssh-keyscan -H <host>` once, then pin. See docs/GITHUB_SECRETS.md §1 |
-| T-012 | **Container builds unverified** on this host (proot class, D-013/D-018) — first CI run after push exercises them | Watch the `docker-*` jobs on the push of `f6ffc7b1`…`3daa791b` |
+| T-012 | **Container builds now verified in CI** — run 38116547621 built both backend and frontend images green. Still never built *on this host* (proot class, D-013/D-018) | none for CI; local builds impossible by design |
 | T-013 | ~~gh unauthenticated~~ **resolved 2026-10-11** — `gh auth status` clean as `nyeinpyaesone-ui`. Codespaces TLS timeout never retested | none (closed except optional Codespaces retest) |
 | T-004 | GitHub **secrets still 0**: `DOCKER_PAT_BACKEND/FRONTEND`, `SSH_PRIVATE_KEY`, `STAGING_*`/`PRODUCTION_*` hosts+known_hosts all missing. `DOCKER_USER` var **is** set (`powerrangeranikg`) | `gh secret set` per docs/GITHUB_SECRETS.md; until then image push + deploys stay skipped |
 | T-005 | Production server not provisioned (`.env.production`, services) | docs/END_USER_INSTALL.md |
-| T-007 | ~~Commits not pushed~~ resolved earlier; **regressed 2026-10-11**: 8 local commits again unpushed by design (ask-gate) | Push when user approves — `bb7295f2` push is the switch that turns CI green |
+| T-007 | ~~Commits not pushed~~ **resolved 2026-10-11** — 10 commits pushed (`bb7295f2`…`59156a96`), CI green | none (closed) |
 | T-008 | GitHub reports **96 vulnerabilities (10 critical, 50 high)** on default branch (was 106/9) | Dependabot groups batch them; 29 open PRs — triage majors (T-009) |
 | T-009 | Frontend moderate prod vulns remain — need breaking majors (react 19 / router 7 / tailwind 4, vite 7/8 in PRs) | batch upgrade epic after B1 |
 | T-010 | `backend/.env` created (random SECRET_KEY, gitignored) — local dev only; Docker/CI use their own env | none (informational) |
@@ -208,7 +219,14 @@ Append-only ledger; never store secrets (env var *names* only).
 | session diff vs origin/main: secret scan | ✅ 0 secret-like strings (8 commits) | 2026-10-11 |
 | GitHub environments `staging`/`production` | ✅ created; policies branch `main` / tag `v*`; orphan `Docker` deleted | 2026-10-11 |
 | `gh auth status` | ✅ authenticated `nyeinpyaesone-ui` | 2026-10-11 |
-| pytest / vitest / eslint / build (unchanged code) | ⏳ last run 2026-10-08 — not re-run this session (no app code touched) | 2026-10-08 |
+| **CI run 38116547621 (main, `59156a96`)** | ✅ **success** — gitleaks, quality, tests, frontend build, both Docker images built | 2026-10-11 |
+| CodeQL run 38116547575 | ✅ success (dup-key fix proven; python/js/actions analyzes green) | 2026-10-11 |
+| `alembic upgrade head` vs live DB | ✅ in CI — 001→008 applied to postgres:15 (8 "Running upgrade" lines) | 2026-10-11 |
+| CI pytest / vitest | ✅ 285 passed / 105 passed (with `backend/static/` absent → makedirs fix `59156a96`) | 2026-10-11 |
+| Trivy + deploy jobs | ⏳ skipped in CI — `can_push=false` until `DOCKER_PAT_*`/SSH secrets exist (T-004) | 2026-10-11 |
+| `docker build` backend + frontend on **this host** | ⬜ impossible — proot class (D-013/D-018); CI builds are the verification | — |
+| pytest local re-run after static-dir fix | ✅ 285 passed with `static/` removed (CI-faithful), ruff+black clean on `main.py` | 2026-10-11 |
+| frontend lint/build (unchanged since 10-08) | ⏳ CI frontend-build job green today = de-facto re-verify; local not re-run | 2026-10-11 (CI) |
 
 > Rule: mark ⬜/⏳ honestly. Never upgrade a claim to ✅ without tool output.
 
