@@ -12,7 +12,7 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | Fact | Value | Source |
 |------|-------|--------|
-| Git HEAD | `1bf5d226` (harness-issue log); **in sync with `origin/main`**; CI green on `f4349751`/`4efa943e` (Trivy rerun of `46055158`+ pending) | `git status -sb`, `gh run list` |
+| Git HEAD | `a210f1df` (drift-proof README counts); **in sync with `origin/main`**; CI **fully green** on it incl. Security Scan (38161680076) | `git status -sb`, `gh run list` |
 | Worktree | **Clean** (0 dirty) | `git status --porcelain` |
 | Tracked files | **274** (+`scripts/repo-guard.sh` 2026-10-12); README/STATUS no longer hardcode current-HEAD counts (T-018 closed permanently) | `git ls-files \| wc -l` |
 | Node | v22.22.1 at `/usr/bin/node` | `node --version` |
@@ -176,7 +176,15 @@ Append-only ledger; never store secrets (env var *names* only).
 - **Done (2026-10-12 Trivy CI fix, via subagent):** Security Scan failed on
   the first run that actually pushed images — `docker/metadata-action`
   `tags` is one ref per line but trivy-action passes `image-ref` as ONE
-  argument; fixed to a single-line ref (`46055158`).
+  argument; fixed by a "Resolve single image refs" step (`46055158`).
+  **Verified:** run 38161185098 + 38161680076 (a210f1df) = success, both
+  images scanned (backend debian 13.7 / frontend alpine 3.24.2), SARIF ×2
+  uploaded → **5 code-scanning alerts** now visible. trivy-action 0.35.0 has
+  no default `exit-code` so findings never fail CI — gating is a pending
+  policy call. Fresh Dependabot banner: **10 vulns (3 critical, 1 high,
+  6 moderate)** — replaces the stale 96/10/50 in T-008. One Dependabot PR
+  (`dependabot/github_actions/github-actions-a79bd13708`, run 38161704324)
+  is red on Gitleaks — triage with T-009, not on main.
 - **Done (2026-10-11 push + first green CI):** pushed 9 commits on user
   approval (`3cce8346..bedd042e`), then fixed the one test failure the push
   exposed — fresh checkouts lack `backend/static/` (empty dirs are invisible
@@ -238,7 +246,7 @@ Append-only ledger; never store secrets (env var *names* only).
 | T-004 | **partially resolved 2026-10-11 (09:18Z):** `DOCKER_PAT_BACKEND` + `DOCKER_PAT_FRONTEND` now set → image push + Trivy activate on the **next main push** (verify on that run's jobs). Still missing: `SSH_PRIVATE_KEY`, `STAGING_KNOWN_HOSTS`, `PRODUCTION_KNOWN_HOSTS` → deploy jobs still fail closed | `gh secret set` per docs/GITHUB_SECRETS.md §1 (values only the user has); then re-check `can_push` + deploy jobs on the next CI run |
 | T-005 | Production server not provisioned (`.env.production`, services) | docs/END_USER_INSTALL.md |
 | T-007 | ~~Commits not pushed~~ **resolved 2026-10-11** — 10 commits pushed (`bb7295f2`…`59156a96`), CI green | none (closed) |
-| T-008 | GitHub reports **96 vulnerabilities (10 critical, 50 high)** on default branch (was 106/9) | Dependabot groups batch them; 29 open PRs — triage majors (T-009) |
+| T-008 | GitHub Dependabot banner (refreshed 2026-10-12): **10 vulnerabilities — 3 critical, 1 high, 6 moderate** (was 96/10/50; the drop is real). Plus 5 Trivy code-scanning alerts from the first successful SARIF upload | T-009 epic; decide whether to gate CI on Trivy `exit-code` |
 | T-009 | Frontend moderate prod vulns remain — need breaking majors (react 19 / router 7 / tailwind 4, vite 7/8 in PRs) | batch upgrade epic after B1 |
 | T-010 | `backend/.env` created (random SECRET_KEY, gitignored) — local dev only; Docker/CI use their own env | none (informational) |
 | T-014 | **"Compact the whole repo, make it easy to reuse for client UI/UX"** — requested late in a prior session, no scope agreed | Needs an agreed target: which of the 12 modules to keep, and whether "reusable" means a theming layer, a template scaffold, or stripping the dead Legacy v1.8/v2.1 trees |
