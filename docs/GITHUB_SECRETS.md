@@ -112,6 +112,32 @@ For a missing secret, the deploy jobs now fail with an explicit
 cryptic SSH error. A failed image push almost always means `DOCKER_USER` or one
 of the `DOCKER_PAT_*` tokens.
 
+## 6. GitHub Environments (Settings → Environments)
+
+`ci.yml`'s deploy jobs declare `environment: staging` / `environment: production`.
+Both environments must exist, otherwise the jobs fail at the deployment-record
+step. Configured policy (created 2026-10-11):
+
+| Environment | Deployment branch policy | Rationale |
+|-------------|--------------------------|-----------|
+| `staging` | selected branches → `main` only | staging deploys on every push to main |
+| `production` | selected tags → `v*` only | production deploys only from release tags |
+
+The policies are fail-closed: no other ref can create a deployment. No
+required reviewers are configured — deploys are automated blue-green; add a
+reviewer rule here if human approval is ever wanted (the job will pause
+waiting for it).
+
+The `copilot` environment is auto-created by GitHub Copilot's coding agent —
+leave it alone. Do not create environments named after tools (`Docker` etc.);
+nothing references them.
+
+```bash
+gh api repos/OWNER/ERP/environments --jq '.environments[].name'
+gh api repos/OWNER/ERP/environments/staging/deployment-branch-policies
+gh api repos/OWNER/ERP/environments/production/deployment-branch-policies
+```
+
 ## Related
 
 - `.github/workflows/ci.yml` — gate and deploy graph

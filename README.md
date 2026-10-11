@@ -38,12 +38,17 @@
 - Node.js 20+
 - Python 3.11+
 
+> **Termux / proot-distro (Android arm64)?** Docker cannot run there — use
+> the native mode (venv + native PostgreSQL/Redis) described in
+> [docs/END_USER_INSTALL.md](docs/END_USER_INSTALL.md#termux--proot-distro-android-arm64).
+> The backend's full test suite is verified to pass natively on aarch64.
+
 ### One-Command Setup
 ```bash
 git clone https://github.com/nyeinpyaesone-ui/ERP.git
 cd ERP
 ./scripts/setup.sh        # Install dependencies
-docker-compose up -d      # Start services
+docker compose up -d      # Start services
 ```
 
 ### Development
