@@ -7,7 +7,7 @@
 │   ├── app/
 │   │   ├── main.py         # App entrypoint, lifespan, router registration
 │   │   ├── models.py       # SQLAlchemy models (27+ tables)
-│   │   ├── routers/        # 16 API routers (auth, crm, hr, inventory, finance, etc.)
+│   │   ├── routers/        # 20 API routers (auth, crm, hr, inventory, finance, payments, etc.)
 │   │   ├── services/       # Business logic (search, llm, permissions, activity_log)
 │   │   ├── database.py     # SQLAlchemy engine/session
 │   │   ├── config.py       # Pydantic Settings (.env)

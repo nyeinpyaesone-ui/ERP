@@ -373,16 +373,16 @@ If using **Cloudflare**:
 
 | Task | Command |
 |------|---------|
-| View logs (all) | `docker-compose -f docker-compose.prod.yml logs -f` |
-| View backend logs | `docker-compose -f docker-compose.prod.yml logs -f backend` |
+| View logs (all) | `docker compose -f docker-compose.prod.yml logs -f` |
+| View backend logs | `docker compose -f docker-compose.prod.yml logs -f backend` |
 | Deploy update | `./scripts/deploy-blue-green.sh production v1.2.3` |
 | Rollback | `./scripts/deploy-blue-green.sh production v1.2.3 --rollback` |
 | Backup database | `./scripts/backup.sh` |
-| Scale backend | `docker-compose -f docker-compose.prod.yml up -d --scale backend=2` |
-| Restart all | `docker-compose -f docker-compose.prod.yml restart` |
-| Stop all | `docker-compose -f docker-compose.prod.yml down` |
-| Run migrations | `docker-compose -f docker-compose.prod.yml run --rm backend alembic upgrade head` |
-| Create admin user | `docker-compose -f docker-compose.prod.yml run --rm backend python -c "..."` |
+| Scale backend | `docker compose -f docker-compose.prod.yml up -d --scale backend=2` |
+| Restart all | `docker compose -f docker-compose.prod.yml restart` |
+| Stop all | `docker compose -f docker-compose.prod.yml down` |
+| Run migrations | `docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head` |
+| Create admin user | `docker compose -f docker-compose.prod.yml run --rm backend python -c "..."` |
 
 ---
 
@@ -404,10 +404,10 @@ sudo certbot certonly --standalone -d api.yourcompany.com -d app.yourcompany.com
 ### Database Migration Failed
 ```bash
 # Check logs
-docker-compose -f docker-compose.prod.yml logs backend
+docker compose -f docker-compose.prod.yml logs backend
 
 # Re-run migration manually
-docker-compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
 ```
 
 ### Backend Unhealthy
@@ -452,7 +452,7 @@ To completely remove ERP SOLUTION:
 ```bash
 # 1. Stop and remove containers, networks, volumes
 cd /path/to/ERP
-docker-compose -f docker-compose.prod.yml down -v
+docker compose -f docker-compose.prod.yml down -v
 
 # 2. Remove Docker images (optional)
 docker rmi $(docker images 'powerrangeranikg/erp-solution-*' -q)

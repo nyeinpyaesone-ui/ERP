@@ -101,7 +101,7 @@ mkdir -p /opt/erp-solution/ssl /opt/erp-solution/logs/nginx /opt/erp-solution/ba
 ./scripts/setup-ssl.sh api.yourdomain.com admin@yourdomain.com
 
 # 5. Start production stack
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # 6. Verify deployment
 # /health and /ready are served by the API, so they carry the /api/v1 prefix
@@ -249,13 +249,13 @@ Migrations run automatically on container startup via `entrypoint.sh`:
 
 ```bash
 # Manual migration (if needed)
-docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
 
 # Create new migration
-docker-compose -f docker-compose.prod.yml exec backend alembic revision --autogenerate -m "description"
+docker compose -f docker-compose.prod.yml exec backend alembic revision --autogenerate -m "description"
 
 # Check migration status
-docker-compose -f docker-compose.prod.yml exec backend alembic current
+docker compose -f docker-compose.prod.yml exec backend alembic current
 ```
 
 ## Monitoring & Health Checks
@@ -282,10 +282,10 @@ healthcheck:
 
 ```bash
 # All services
-docker-compose -f docker-compose.prod.yml logs -f --tail=100
+docker compose -f docker-compose.prod.yml logs -f --tail=100
 
 # Specific service
-docker-compose -f docker-compose.prod.yml logs -f backend --tail=100
+docker compose -f docker-compose.prod.yml logs -f backend --tail=100
 
 # Nginx access logs
 docker exec erp-nginx tail -f /var/log/nginx/access.log
@@ -316,7 +316,7 @@ Backup includes:
 
 ```bash
 # Restore database
-docker-compose -f docker-compose.prod.yml exec -T postgres psql -U erp erp_solution < backup.sql
+docker compose -f docker-compose.prod.yml exec -T postgres psql -U erp erp_solution < backup.sql
 
 # Restore environment
 cp backup/backend.env /opt/erp-solution/.env.production

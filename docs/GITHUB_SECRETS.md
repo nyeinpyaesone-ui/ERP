@@ -81,14 +81,21 @@ value and the `docker-*` jobs fail at the push step.
 ## 3. Optional — runtime only, not referenced by CI
 
 These belong in a deployed server's `.env` (see `docs/PRODUCTION_DEPLOYMENT.md`),
-not in GitHub Actions secrets. Listed because `config.py` reads them.
+not in GitHub Actions secrets. Written from what `backend/app/config.py`
+actually declares — verify against `Settings` before trusting a row:
 
-| Variable | Purpose |
-|----------|---------|
-| `STRIPE_SECRET_KEY` | Billing webhooks |
-| `SENTRY_DSN` | Error tracking |
-| `OPENAI_API_KEY` | Optional hosted-LLM alternative to Ollama |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | S3-compatible object storage for uploads |
+| Variable | Purpose | Wiring status |
+|----------|---------|---------------|
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PUBLISHABLE_KEY` | Billing (PaymentIntents + webhook) | Wired in `routers/payments.py`; returns HTTP 400 "not configured" until set |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | Local LLM inference | Wired in `services/llm_service.py`; defaults to `http://localhost:11434` |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Outbound email | **Declared but unwired** — no mail-sending service exists yet; safe to leave at defaults |
+| `SENTRY_DSN` | Error tracking | **Not read** — no Sentry SDK is a dependency |
+| `OPENAI_API_KEY` | Hosted-LLM alternative | **Not read** — only Ollama is implemented |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | S3-compatible object storage | **Not read** — uploads go to local `UPLOAD_DIR`; no boto3 installed |
+
+Frontend: the browser bundle reads `VITE_API_URL` at build time
+(see `backend/frontend-react/.env.example`); unset means same-origin
+`/api/v1`, which is correct for the packaged nginx setup.
 
 ## 4. Setting secrets
 
