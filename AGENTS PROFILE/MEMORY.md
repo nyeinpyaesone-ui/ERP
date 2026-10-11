@@ -4,7 +4,7 @@ Durable cross-session state. Companion to [`AGENTS.md`](../AGENTS.md)
 (AGENTS.md = **how the repo works**; this file = **what is true right now**).
 Append-only ledger; never store secrets (env var *names* only).
 
-**Last verified:** 2026-10-11 (session: drift refresh — §1 fully re-verified; all suites green)
+**Last verified:** 2026-10-12 (session: drift refresh + fixes — see §3)
 
 ---
 
@@ -12,9 +12,9 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | Fact | Value | Source |
 |------|-------|--------|
-| Git HEAD | `4eab0b09` (memory-record commit); **in sync with `origin/main`**; CI run 38119698967 **green** on it | `git status -sb`, `gh run list` |
+| Git HEAD | `1bf5d226` (harness-issue log); **in sync with `origin/main`**; CI green on `f4349751`/`4efa943e` (Trivy rerun of `46055158`+ pending) | `git status -sb`, `gh run list` |
 | Worktree | **Clean** (0 dirty) | `git status --porcelain` |
-| Tracked files | **273** (T-015 sweep wrote 272 but the count was already 273 at `48456b39`; README/STATUS still stale → T-018) | `git ls-files \| wc -l` |
+| Tracked files | **274** (+`scripts/repo-guard.sh` 2026-10-12); README/STATUS no longer hardcode current-HEAD counts (T-018 closed permanently) | `git ls-files \| wc -l` |
 | Node | v22.22.1 at `/usr/bin/node` | `node --version` |
 | npm / npx | **10.9.2 on PATH** at `/home/admin/.local/bin` | `which npm npx` |
 | npm fallback | `/tmp/opencode/npm10/…` volatile — re-bootstrap if gone; **Makefile still hardcodes this path** | `ls`, `Makefile:18` |
@@ -245,7 +245,7 @@ Append-only ledger; never store secrets (env var *names* only).
 | T-015 | ~~Doc-drift batch~~ **resolved 2026-10-11** — README counts + infra row (ES/S3 → Ollama/Docker/GHA), STATUS_CHECKLIST 259/64→272/103, 56 `docker-compose ` v1 CLI refs → v2 across 10 docs, AGENTS.md 16→20 routers, profile 001–006→001–008 / strict-TS→eslint / 80%→58% claims, GITHUB_SECRETS §3 rewritten to actual `Settings` wiring (SMTP reserved-unwired, SENTRY/OPENAI/AWS not read) | Re-open if new drift appears; keep AGENTS.md + profiles in the same sweep |
 | T-016 | `STAGING_DOMAIN` / `PRODUCTION_DOMAIN` repository variables **unset** — deploy jobs' GitHub-Deployment target_url renders empty | `gh variable set STAGING_DOMAIN --body …` once real hostnames exist |
 | T-017 | ~~junk PR #135 open~~ **resolved 2026-10-11** — closed on user approval, head `secure-github-env-setup-92546` + base `ci-cd-pipeline-basics-cf366` deleted. Same class as #85 (qwen-chat task bot, +25.7k/−18.3k, re-added deleted `frontend/`) | Re-open if another task-bot PR appears; treat >20k-line CONFLICTING diffs as junk by default |
-| T-018 | ~~README/STATUS doc counts stale~~ **resolved 2026-10-11** — README.md + STATUS_CHECKLIST.md + AGENTS.md + docs/TESTING.md updated 272→**273** files / 103→**107** commits / 58.21→**58.89%** | Keep counts in the same sweep as any MEMORY §1 change |
+| T-018 | ~~README/STATUS doc counts stale~~ **resolved 2026-10-11, made permanent 2026-10-12** — counts bumped to 273/107/58.89%, then drifting current-HEAD counts removed from README/STATUS entirely (kept only the immutable v1.0.0 tag facts + a `git ls-files` pointer) | Nothing — recurrence structurally prevented |
 | T-019 | **qwen-chat task bot may be operating on this host** — same actor opened junk PR #135 (~14:52Z) and likely left an empty `git init` in `scripts/` that wiped 14 tracked scripts (~23:26). Files restored; **guard added 2026-10-12**: `make guard` → `scripts/repo-guard.sh` fails on nested `.git`, missing tracked files, or empty `scripts/*.sh` | Identify what automation/token that task uses (PR body says "task 0c24ebdf-…"); consider disabling it. Run `make guard` after any long background job or before commits |
 
 ## 5. Verification ledger
