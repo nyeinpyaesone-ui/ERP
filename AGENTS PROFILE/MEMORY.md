@@ -4,7 +4,7 @@ Durable cross-session state. Companion to [`AGENTS.md`](../AGENTS.md)
 (AGENTS.md = **how the repo works**; this file = **what is true right now**).
 Append-only ledger; never store secrets (env var *names* only).
 
-**Last verified:** 2026-10-08 (session: CI/CD hardening + prod env correctness)
+**Last verified:** 2026-10-11 (session: hygiene + proot detect + env/CI correctness)
 
 ---
 
@@ -12,20 +12,22 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | Fact | Value | Source |
 |------|-------|--------|
-| Git HEAD | `0650937c` fix(prod) ENVIRONMENT=prod; session landed `adc23ccc`→`0650937c` + env fixes (run `git log -10`) | `git log` |
-| Worktree | **Clean**, `main` in sync with `origin/main` (0/0) | `git status --short` |
-| Tracked files | 273 at HEAD; 274 at tag `v1.0.0` | `git ls-files \\| wc -l` |
+| Git HEAD | `3daa791b` docs Termux/env; **8 commits ahead of origin/main** (`bb7295f2`…`3daa791b` unpushed) | `git log`, `git rev-list` |
+| Worktree | **Clean** (0 dirty) | `git status --porcelain` |
+| Tracked files | **272** (was 275; removed orphan package-lock.json + docker-build-push.sh, snyk workflow) | `git ls-files \| wc -l` |
 | Node | v22.22.1 at `/usr/bin/node` | `node --version` |
 | npm / npx | **10.9.2 on PATH** at `/home/admin/.local/bin` | `which npm npx` |
-| npm fallback | `/tmp/opencode/npm10/…` volatile — re-bootstrap if gone | `ls` |
+| npm fallback | `/tmp/opencode/npm10/…` volatile — re-bootstrap if gone; **Makefile still hardcodes this path** | `ls`, `Makefile:18` |
 | Python | 3.14.4 (venv) — runs 285 tests; Docker image is 3.11-slim | `python --version` |
-| Alembic chain | **001 → 008** (offline `--sql` regenerates 47 DDL stmts under alembic 1.20) | `alembic upgrade head --sql` |
-| Frontend (canonical) | `backend/frontend-react` — scripts: `dev`, `build`, `preview`, `test`, `test:watch`; **105 vitest tests** | `package.json`, `npm run test` |
-| CI workflows | `ci.yml`, `codeql.yml`, `opencode.yml`, `snyk-container.yml`, `release.yml` | `ls .github/workflows` |
-| Docker daemon | **Down** — `docker compose` v2.40.3 present, but socket missing; start needs interactive sudo | `docker ps` |
-| Podman 5.7.0 | Present but **unusable** — rootless setup dies in `newuidmap` (D-013) | `podman info` |
-| Native PG18 / Redis | `/usr/lib/postgresql/18/bin/*` + `/usr/bin/redis-server` available; neither running | `which postgres redis-server` |
-| gh CLI | Installed, **not authenticated** — secrets/PR operations unavailable | `gh auth status` |
+| Alembic chain | **001 → 008** (offline SQL emits; GIN index fixed in `bb7295f2` so live PG works) | `alembic upgrade head --sql` |
+| Frontend (canonical) | `backend/frontend-react` — **105 vitest tests**, eslint 0 errors/127 warnings, vite build green | `npm test`/`lint`/`build` |
+| CI workflows | `ci.yml`, `codeql.yml`, `opencode.yml`, `release.yml` (**snyk-container.yml removed** `ad13f2bb`) | `ls .github/workflows` |
+| GitHub auth | **gh authenticated** as `nyeinpyaesone-ui` (was unauthenticated) | `gh auth status` |
+| GitHub secrets | **0 configured** (SNYK_TOKEN gone with Snyk; DOCKER_PAT_*/SSH_* still missing) | `gh secret list` |
+| GitHub variables | `DOCKER_USER=powerrangeranikg` set; **STAGING_DOMAIN / PRODUCTION_DOMAIN unset** | `gh api .../actions/variables` |
+| GitHub environments | `staging` (main only) + `production` (v* tags only) **created 2026-10-11**, fail-closed; `Docker` orphan deleted; `copilot` auto-managed, left alone | `gh api .../environments` |
+| Docker daemon | **Down** — host is **proot/Termux class on aarch64** (no uid_map, `/data/data/com.termux` exists) | `docker ps`, new `erp_detect_runtime_class` |
+| Open PRs | 29 Dependabot; **PR #85 closed + branch deleted** (inverted junk PR, 21k node_modules tracked) | `gh pr list`, `gh pr view 85` |
 
 ## 2. Decisions ledger
 
@@ -46,6 +48,9 @@ Append-only ledger; never store secrets (env var *names* only).
 | D-013 | **Container runtime cannot run on this host.** Native PG18/Redis binaries are the only viable local path | `/proc/self` reports uid 0 → `newuidmap` fails for both rootlesskit and podman; `sudo` needs an interactive password |
 | D-014 | **`ENVIRONMENT` accepts exactly `dev` \| `test` \| `prod`** — never `production`. This is not configurable | `Settings` uses a `Literal`; a bad value raises at import. Only surfaces on a real deploy, since CI/dev use `dev` |
 | D-015 | **`.env.example` is generated from `backend/app/config.py`**, not hand-maintained. Every key must be a real `Settings` field or an explicit `docker-compose.yml` interpolation | `extra="ignore"` meant 14 dead keys loaded as no-ops while 12 real ones silently fell back to defaults |
+| D-016 | **Trivy in `ci.yml` is the only container scanner**; `snyk-container.yml` + `SNYK_TOKEN` removed (`ad13f2bb`) | Snyk ran red on every build (token never configured) and duplicated Trivy; Dependabot's snyk bump stream dies with the file |
+| D-017 | **GitHub environments `staging`/`production` are part of the deploy contract** — staging = branch `main` only, production = tag `v*` only, fail-closed | ci.yml declares `environment:` on both deploy jobs; without the environments the jobs die at the deployment-record step. `Docker`/tool-named envs are banned (orphans) |
+| D-018 | **Hosts are classified before provisioning** (`erp_detect_runtime_class`: docker-capable / proot-termux / containerized / unknown) | This very host is proot/Termux aarch64 — Docker can never run here (D-013); installer must guide to native mode instead of `get.docker.com` + `systemctl` failing mid-flight |
 
 ## 3. Progress log
 
@@ -138,22 +143,41 @@ Append-only ledger; never store secrets (env var *names* only).
 - **Deferred (requested, not started):** "/compact the whole repo, remodify
   easy to reuse this ERP for client UI/UX" — no scoping or file list agreed
   with the user before the session closed. Treat as an open thread, not work.
+- **Done (2026-10-11 hygiene + proot + env/CI):** deep audit then 8 commits
+  (all local, **unpushed** per ask-gate): `.gitignore` TLS/secrets rules
+  (`f6ffc7b1`); codeql.yml duplicate `timeout-minutes` removed — the file was
+  rejected at queue time, killing every CodeQL run at 0s (`4dfeb278`);
+  orphan root `package-lock.json` + superseded `docker-build-push.sh` deleted
+  (`1f80d6b6`); **Snyk workflow removed** (Trivy remains; 4 docs swept —
+  `ad13f2bb`); **`erp_detect_runtime_class`** + proot early-exit +
+  `install.sh --preflight` native-mode report (`794101a9`, smoke-tested here:
+  class=proot-termux, all native components ok, exit 0); Termux/arm64 docs +
+  GitHub-Environments contract (`3daa791b`). GitHub side: `staging`
+  (branch main) + `production` (tag v*) environments created fail-closed,
+  orphan `Docker` env deleted, PR #85 (inverted, 21k junk files) closed and
+  branch deleted. Root-caused all remote CI failures: Tests=alembic GIN bug
+  (fixed locally in `bb7295f2`, unpushed), codeql=dup key (fixed), snyk=no
+  token (workflow removed). Local env audited: `.env` 22 keys +
+  `backend/.env` 23 keys, all compose `:?` vars set, ENVIRONMENT=dev both,
+  gitignored — nothing to change.
 
 ## 4. Open threads
 
 | ID | Thread | Next action |
 |----|--------|-------------|
-| T-003 | Alembic 001–008 **never applied to live PostgreSQL** — blocked: docker daemon down, start needs interactive sudo | `sudo systemctl start docker` → `docker compose up -d postgres redis` → `alembic upgrade head` |
-| T-011 | **CI deploy jobs need `STAGING_KNOWN_HOSTS` + `PRODUCTION_KNOWN_HOSTS` secrets** (new in D-012) or they fail closed | Populate with `ssh-keyscan -H <host>` once, then pin. See docs/GITHUB_SECRETS.md |
-| T-012 | **Container builds unverified** — no runtime on this host, so `docker build` for backend/frontend and the frontend `npm ci` image path are untested | First CI run on the pushed commit will exercise them; watch the `docker-*` jobs |
-| T-013 | Codespaces unusable: `api.github.com` TLS handshake timeout (0/3); `gh` unauthenticated | SHAs were resolved by scraping `/releases/tag/<version>` HTML instead |
-| T-004 | GitHub secrets pending: `DOCKER_USER`, `DOCKER_PAT_BACKEND/FRONTEND`; Docker Hub images empty; `gh` unauthenticated | `gh auth login` → STATUS_CHECKLIST.md → docs/GITHUB_SECRETS.md |
+| T-003 | Alembic 001–008 never applied to a **persistent live** PostgreSQL. Mitigated: since `3cce8346` the CI test job runs `alembic upgrade head` against a fresh postgres:15 service on every push (GIN fix `bb7295f2` unpushed, so CI currently fails there) | Push `bb7295f2` → CI exercises chain; locally: native PG18 binaries exist on this host — init a cluster and run upgrade head |
+| T-011 | **CI deploy jobs need `STAGING_KNOWN_HOSTS` + `PRODUCTION_KNOWN_HOSTS` secrets** (D-012) or they fail closed | Populate with `ssh-keyscan -H <host>` once, then pin. See docs/GITHUB_SECRETS.md §1 |
+| T-012 | **Container builds unverified** on this host (proot class, D-013/D-018) — first CI run after push exercises them | Watch the `docker-*` jobs on the push of `f6ffc7b1`…`3daa791b` |
+| T-013 | ~~gh unauthenticated~~ **resolved 2026-10-11** — `gh auth status` clean as `nyeinpyaesone-ui`. Codespaces TLS timeout never retested | none (closed except optional Codespaces retest) |
+| T-004 | GitHub **secrets still 0**: `DOCKER_PAT_BACKEND/FRONTEND`, `SSH_PRIVATE_KEY`, `STAGING_*`/`PRODUCTION_*` hosts+known_hosts all missing. `DOCKER_USER` var **is** set (`powerrangeranikg`) | `gh secret set` per docs/GITHUB_SECRETS.md; until then image push + deploys stay skipped |
 | T-005 | Production server not provisioned (`.env.production`, services) | docs/END_USER_INSTALL.md |
-| T-007 | ~~Commits not pushed~~ **resolved this session** — `git push origin main` succeeded; `main` in sync with `origin/main` | none (closed) |
-| T-008 | GitHub reports 106 Dependabot vulnerabilities (9 critical) on default branch | `groups:` now batches them; close stale PRs for the 9 deleted branches |
-| T-009 | Frontend 2 moderate prod vulns remain — need breaking majors (react 19 / router 7 / tailwind 4) | batch upgrade epic after B1 |
+| T-007 | ~~Commits not pushed~~ resolved earlier; **regressed 2026-10-11**: 8 local commits again unpushed by design (ask-gate) | Push when user approves — `bb7295f2` push is the switch that turns CI green |
+| T-008 | GitHub reports **96 vulnerabilities (10 critical, 50 high)** on default branch (was 106/9) | Dependabot groups batch them; 29 open PRs — triage majors (T-009) |
+| T-009 | Frontend moderate prod vulns remain — need breaking majors (react 19 / router 7 / tailwind 4, vite 7/8 in PRs) | batch upgrade epic after B1 |
 | T-010 | `backend/.env` created (random SECRET_KEY, gitignored) — local dev only; Docker/CI use their own env | none (informational) |
-| T-014 | **"Compact the whole repo, make it easy to reuse for client UI/UX"** — requested late in the session, no scope agreed | Needs an agreed target: which of the 12 modules to keep, and whether "reusable" means a theming layer, a template scaffold, or stripping the dead Legacy v1.8/v2.1 trees |
+| T-014 | **"Compact the whole repo, make it easy to reuse for client UI/UX"** — requested late in a prior session, no scope agreed | Needs an agreed target: which of the 12 modules to keep, and whether "reusable" means a theming layer, a template scaffold, or stripping the dead Legacy v1.8/v2.1 trees |
+| T-015 | **Doc-drift batch**: README claims 273 files/80 commits (actual 272/94+), STATUS_CHECKLIST 259/64, ~10 docs still use `docker-compose` v1 CLI, AGENTS.md says "16 API routers" (actual 20), profile TOOLS/HEARTBEATS/SKILLS say migration chain 001–006 + "strict TS" + 80% coverage claim (actual 008, no tsconfig, floor 58) | One docs-sweep pass; AGENTS.md + profile files main-agent-owned |
+| T-016 | `STAGING_DOMAIN` / `PRODUCTION_DOMAIN` repository variables **unset** — deploy jobs' GitHub-Deployment target_url renders empty | `gh variable set STAGING_DOMAIN --body …` once real hostnames exist |
 
 ## 5. Verification ledger
 
@@ -178,6 +202,13 @@ Append-only ledger; never store secrets (env var *names* only).
 | prod fail-closed matrix (placeholder/short key, example DB) | ✅ all three refuse; real key + real DB boots | 2026-10-08 |
 | `.env.production.template` vs compose interpolations | ✅ 8/8 vars present | 2026-10-08 |
 | `install.sh` + `setup-production.sh` shell syntax | ✅ `bash -n` clean | 2026-10-08 |
+| 4 workflows: strict YAML (dup-key loader) + pin audit | ✅ 0 dup keys, 0 unpinned, all parse (snyk file gone) | 2026-10-11 |
+| `install.sh --preflight` smoke on this host | ✅ runtime-class proot-termux, native components ok, exit 0 | 2026-10-11 |
+| new `.gitignore` rules vs tracked files | ✅ `git check-ignore` no matches; status clean | 2026-10-11 |
+| session diff vs origin/main: secret scan | ✅ 0 secret-like strings (8 commits) | 2026-10-11 |
+| GitHub environments `staging`/`production` | ✅ created; policies branch `main` / tag `v*`; orphan `Docker` deleted | 2026-10-11 |
+| `gh auth status` | ✅ authenticated `nyeinpyaesone-ui` | 2026-10-11 |
+| pytest / vitest / eslint / build (unchanged code) | ⏳ last run 2026-10-08 — not re-run this session (no app code touched) | 2026-10-08 |
 
 > Rule: mark ⬜/⏳ honestly. Never upgrade a claim to ✅ without tool output.
 
