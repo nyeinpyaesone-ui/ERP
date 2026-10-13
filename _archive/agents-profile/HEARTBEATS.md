@@ -28,7 +28,7 @@ context compaction or long silence.
 
 - [ ] Changed Python → run targeted `pytest` in `backend/venv`
       (`pytest.ini` supplies `pythonpath` — never move it to `pyproject.toml`).
-- [ ] Changed frontend → `cd backend/frontend-react && npm run build`
+- [ ] Changed frontend → `cd frontend-react && npm run build`
       (and `npm run test` for logic; vitest exists).
 - [ ] Changed permissions/RBAC → `pytest backend/app/tests/test_permission_consistency.py`
       (and `test_route_permissions.py`); every `require_permission()` must map to

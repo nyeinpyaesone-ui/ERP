@@ -318,7 +318,7 @@ prepare_images() {
         build_cmd=(docker buildx build --load)
     fi
     "${build_cmd[@]}" -t "$(erp_image_ref backend "${version}" "${user}")" "${ERP_DIR}/backend"
-    "${build_cmd[@]}" -t "$(erp_image_ref frontend "${version}" "${user}")" "${ERP_DIR}/backend/frontend-react"
+    "${build_cmd[@]}" -t "$(erp_image_ref frontend "${version}" "${user}")" "${ERP_DIR}/frontend-react"
     erp_success "Images built locally"
 }
 

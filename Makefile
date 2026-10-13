@@ -19,13 +19,13 @@ NPM ?= $(shell command -v npm >/dev/null 2>&1 && echo npm || echo node /tmp/open
 
 install:
 	cd backend && python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt
-	cd backend/frontend-react && $(NPM) install
+	cd frontend-react && $(NPM) install
 	cd mobile && npm install
 
 dev:
 	docker compose up -d postgres redis
 	@echo "Start backend:  cd backend && . venv/bin/activate && uvicorn app.main:app --reload"
-	@echo "Start frontend: cd backend/frontend-react && $(NPM) run dev"
+	@echo "Start frontend: cd frontend-react && $(NPM) run dev"
 	@echo "Start mobile:   cd mobile && npx expo start"
 
 build:
@@ -33,12 +33,12 @@ build:
 
 test:
 	cd backend && . venv/bin/activate && pytest
-	cd backend/frontend-react && $(NPM) test
+	cd frontend-react && $(NPM) test
 
 lint:
 	cd backend && . venv/bin/activate && ruff check . && black --check .
 	cd backend && . venv/bin/activate && mypy app/ --ignore-missing-imports || true
-	cd backend/frontend-react && $(NPM) run lint
+	cd frontend-react && $(NPM) run lint
 
 guard:
 	./scripts/repo-guard.sh

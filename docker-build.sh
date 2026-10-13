@@ -58,7 +58,7 @@ done
 VERSION="$(erp_detect_version "${VERSION:-}")"
 DOCKER_USER="$(erp_detect_docker_user)"
 BACKEND_CONTEXT="${CONTEXT:-${ERP_PROJECT_ROOT}/backend}"
-FRONTEND_CONTEXT="${ERP_PROJECT_ROOT}/backend/frontend-react"
+FRONTEND_CONTEXT="${ERP_PROJECT_ROOT}/frontend-react"
 
 BACKEND_IMAGE="${DOCKER_USER}/erp-solution-backend"
 FRONTEND_IMAGE="${DOCKER_USER}/erp-solution-frontend"

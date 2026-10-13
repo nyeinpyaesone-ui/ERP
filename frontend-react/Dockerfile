@@ -4,7 +4,7 @@ WORKDIR /app
 # Copy the lockfile alongside the manifest so `npm ci` installs exactly the
 # versions CI resolves. The previous `COPY package.json .` + `npm install`
 # resolved fresh from the registry, so image contents could drift from the
-# lockfile that backend/frontend-react/package-lock.json pins.
+# lockfile that frontend-react/package-lock.json pins.
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .

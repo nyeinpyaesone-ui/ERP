@@ -57,7 +57,7 @@ docker compose up -d      # Start services
 cd backend && source venv/bin/activate && uvicorn app.main:app --reload
 
 # Terminal 2 — Frontend
-cd backend/frontend-react && npm run dev
+cd frontend-react && npm run dev
 
 # Terminal 3 — Mobile
 cd mobile && npx expo start
@@ -184,3 +184,18 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 ---
 
 Built with ❤️ by the ERP SOLUTION Team
+
+## Repository layout (v1.8.0+)
+
+```
+backend/          FastAPI app, tests, alembic, Dockerfile (image: erp-solution-backend)
+frontend-react/   React/Vite web app + nginx image (image: erp-solution-frontend)  [moved out of backend/]
+mobile/           Expo React Native app
+infra/            Kubernetes manifests & kustomize overlays
+nginx/            Blue-green upstream configs (prod edge)
+scripts/          setup/deploy helpers
+docs/             Operational documentation
+_archive/         Legacy agent profiles & superseded guides (not part of the product)
+```
+
+**Upstream note:** `origin/main` contains a *disjoint* Django (`src/`, `config/`) codebase with no merge-base to this release line. The v1.8.0 tag belongs to this FastAPI package; publishing it requires either replacing the upstream history or pushing this branch as a new default — see CHANGELOG.

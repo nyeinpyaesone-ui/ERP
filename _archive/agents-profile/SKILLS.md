@@ -23,7 +23,7 @@ values → [SOUL.md](SOUL.md) · backlog → [IMPROVEMENTS.md](IMPROVEMENTS.md).
 | 3 | Backend feature/bug (FastAPI/SQLAlchemy) | Follow existing router/service patterns; PEP 8 + type hints; no comments unless asked | read/edit → bash | `backend/venv … pytest` (targeted) + Beat B |
 | 4 | RBAC / permissions change | Edit `permissions_catalogue.py` **first**, then router; keep `has_permission` only in `services/permissions.py` | edit → bash | `test_permission_consistency.py`, `test_route_permissions.py` |
 | 5 | DB migration | `alembic revision --autogenerate -m "desc"`; keep chain linear (001–008) | bash | `alembic upgrade head` on running PG; chain `ls versions/` |
-| 6 | Frontend change (React/Vite) | Only in `backend/frontend-react`; React 18 (JSX, no tsconfig); eslint 10 flat config — `npm run lint` must pass | edit → bash | `npm run build` + `npm run test` + `npm run lint` |
+| 6 | Frontend change (React/Vite) | Only in `frontend-react`; React 18 (JSX, no tsconfig); eslint 10 flat config — `npm run lint` must pass | edit → bash | `npm run build` + `npm run test` + `npm run lint` |
 | 7 | Frontend dependency/install | npm 10.9.2 on PATH; fallback `node /tmp/opencode/npm10/package/bin/npm-cli.js` | bash | `npm --version`; lockfile diff sane |
 | 8 | Tests (add/fix) | Place under `backend/app/tests/`; pytest config comes from `pytest.ini` | edit → bash | `pytest -q`; coverage floor 58% (pyproject `fail_under`) |
 | 9 | Docker image change | Keep Dockerfiles multi-stage (backend already builder + runtime) | edit → bash | CI `docker-*` jobs build; `docker compose config` validates compose (local build impossible on proot hosts) |
@@ -32,7 +32,7 @@ values → [SOUL.md](SOUL.md) · backlog → [IMPROVEMENTS.md](IMPROVEMENTS.md).
 | 12 | Browser/E2E (portal flows) | Playwright MCP or `playwright_browser_*`; target dev server URL from `npm run dev` | playwright | Screenshot/snapshot evidence |
 | 13 | Docs update | Match existing doc tables/voice; update TOC/links; AGENTS.md owns repo facts | read/write | Links resolve; no stale claims (drift → MEMORY §4) |
 | 14 | Git commit / PR | Conventional Commits (`feat:`…); stage intended files only | bash | `git status` clean of secrets; CI green (never push unless asked) |
-| 15 | CI workflow change | `ci.yml` jobs: secret-scan → quality → test → frontend-build → docker → security → deploys; builds `backend/frontend-react/dist/` | read/edit | `docker-compose config`-level sanity; Actions run on push |
+| 15 | CI workflow change | `ci.yml` jobs: secret-scan → quality → test → frontend-build → docker → security → deploys; builds `frontend-react/dist/` | read/edit | `docker-compose config`-level sanity; Actions run on push |
 | 16 | Ambiguous/multi-step problem | `sequential-thinking` tool → `todowrite` plan → execute | sequential-thinking, todowrite | Plan matches delivered scope |
 | 17 | Need user decision | `question` tool with concrete options (recommendation first) | question | Choice recorded in MEMORY if durable |
 | 18 | Large-output digest (tool dumps, CI logs) | Delegate to explore agent with size cap | task(explore) | Digest ≤ stated word cap |

@@ -18,7 +18,7 @@ task routing in [SKILLS.md](SKILLS.md).
 1. **Correctness over speed** — a verified claim beats a fast guess. Use the
    Verification Ledger in [MEMORY.md](MEMORY.md) §5.
 2. **Single source of truth** — permissions → `permissions_catalogue.py`;
-   repo facts → `AGENTS.md`; frontend → `backend/frontend-react`. Never fork facts.
+   repo facts → `AGENTS.md`; frontend → `frontend-react`. Never fork facts.
 3. **Brevity** — CLI answers under ~4 lines unless detail is requested; no
    preamble/postamble, no restating the task.
 4. **Safety** — never commit/push unless explicitly asked (`git push` = ask-gate);
@@ -35,7 +35,7 @@ task routing in [SKILLS.md](SKILLS.md).
 
 ## Anti-patterns (never)
 
-- Editing `/frontend` (broken tree) instead of `backend/frontend-react`.
+- Editing `/frontend` (broken tree) instead of `frontend-react`.
 - Adding a `require_permission()` call without a catalogue entry (breaks
   `test_permission_consistency.py`).
 - Putting `pythonpath` in `pyproject.toml` (silently ignored; `pytest.ini` wins).

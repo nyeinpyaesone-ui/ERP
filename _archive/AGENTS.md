@@ -18,7 +18,7 @@
 │   ├── pyproject.toml      # ruff/black/mypy/coverage/isort config
 │   ├── requirements.txt    # Pinned to installed versions; local == Docker == CI
 │   └── venv/               # Local venv (gitignored)
-├── backend/frontend-react/  # WORKING Vite+React PWA — canonical frontend (D-001)
+├── frontend-react/  # WORKING Vite+React PWA — canonical frontend (D-001)
 ├── mobile/                  # Expo SDK 50 (React Native) - unverified
 ├── docker-compose.yml       # Dev stack (postgres, redis, backend, frontend, ollama)
 ├── docker-compose.prod.yml  # Prod stack with nginx, networks, secrets
@@ -32,8 +32,8 @@
 ## Critical Context
 
 **Single canonical frontend:**
-- `/backend/frontend-react` — **WORKING**: Vite 6.4.3, React 18, PWA, builds successfully (2068 modules)
-- `/frontend` — **deleted** (was broken: no package.json, no nginx.conf). CI builds `backend/frontend-react/dist/`.
+- `/frontend-react` — **WORKING**: Vite 6.4.3, React 18, PWA, builds successfully (2068 modules)
+- `/frontend` — **deleted** (was broken: no package.json, no nginx.conf). CI builds `frontend-react/dist/`.
 
 **Database not running** — PostgreSQL/Redis only exist in docker-compose. Backend boots but fails on DB connection (expected). Run `docker compose up -d postgres redis` first.
 
@@ -52,10 +52,10 @@
 cd backend && source venv/bin/activate && uvicorn app.main:app --reload
 
 # Frontend dev (WORKING portal)
-cd backend/frontend-react && node /tmp/opencode/npm10/package/bin/npm-cli.js run dev
+cd frontend-react && node /tmp/opencode/npm10/package/bin/npm-cli.js run dev
 
 # Frontend build (WORKING)
-cd backend/frontend-react && node /tmp/opencode/npm10/package/bin/npm-cli.js run build
+cd frontend-react && node /tmp/opencode/npm10/package/bin/npm-cli.js run build
 
 # Mobile (unverified)
 cd mobile && npm install && npx expo start
@@ -82,10 +82,10 @@ cd backend && source venv/bin/activate && alembic revision --autogenerate -m "in
 |-------|----------|
 | `ModuleNotFoundError: psycopg2` | `pip install psycopg2-binary` in venv |
 | `npm ENOENT rename` cache errors | Use npm 10: `node /tmp/opencode/npm10/package/bin/npm-cli.js install` |
-| Frontend build fails | Use `/backend/frontend-react`, not `/frontend` |
+| Frontend build fails | Use `/frontend-react`, not `/frontend` |
 | Backend won't start | Start postgres/redis first: `docker compose up -d postgres redis` |
 | Alembic "target database not up to date" | Run `alembic upgrade head` or create 001_initial migration |
-| CI builds broken frontend | Already fixed — `ci.yml` builds `backend/frontend-react`; do not repoint it |
+| CI builds broken frontend | Already fixed — `ci.yml` builds `frontend-react`; do not repoint it |
 | Trivy reports no findings | It scanned `sha-<40>` while `metadata-action` pushes `sha-<7>`; `security` now consumes `needs.docker-*.outputs.image_tag` |
 | Action version bump needed | Workflows pin `uses:` to a 40-char SHA + `# vX.Y.Z`; Dependabot updates those natively |
 | Container runtime won't start here | `/proc/self` reports uid 0 → `newuidmap` fails for rootlesskit/podman; use native PG18 + Redis binaries |
@@ -115,7 +115,7 @@ CORS_ORIGINS=https://app.domain.com
 - **Search**: PostgreSQL full-text via `search_service.py`, endpoint `/api/v1/search/`
 - **LLM**: Ollama integration via `llm_service.py`, tools, streaming, templates
 - **PWA**: Vite plugin generates service worker, offline support
-- **Nginx**: Two layers. `backend/frontend-react/nginx.conf` (dev image, port 80) routes `/api` → `backend:8000` with WebSocket upgrade headers and `/` → SPA. `nginx.conf` at the repo root (mounted as `/etc/nginx/nginx.conf` by `docker-compose.prod.yml`) does the same against the blue/green `upstream backend`/`upstream frontend`, includes `nginx/ssl.conf` for TLS, and sets `client_max_body_size 50m` for uploads. The API's WebSocket lives at `/api/v1/ws` — there is no separate `/ws` route.
+- **Nginx**: Two layers. `frontend-react/nginx.conf` (dev image, port 80) routes `/api` → `backend:8000` with WebSocket upgrade headers and `/` → SPA. `nginx.conf` at the repo root (mounted as `/etc/nginx/nginx.conf` by `docker-compose.prod.yml`) does the same against the blue/green `upstream backend`/`upstream frontend`, includes `nginx/ssl.conf` for TLS, and sets `client_max_body_size 50m` for uploads. The API's WebSocket lives at `/api/v1/ws` — there is no separate `/ws` route.
 
 ## File Conventions
 

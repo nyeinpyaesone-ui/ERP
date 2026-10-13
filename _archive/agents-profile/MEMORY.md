@@ -20,7 +20,7 @@ Append-only ledger; never store secrets (env var *names* only).
 | npm fallback | `/tmp/opencode/npm10/…` volatile — re-bootstrap if gone; **Makefile still hardcodes this path** | `ls`, `Makefile:18` |
 | Python | 3.14.4 (venv) — runs 285 tests; Docker image is 3.11-slim | `python --version` |
 | Alembic chain | **001 → 008** (offline SQL emits; GIN index fixed in `bb7295f2` so live PG works) | `alembic upgrade head --sql` |
-| Frontend (canonical) | `backend/frontend-react` — **105 vitest tests**, eslint 0 errors/127 warnings, vite build green | `npm test`/`lint`/`build` |
+| Frontend (canonical) | `frontend-react` — **105 vitest tests**, eslint 0 errors/127 warnings, vite build green | `npm test`/`lint`/`build` |
 | CI workflows | `ci.yml`, `codeql.yml`, `opencode.yml`, `release.yml` (**snyk-container.yml removed** `ad13f2bb`) | `ls .github/workflows` |
 | GitHub auth | **gh authenticated** as `nyeinpyaesone-ui` (was unauthenticated) | `gh auth status` |
 | GitHub secrets | **2 configured** — `DOCKER_PAT_BACKEND` + `DOCKER_PAT_FRONTEND` (set 2026-10-11T09:18Z); `SSH_PRIVATE_KEY` + `STAGING_*`/`PRODUCTION_*` known_hosts **still missing** (T-004) | `gh secret list` |
@@ -33,7 +33,7 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | ID | Decision | Rationale / hook |
 |----|----------|------------------|
-| D-001 | **`backend/frontend-react` is the only real frontend**; `/frontend` is broken and deprecation-only | AGENTS.md Critical Context; CI builds `backend/frontend-react/dist/` |
+| D-001 | **`frontend-react` is the only real frontend**; `/frontend` is broken and deprecation-only | AGENTS.md Critical Context; CI builds `frontend-react/dist/` |
 | D-002 | Permissions single source of truth = `backend/app/permissions_catalogue.py`; `has_permission` lives only in `app/services/permissions.py` | Broke circular import; `test_permission_consistency.py` enforces |
 | D-003 | `backend/pytest.ini` wins over `pyproject.toml` for pytest config (`pythonpath`) | Active config precedence |
 | D-004 | Blue-green (`scripts/deploy-blue-green.sh`) is the deploy path; root `deploy.sh` is legacy pending replacement | IMP-P1-2 |
@@ -213,7 +213,7 @@ Append-only ledger; never store secrets (env var *names* only).
   SMTP_* — **declared but unwired** (no mail service exists); SENTRY_DSN /
   OPENAI_API_KEY / AWS_* — **not read** (no SDKs); uploads = local
   UPLOAD_DIR; frontend reads only `VITE_API_URL` (default `/api/v1`), now
-  documented in new `backend/frontend-react/.env.example`. T-015 drift
+  documented in new `frontend-react/.env.example`. T-015 drift
   sweep: README/STATUS counts (272 files/103 commits), infra row fixed
   (no ES/S3 in repo; Ollama/Docker/GHA are real), 56 v1 `docker-compose`
   CLI refs → v2, AGENTS.md 16→20 routers, profile chain/lint/coverage
@@ -272,9 +272,9 @@ Append-only ledger; never store secrets (env var *names* only).
 | `pytest` (backend) | ✅ 285 passed, 6 warnings (re-verified 2026-10-11) | 2026-10-11 |
 | backend `ruff check` + `black --check` | ✅ clean (67 files) | 2026-10-11 |
 | coverage (`coverage report`) | ✅ **58.89%** ≥ 58 floor (stale `.coverage` artifact claimed 57.85 — no `--cov` in addopts; `coverage run -m pytest` is the real measure) | 2026-10-11 |
-| `backend/frontend-react` vitest | ✅ 105/105 (incl. single-client gate) | 2026-10-11 |
-| `backend/frontend-react` build | ✅ vite + PWA sw (6 entries, 838.26 KiB) | 2026-10-11 |
-| `backend/frontend-react` lint (eslint 10) | ✅ 0 errors / 127 warnings; CI enforces | 2026-10-11 |
+| `frontend-react` vitest | ✅ 105/105 (incl. single-client gate) | 2026-10-11 |
+| `frontend-react` build | ✅ vite + PWA sw (6 entries, 838.26 KiB) | 2026-10-11 |
+| `frontend-react` lint (eslint 10) | ✅ 0 errors / 127 warnings; CI enforces | 2026-10-11 |
 | all 5 workflows: YAML parse + pin audit | ✅ 0 unpinned, concurrency + timeout everywhere | 2026-10-08 |
 | `docker compose config` | ✅ valid (no `version:` warning) | 2026-10-08 |
 | `npm ci` from lockfile (throwaway copy) | ✅ exit 0, 761 packages resolved | 2026-10-08 |

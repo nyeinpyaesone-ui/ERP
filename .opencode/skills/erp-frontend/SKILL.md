@@ -1,9 +1,9 @@
 ---
 name: ERP Frontend
-description: Canonical Vite+React PWA at backend/frontend-react - single-API-client rule, env contract, test/lint/build commands with expected results, endpoint-calling conventions, and npm-wrapper pitfalls
+description: Canonical Vite+React PWA at frontend-react - single-API-client rule, env contract, test/lint/build commands with expected results, endpoint-calling conventions, and npm-wrapper pitfalls
 ---
 
-# ERP Frontend (`backend/frontend-react/`)
+# ERP Frontend (`frontend-react/`)
 
 The ONLY real frontend (D-001). Root `/frontend` is deleted/broken — never create or build it.
 
@@ -17,7 +17,7 @@ The ONLY real frontend (D-001). Root `/frontend` is deleted/broken — never cre
 
 - Only `VITE_API_URL` is read (default `/api/v1`, relative — nginx proxies `/api` to the backend). See `.env.example`. Nothing else is consumed; do not add VITE_-vars without wiring them.
 
-## Commands (from `backend/frontend-react/`)
+## Commands (from `frontend-react/`)
 
 ```sh
 npm test          # vitest run -> 105/105 (~35s)

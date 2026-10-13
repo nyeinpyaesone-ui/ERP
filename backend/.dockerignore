@@ -7,7 +7,7 @@ __pycache__/
 *.pyo
 *.pyd
 
-# The frontend is a separate image built from backend/frontend-react. Without
+# The frontend is a separate image built from frontend-react. Without
 # this the context carried frontend-react/node_modules (290MB) into the build.
 frontend-react/
 

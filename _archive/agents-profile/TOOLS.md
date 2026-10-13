@@ -43,7 +43,7 @@ Source of permission truth: [`../opencode.json`](../opencode.json).
 | `bash *` | allow |
 | `bash git push *` | **ask** |
 | `bash rm -rf *` | **ask** |
-| Watcher ignores | `__pycache__`, `*.pyc`, `backend/venv/**`, `node_modules/**`, `backend/frontend-react/dist/**`, `scripts/backups/**`, `.git/**` |
+| Watcher ignores | `__pycache__`, `*.pyc`, `backend/venv/**`, `node_modules/**`, `frontend-react/dist/**`, `scripts/backups/**`, `.git/**` |
 
 ## 5. Command cheatsheet (repo commands: `../AGENTS.md → Key Commands`)
 
@@ -56,10 +56,10 @@ cd backend && source venv/bin/activate && uvicorn app.main:app --reload
 cd backend && source venv/bin/activate && pytest           # pytest.ini supplies pythonpath
 cd backend && source venv/bin/activate && alembic upgrade head   # chain is 001–008
 
-# Frontend (canonical: backend/frontend-react)
-cd backend/frontend-react && npm run dev      # npm 10.9.2 now on PATH
-cd backend/frontend-react && npm run build
-cd backend/frontend-react && npm run test     # vitest
+# Frontend (canonical: frontend-react)
+cd frontend-react && npm run dev      # npm 10.9.2 now on PATH
+cd frontend-react && npm run build
+cd frontend-react && npm run test     # vitest
 
 # Stack / deploy
 docker-compose up -d backend frontend

@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-# Root package-lock.json is an orphan artifact (no root package.json); real locks live in backend/frontend-react and mobile
+# Root package-lock.json is an orphan artifact (no root package.json); real locks live in frontend-react and mobile
 /package-lock.json
 backend/venv/
 **/__pycache__/
@@ -9,8 +9,8 @@ backend/venv/
 *.pyd
 
 # Build outputs
-backend/frontend-react/dist/
-backend/frontend-react/build/
+frontend-react/dist/
+frontend-react/build/
 mobile/dist/
 mobile/.expo/
 

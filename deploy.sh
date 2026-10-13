@@ -303,7 +303,7 @@ if ! "${DC[@]}" --env-file "${ENV_FILE}" -f docker-compose.prod.yml pull backend
     U="$(sed -n 's/^DOCKER_USER=//p' "${ENV_FILE}" | tail -n1)"
     U="${U:-${ERP_USER_ARG}}"
     docker build -t "${U}/erp-solution-backend:${V}" ./backend
-    docker build -t "${U}/erp-solution-frontend:${V}" ./backend/frontend-react
+    docker build -t "${U}/erp-solution-frontend:${V}" ./frontend-react
 fi
 
 # --- start ------------------------------------------------------------------
