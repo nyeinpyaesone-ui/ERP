@@ -1,30 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Plug, Webhook, Plus, Trash2, Send, CheckCircle, Slack, MessageCircle, Zap } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plug, Webhook, Trash2, Send, CheckCircle, Slack, MessageCircle, Zap } from 'lucide-react';
 import api from '../api/axios';
 
-export default function Integrations() {
-  const [integrations, setIntegrations] = useState([]);
+export default function Integrations() { const [integrations, setIntegrations] = useState([]);
   const [webhooks, setWebhooks] = useState([]);
   const [activeTab, setActiveTab] = useState('integrations');
 
-  useEffect(() => {
-    api.get(`/integrations/integrations`).then(r => setIntegrations(r.data));
-    api.get(`/integrations/webhooks`).then(r => setWebhooks(r.data));
-  }, []);
+  useEffect(() => { api.get(`/integrations/integrations`).then(r => setIntegrations(r.data));
+    api.get(`/integrations/webhooks`).then(r => setWebhooks(r.data)); }, []);
 
-  const testWebhook = async (id) => {
-    try {
-      const res = await api.post(`/integrations/webhooks/${id}/test`, {});
-      alert(`Webhook test: ${res.data.status}`);
-    } catch (e) { alert('Test failed'); }
-  };
+  const testWebhook = async (id) => { try { const res = await api.post(`/integrations/webhooks/${id}/test`, {});
+      alert(`Webhook test: ${res.data.status}`); } catch (e) { alert('Test failed'); } };
 
-  const getProviderIcon = (provider) => {
-    if (provider === 'slack') return <Slack className="w-5 h-5" />;
+  const getProviderIcon = (provider) => { if (provider === 'slack') return <Slack className="w-5 h-5" />;
     if (provider === 'teams') return <MessageCircle className="w-5 h-5" />;
     if (provider === 'zapier') return <Zap className="w-5 h-5" />;
-    return <Plug className="w-5 h-5" />;
-  };
+    return <Plug className="w-5 h-5" />; };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -105,6 +96,5 @@ export default function Integrations() {
         </div>
       )}
     </div>
-  );
-}
+  ); }
 

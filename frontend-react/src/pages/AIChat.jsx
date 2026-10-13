@@ -1,14 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import {
-  MessageSquare, Send, Loader, Bot, User, Lightbulb, Sparkles,
+import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { MessageSquare, Send, Loader, Bot, User, Lightbulb, Sparkles,
   ChevronLeft, Plus, Clock, Zap, Settings, Trash2, Archive,
-  Cpu, BarChart3, Wrench, FileText, ArrowRight, Copy, Check
-} from 'lucide-react';
+  Cpu, BarChart3, Wrench, FileText, ArrowRight, Copy, Check } from 'lucide-react';
 import api from '../api/axios';
 
-export default function AIChat() {
-  const [messages, setMessages] = useState([]);
+export default function AIChat() { const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -23,200 +20,110 @@ export default function AIChat() {
   const token = localStorage.getItem('token');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchConversations();
+  useEffect(() => { fetchConversations();
     fetchModels();
-    fetchTemplates();
-  }, []);
+    fetchTemplates(); }, []);
 
-  const fetchConversations = async () => {
-    try {
-      const res = await api.get(`/llm/conversations`);
-      setConversations(res.data);
-    } catch (e) {}
-  };
+  const fetchConversations = async () => { try { const res = await api.get(`/llm/conversations`);
+      setConversations(res.data); } catch (e) {} };
 
-  const fetchModels = async () => {
-    try {
-      const res = await api.get(`/llm/models`);
+  const fetchModels = async () => { try { const res = await api.get(`/llm/models`);
       setModels(res.data.models || []);
       const defaultModel = res.data.models?.find(m => m.is_default);
-      if (defaultModel) setSelectedModel(defaultModel.model_id);
-    } catch (e) {}
-  };
+      if (defaultModel) setSelectedModel(defaultModel.model_id); } catch (e) {} };
 
-  const fetchTemplates = async () => {
-    try {
-      const res = await api.get(`/llm/templates`);
-      setTemplates(res.data);
-    } catch (e) {}
-  };
+  const fetchTemplates = async () => { try { const res = await api.get(`/llm/templates`);
+      setTemplates(res.data); } catch (e) {} };
 
-  const loadConversation = async (id) => {
-    try {
-      const res = await api.get(`/llm/conversations/${id}`);
+  const loadConversation = async (id) => { try { const res = await api.get(`/llm/conversations/${id}`);
       const conv = res.data;
       setConversationId(conv.id);
       setMessages(conv.messages.map(m => ({ role: m.role, content: m.content })));
-      if (conv.model_id) setSelectedModel(conv.model_id);
-    } catch (e) {}
-  };
+      if (conv.model_id) setSelectedModel(conv.model_id); } catch (e) {} };
 
-  const newConversation = () => {
-    setConversationId(null);
+  const newConversation = () => { setConversationId(null);
     setMessages([]);
-    setInput('');
-  };
+    setInput(''); };
 
-  const deleteConversation = async (id, e) => {
-    e.stopPropagation();
+  const deleteConversation = async (id, e) => { e.stopPropagation();
     if (!confirm('Delete this conversation?')) return;
-    try {
-      await api.delete(`/llm/conversations/${id}`);
+    try { await api.delete(`/llm/conversations/${id}`);
       if (conversationId === id) newConversation();
-      fetchConversations();
-    } catch (e) {}
-  };
+      fetchConversations(); } catch (e) {} };
 
-  const archiveConversation = async (id, e) => {
-    e.stopPropagation();
-    try {
-      await api.put(`/llm/conversations/${id}/archive`, {});
+  const archiveConversation = async (id, e) => { e.stopPropagation();
+    try { await api.put(`/llm/conversations/${id}/archive`, {});
       if (conversationId === id) newConversation();
-      fetchConversations();
-    } catch (e) {}
-  };
+      fetchConversations(); } catch (e) {} };
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(() => { scrollToBottom(); }, [messages]);
 
-  const sendMessage = async (useStream = false) => {
-    if (!input.trim() || loading || streaming) return;
+  const sendMessage = async (useStream = false) => { if (!input.trim() || loading || streaming) return;
     const userMsg = input.trim();
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setInput('');
     setLoading(true);
 
-    if (useStream) {
-      await streamResponse(userMsg);
-    } else {
-      await regularResponse(userMsg);
-    }
-  };
+    if (useStream) { await streamResponse(userMsg); } else { await regularResponse(userMsg); } };
 
-  const regularResponse = async (userMsg) => {
-    try {
-      const res = await api.post(`/llm/chat`, {
-        messages: [...messages, { role: 'user', content: userMsg }].map(m => ({ role: m.role, content: m.content })),
+  const regularResponse = async (userMsg) => { try { const res = await api.post(`/llm/chat`, { messages: [...messages, { role: 'user', content: userMsg }].map(m => ({ role: m.role, content: m.content })),
         model_id: selectedModel,
         conversation_id: conversationId,
-        use_tools: true
-      });
+        use_tools: true });
 
       const assistantContent = res.data.message?.content || 'No response';
-      setMessages(prev => [...prev, {
-        role: 'assistant',
+      setMessages(prev => [...prev, { role: 'assistant',
         content: assistantContent,
         model: res.data.message?.model,
         tokens: res.data.message?.tokens_used,
-        latency: res.data.message?.latency_ms
-      }]);
+        latency: res.data.message?.latency_ms }]);
 
-      if (res.data.conversation_id && !conversationId) {
-        setConversationId(res.data.conversation_id);
-        fetchConversations();
-      }
-    } catch (e) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Error: ' + (e.response?.data?.detail || e.message) }]);
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (res.data.conversation_id && !conversationId) { setConversationId(res.data.conversation_id);
+        fetchConversations(); } } catch (e) { setMessages(prev => [...prev, { role: 'assistant', content: 'Error: ' + (e.response?.data?.detail || e.message) }]); } finally { setLoading(false); } };
 
-  const streamResponse = async (userMsg) => {
-    setStreaming(true);
+  const streamResponse = async (userMsg) => { setStreaming(true);
     setMessages(prev => [...prev, { role: 'assistant', content: '', streaming: true }]);
 
-    try {
-      const response = await fetch(`/api/v1/llm/chat/stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          messages: [...messages, { role: 'user', content: userMsg }].map(m => ({ role: m.role, content: m.content })),
-          model_id: selectedModel
-        })
-      });
+    try { const response = await fetch(`/api/v1/llm/chat/stream`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ messages: [...messages, { role: 'user', content: userMsg }].map(m => ({ role: m.role, content: m.content })),
+          model_id: selectedModel }) });
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullContent = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
+      while (true) { const { done, value } = await reader.read();
         if (done) break;
 
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.type === 'content') {
-                fullContent += data.content;
-                setMessages(prev => {
-                  const newMessages = [...prev];
+        for (const line of lines) { if (line.startsWith('data: ')) { try { const data = JSON.parse(line.slice(6));
+              if (data.type === 'content') { fullContent += data.content;
+                setMessages(prev => { const newMessages = [...prev];
                   const lastMsg = newMessages[newMessages.length - 1];
-                  if (lastMsg.role === 'assistant' && lastMsg.streaming) {
-                    lastMsg.content = fullContent;
-                  }
-                  return newMessages;
-                });
-              } else if (data.type === 'done') {
-                setMessages(prev => {
-                  const newMessages = [...prev];
+                  if (lastMsg.role === 'assistant' && lastMsg.streaming) { lastMsg.content = fullContent; }
+                  return newMessages; }); } else if (data.type === 'done') { setMessages(prev => { const newMessages = [...prev];
                   const lastMsg = newMessages[newMessages.length - 1];
-                  if (lastMsg.streaming) {
-                    delete lastMsg.streaming;
-                    lastMsg.tokens = data.total_tokens;
-                  }
-                  return newMessages;
-                });
-              }
-            } catch (e) {}
-          }
-        }
-      }
+                  if (lastMsg.streaming) { delete lastMsg.streaming;
+                    lastMsg.tokens = data.total_tokens; }
+                  return newMessages; }); } } catch (e) {} } } }
 
-      fetchConversations();
-    } catch (e) {
-      setMessages(prev => {
-        const newMessages = [...prev];
+      fetchConversations(); } catch (e) { setMessages(prev => { const newMessages = [...prev];
         const lastMsg = newMessages[newMessages.length - 1];
-        if (lastMsg.streaming) {
-          lastMsg.content = 'Error: Streaming failed';
-          delete lastMsg.streaming;
-        }
-        return newMessages;
-      });
-    } finally {
-      setStreaming(false);
-      setLoading(false);
-    }
-  };
+        if (lastMsg.streaming) { lastMsg.content = 'Error: Streaming failed';
+          delete lastMsg.streaming; }
+        return newMessages; }); } finally { setStreaming(false);
+      setLoading(false); } };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = (text) => { navigator.clipboard.writeText(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+    setTimeout(() => setCopied(false), 2000); };
 
-  const applyTemplate = (template) => {
-    setInput(template.user_prompt_template || '');
-  };
+  const applyTemplate = (template) => { setInput(template.user_prompt_template || ''); };
 
   const quickQuestions = [
     'What is my total pipeline value?',
@@ -243,9 +150,7 @@ export default function AIChat() {
               <div
                 key={conv.id}
                 onClick={() => loadConversation(conv.id)}
-                className={`group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer text-sm mb-1 transition-colors ${
-                  conversationId === conv.id ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50 text-gray-700'
-                }`}
+                className={`group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer text-sm mb-1 transition-colors ${ conversationId === conv.id ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50 text-gray-700' }`}
               >
                 <MessageSquare className="w-4 h-4 flex-shrink-0" />
                 <span className="truncate flex-1">{conv.title || 'Untitled'}</span>
@@ -400,12 +305,8 @@ export default function AIChat() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage(e.metaKey || e.ctrlKey);
-                }
-              }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault();
+                  sendMessage(e.metaKey || e.ctrlKey); } }}
               placeholder="Ask about your business... (Cmd+Enter to stream)"
               className="flex-1 input-field"
               disabled={loading || streaming}
@@ -430,6 +331,5 @@ export default function AIChat() {
         </div>
       </div>
     </div>
-  );
-}
+  ); }
 

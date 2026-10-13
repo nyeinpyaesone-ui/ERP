@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Users, Building2, DollarSign, Plus, Search, Filter, Phone, Mail } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, Building2, DollarSign, Plus, Filter, Phone, Mail } from 'lucide-react';
 import api from '../api/axios';
 
-export default function CRM() {
-  const [activeTab, setActiveTab] = useState('contacts');
+export default function CRM() { const [activeTab, setActiveTab] = useState('contacts');
   const [contacts, setContacts] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [deals, setDeals] = useState([]);
@@ -12,25 +10,13 @@ export default function CRM() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchData(); }, [activeTab]);
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      if (activeTab === 'contacts') {
-        const res = await api.get(`/crm/contacts`);
-        setContacts(res.data);
-      } else if (activeTab === 'companies') {
-        const res = await api.get(`/crm/companies`);
-        setCompanies(res.data);
-      } else if (activeTab === 'deals') {
-        const res = await api.get(`/crm/deals`);
-        setDeals(res.data);
-      } else if (activeTab === 'pipeline') {
-        const res = await api.get(`/crm/deals/pipeline`);
-        setPipeline(res.data);
-      }
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
-  };
+  const fetchData = async () => { setLoading(true);
+    try { if (activeTab === 'contacts') { const res = await api.get(`/crm/contacts`);
+        setContacts(res.data); } else if (activeTab === 'companies') { const res = await api.get(`/crm/companies`);
+        setCompanies(res.data); } else if (activeTab === 'deals') { const res = await api.get(`/crm/deals`);
+        setDeals(res.data); } else if (activeTab === 'pipeline') { const res = await api.get(`/crm/deals/pipeline`);
+        setPipeline(res.data); } } catch (e) { console.error(e); }
+    finally { setLoading(false); } };
 
   const tabs = [
     { id: 'contacts', label: 'Contacts', icon: Users },
@@ -113,6 +99,5 @@ export default function CRM() {
         </>
       )}
     </div>
-  );
-}
+  ); }
 

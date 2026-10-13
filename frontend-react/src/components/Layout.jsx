@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard, Users, Package, DollarSign, Briefcase,
+import { LayoutDashboard, Users, Package, DollarSign, Briefcase,
   BarChart2, MessageSquare, FileText, GitBranch,
   Settings, Database, Zap, Shield, Search, LogOut,
-  Menu, X, ChevronDown, Building2, HelpCircle
-} from 'lucide-react';
+  Menu, X, ChevronDown, Building2, HelpCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const navigation = [
@@ -30,18 +28,15 @@ const navigation = [
 ];
 
 /** Render navigation, the current user's menu, and the nested route outlet. */
-export default function Layout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+export default function Layout() { const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   /** Clear local authentication, navigate to /login, and close the user menu. */
-  const handleLogout = () => {
-    logout();
+  const handleLogout = () => { logout();
     navigate('/login');
-    setUserMenuOpen(false);
-  };
+    setUserMenuOpen(false); };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -55,9 +50,7 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 lg:translate-x-0 ${ sidebarOpen ? 'translate-x-0' : '-translate-x-full' }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -78,12 +71,9 @@ export default function Layout() {
                 key={item.name}
                 to={item.href}
                 className={({ isActive }) =>
-                  `flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                    isActive
+                  `flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${ isActive
                       ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`
-                }
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }` }
                 onClick={() => setSidebarOpen(false)}
               >
                 <item.icon className="w-5 h-5 mr-3 flex-shrink-0" />
@@ -160,5 +150,4 @@ export default function Layout() {
         </main>
       </div>
     </div>
-  );
-}
+  ); }

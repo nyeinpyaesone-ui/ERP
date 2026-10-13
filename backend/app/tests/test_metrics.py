@@ -1,6 +1,5 @@
 """Tests for the Prometheus /metrics endpoint (app/routers/metrics.py)."""
 
-import pytest
 from httpx import AsyncClient
 
 

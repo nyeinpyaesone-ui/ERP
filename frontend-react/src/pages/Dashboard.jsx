@@ -1,15 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Users, Building2, Package, Receipt, FolderKanban,
+import { Users, Building2, Package, Receipt, FolderKanban,
   TrendingUp, TrendingDown, AlertTriangle, Activity,
   DollarSign, BarChart3, ArrowUpRight, ArrowDownRight,
-  Sparkles, Zap, Clock, Target, Percent
-} from 'lucide-react';
-import { LineChartComponent, BarChartComponent, AreaChartComponent, Sparkline } from '../components/Charts.jsx';
+  Sparkles, Zap, Clock, Target, Percent } from 'lucide-react';
+import { BarChartComponent, AreaChartComponent, Sparkline } from '../components/Charts.jsx';
 import { SkeletonStats } from '../components/Skeleton.jsx';
 import api from '../api/axios';
-
 
 const statCards = [
   { label: 'Contacts', icon: Users, color: 'bg-blue-500', path: '/crm', key: 'total_contacts', trend: 'contacts_trend' },
@@ -18,20 +15,15 @@ const statCards = [
   { label: 'Revenue', icon: DollarSign, color: 'bg-amber-500', path: '/finance', key: 'total_revenue', format: 'currency', trend: 'revenue_trend' },
 ];
 
-export default function Dashboard() {
-  const [stats, setStats] = useState({});
+export default function Dashboard() { const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [revenueData, setRevenueData] = useState([]);
   const [pipelineData, setPipelineData] = useState([]);
   const [activityData, setActivityData] = useState([]);
 
-  useEffect(() => {
-    fetchDashboard();
-  }, []);
+  useEffect(() => { fetchDashboard(); }, []);
 
-  const fetchDashboard = async () => {
-    try {
-      const [analytics, crm, hr, inventory, finance, projects, trends] = await Promise.all([
+  const fetchDashboard = async () => { try { const [analytics, crm, hr, inventory, finance, projects, trends] = await Promise.all([
         api.get(`/analytics/dashboard`).catch(() => ({ data: {} })),
         api.get(`/crm/dashboard`).catch(() => ({ data: {} })),
         api.get(`/hr/dashboard`).catch(() => ({ data: {} })),
@@ -41,20 +33,16 @@ export default function Dashboard() {
         api.get(`/analytics/monthly-trends`).catch(() => ({ data: {} })),
       ]);
 
-      setStats({
-        ...analytics.data,
+      setStats({ ...analytics.data,
         ...crm.data,
         ...hr.data,
         ...inventory.data,
         ...finance.data,
-        ...projects.data,
-      });
+        ...projects.data, });
 
       // Build chart data
-      const monthlyRevenue = trends.data?.revenue?.map(r => ({
-        month: r.period,
-        revenue: r.amount
-      })) || [];
+      const monthlyRevenue = trends.data?.revenue?.map(r => ({ month: r.period,
+        revenue: r.amount })) || [];
       setRevenueData(monthlyRevenue);
 
       const pipeline = analytics.data?.crm?.pipeline_value || 0;
@@ -64,21 +52,14 @@ export default function Dashboard() {
         { name: 'Lost', value: (crm.data?.total_deals || 0) - (crm.data?.won_deals || 0), fill: '#ef4444' },
       ]);
 
-      const activity = analytics.data?.recent_activity?.slice(0, 7).map((a, i) => ({
-        day: `Day ${i + 1}`,
-        actions: 1
-      })) || [];
-      setActivityData(activity);
+      const activity = analytics.data?.recent_activity?.slice(0, 7).map((a, i) => ({ day: `Day ${i + 1}`,
+        actions: 1 })) || [];
+      setActivityData(activity); } catch (e) { console.error('Dashboard fetch error:', e); }
+    finally { setLoading(false); } };
 
-    } catch (e) { console.error('Dashboard fetch error:', e); }
-    finally { setLoading(false); }
-  };
-
-  const formatValue = (value, format) => {
-    if (value === undefined || value === null) return '—';
+  const formatValue = (value, format) => { if (value === undefined || value === null) return '—';
     if (format === 'currency') return `$${Number(value).toLocaleString()}`;
-    return Number(value).toLocaleString();
-  };
+    return Number(value).toLocaleString(); };
 
   const trendData = [
     { day: 1, value: 120 }, { day: 2, value: 132 }, { day: 3, value: 101 },
@@ -265,6 +246,5 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
-  );
-}
+  ); }
 

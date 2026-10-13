@@ -1,18 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, BarChart3, Download, TrendingUp, PieChart, Activity } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BarChart3, Download, TrendingUp, PieChart, Activity } from 'lucide-react';
 import api from '../api/axios';
 
-export default function Reports() {
-  const [revenue, setRevenue] = useState(null);
+export default function Reports() { const [revenue, setRevenue] = useState(null);
   const [pipeline, setPipeline] = useState(null);
   const [inventory, setInventory] = useState(null);
   const [activeReport, setActiveReport] = useState('revenue');
 
-  useEffect(() => {
-    if (activeReport === 'revenue') api.get(`/reports/revenue`).then(r => setRevenue(r.data));
+  useEffect(() => { if (activeReport === 'revenue') api.get(`/reports/revenue`).then(r => setRevenue(r.data));
     if (activeReport === 'pipeline') api.get(`/reports/pipeline`).then(r => setPipeline(r.data));
-    if (activeReport === 'inventory') api.get(`/reports/inventory`).then(r => setInventory(r.data));
-  }, [activeReport]);
+    if (activeReport === 'inventory') api.get(`/reports/inventory`).then(r => setInventory(r.data)); }, [activeReport]);
 
   const reports = [
     { id: 'revenue', label: 'Revenue Report', icon: TrendingUp },
@@ -72,6 +69,5 @@ export default function Reports() {
         )}
       </div>
     </div>
-  );
-}
+  ); }
 

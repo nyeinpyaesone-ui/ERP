@@ -1,16 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Building, Briefcase, DollarSign, Plus } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, Building, Briefcase, DollarSign } from 'lucide-react';
 import api from '../api/axios';
 
-export default function HR() {
-  const [employees, setEmployees] = useState([]);
+export default function HR() { const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [activeTab, setActiveTab] = useState('employees');
 
-  useEffect(() => {
-    api.get(`/hr/employees`).then(r => setEmployees(r.data));
-    api.get(`/hr/departments`).then(r => setDepartments(r.data));
-  }, []);
+  useEffect(() => { api.get(`/hr/employees`).then(r => setEmployees(r.data));
+    api.get(`/hr/departments`).then(r => setDepartments(r.data)); }, []);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -58,6 +55,5 @@ export default function HR() {
         </div>
       )}
     </div>
-  );
-}
+  ); }
 

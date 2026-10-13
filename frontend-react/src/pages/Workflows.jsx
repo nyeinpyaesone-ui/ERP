@@ -1,31 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Workflow, Plus, ToggleLeft, ToggleRight, Trash2, Play, GitBranch, Settings2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Workflow, Plus, ToggleLeft, ToggleRight, Trash2, Play, GitBranch } from 'lucide-react';
 import api from '../api/axios';
 
-export default function Workflows() {
-  const [workflows, setWorkflows] = useState([]);
+export default function Workflows() { const [workflows, setWorkflows] = useState([]);
   const [executions, setExecutions] = useState([]);
   const [activeTab, setActiveTab] = useState('workflows');
 
-  useEffect(() => {
-    api.get(`/workflows/workflows`).then(r => setWorkflows(r.data));
-    api.get(`/workflows/executions`).then(r => setExecutions(r.data));
-  }, []);
+  useEffect(() => { api.get(`/workflows/workflows`).then(r => setWorkflows(r.data));
+    api.get(`/workflows/executions`).then(r => setExecutions(r.data)); }, []);
 
-  const toggleWorkflow = async (id) => {
-    try {
-      await api.put(`/workflows/workflows/${id}/toggle`, {});
-      setWorkflows(workflows.map(w => w.id === id ? { ...w, is_active: !w.is_active } : w));
-    } catch (e) { console.error(e); }
-  };
+  const toggleWorkflow = async (id) => { try { await api.put(`/workflows/workflows/${id}/toggle`, {});
+      setWorkflows(workflows.map(w => w.id === id ? { ...w, is_active: !w.is_active } : w)); } catch (e) { console.error(e); } };
 
-  const deleteWorkflow = async (id) => {
-    if (!confirm('Delete this workflow?')) return;
-    try {
-      await api.delete(`/workflows/workflows/${id}`);
-      setWorkflows(workflows.filter(w => w.id !== id));
-    } catch (e) { console.error(e); }
-  };
+  const deleteWorkflow = async (id) => { if (!confirm('Delete this workflow?')) return;
+    try { await api.delete(`/workflows/workflows/${id}`);
+      setWorkflows(workflows.filter(w => w.id !== id)); } catch (e) { console.error(e); } };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -115,6 +104,5 @@ export default function Workflows() {
         </div>
       )}
     </div>
-  );
-}
+  ); }
 

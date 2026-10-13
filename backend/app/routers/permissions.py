@@ -1,7 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, require_admin, require_superadmin
@@ -64,8 +64,7 @@ class PermissionResponse(BaseModel):
     action: str
     description: str | None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RoleResponse(BaseModel):
@@ -76,8 +75,7 @@ class RoleResponse(BaseModel):
     is_system: bool
     permissions: list[PermissionResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FieldPermissionResponse(BaseModel):
@@ -87,8 +85,7 @@ class FieldPermissionResponse(BaseModel):
     field_name: str
     access_level: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DataPolicyResponse(BaseModel):
@@ -101,8 +98,7 @@ class DataPolicyResponse(BaseModel):
     priority: int
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==================== ROLES ====================

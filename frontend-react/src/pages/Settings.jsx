@@ -1,55 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, Save, Key, Mail, Database, CreditCard, Shield, Bell, Globe, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, Save, Key, Mail, Database, CreditCard, Shield, Bell, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 
-export default function SettingsPage() {
-  const [settings, setSettings] = useState([]);
+export default function SettingsPage() { const [settings, setSettings] = useState([]);
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
   const [newCategory, setNewCategory] = useState('general');
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
+  useEffect(() => { fetchSettings(); }, []);
 
-  const fetchSettings = async () => {
-    try {
-      const res = await api.get(`/admin/settings`);
-      setSettings(res.data);
-    } catch (e) { console.error(e); }
-  };
+  const fetchSettings = async () => { try { const res = await api.get(`/admin/settings`);
+      setSettings(res.data); } catch (e) { console.error(e); } };
 
-  const addSetting = async () => {
-    if (!newKey || !newValue) return;
-    try {
-      await api.post(`/admin/settings`, {
-        key: newKey,
+  const addSetting = async () => { if (!newKey || !newValue) return;
+    try { await api.post(`/admin/settings`, { key: newKey,
         value: newValue,
-        category: newCategory
-      });
+        category: newCategory });
       setNewKey(''); setNewValue(''); setNewCategory('general');
-      fetchSettings();
-    } catch (e) { console.error(e); }
-  };
+      fetchSettings(); } catch (e) { console.error(e); } };
 
-  const deleteSetting = async (key) => {
-    if (!confirm(`Delete setting "${key}"?`)) return;
-    try {
-      await api.delete(`/admin/settings/${key}`);
-      fetchSettings();
-    } catch (e) { console.error(e); }
-  };
+  const deleteSetting = async (key) => { if (!confirm(`Delete setting "${key}"?`)) return;
+    try { await api.delete(`/admin/settings/${key}`);
+      fetchSettings(); } catch (e) { console.error(e); } };
 
   const categories = ['general', 'email', 'stripe', 'ai', 'security', 'notifications'];
 
-  const getCategoryIcon = (cat) => {
-    if (cat === 'email') return <Mail className="w-4 h-4" />;
+  const getCategoryIcon = (cat) => { if (cat === 'email') return <Mail className="w-4 h-4" />;
     if (cat === 'stripe') return <CreditCard className="w-4 h-4" />;
     if (cat === 'security') return <Shield className="w-4 h-4" />;
     if (cat === 'notifications') return <Bell className="w-4 h-4" />;
     if (cat === 'ai') return <Key className="w-4 h-4" />;
-    return <Settings className="w-4 h-4" />;
-  };
+    return <Settings className="w-4 h-4" />; };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -137,6 +118,5 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
-  );
-}
+  ); }
 
