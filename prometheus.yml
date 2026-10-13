@@ -1,0 +1,20 @@
+# Prometheus scrape configuration for erp-solution production.
+# Mounted into the `prometheus` service in docker-compose.prod.yml.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Backend exposes Prometheus text format at GET /metrics
+  # (see backend/app/routers/metrics.py). Blue is the default active stack;
+  # add a target for backend-green when running the blue-green profile.
+  - job_name: "erp-backend"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["backend:8000"]
+        labels:
+          stack: blue
+      # Uncomment when deploying the green stack during a blue-green cutover:
+      # - targets: ["backend-green:8000"]
+      #   labels:
+      #     stack: green

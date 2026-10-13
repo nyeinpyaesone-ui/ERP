@@ -15,6 +15,25 @@ async def health_check():
     return {"status": "healthy"}
 
 
+# Aliases matching the Kubernetes probe paths in infra/k8s/base/api-deployment.yaml.
+@router.get("/health/live", include_in_schema=False)
+async def health_live():
+    """Liveness alias of /health."""
+    return {"status": "healthy"}
+
+
+@router.get("/health/startup", include_in_schema=False)
+async def health_startup():
+    """Startup alias of /health (process up == startup complete)."""
+    return {"status": "healthy"}
+
+
+@router.get("/health/ready", include_in_schema=False)
+async def health_ready(db: Session = Depends(get_db)):
+    """Readiness alias of /ready for Kubernetes readiness probes."""
+    return await readiness_check(db)
+
+
 @router.get("/ready")
 async def readiness_check(db: Session = Depends(get_db)):
     """Return database and Redis check results with ``ready`` or ``not_ready`` status.

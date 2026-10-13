@@ -9,7 +9,7 @@ metadata:
 data:
   # Application
   APP_ENV: "production"
-  APP_PORT: "3000"
+  APP_PORT: "8000"  # backend container listens on 8000; Service still exposes 3000 -> targetPort 8000
   APP_LOG_LEVEL: "info"
 
   # Database

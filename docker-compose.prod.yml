@@ -135,6 +135,18 @@ services:
     networks:
       - erp-network
 
+  # Prometheus — scrapes /metrics from the active backend for monitoring.
+  # See docs/PRODUCTION_DEPLOYMENT.md (Monitoring section).
+  prometheus:
+    image: prom/prometheus:v2.53.4
+    container_name: erp-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - erp-network
+
   # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
@@ -159,6 +171,7 @@ volumes:
   redis_data:
   ollama_data:
   backend_logs:
+  prometheus_data:
 
 networks:
   erp-network:
