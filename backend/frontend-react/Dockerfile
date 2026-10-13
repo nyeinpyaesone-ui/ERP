@@ -1,3 +1,12 @@
+# syntax=docker/dockerfile:1
+###############################################################################
+# ERP SOLUTION — frontend image (static Vite build served by nginx)
+#
+# Multi-arch: node:20-alpine and nginx:alpine are manifest lists covering
+# linux/amd64 and linux/arm64, so this image builds natively on both. The
+# produced bundle is architecture-neutral JS/CSS; only the nginx runtime
+# differs per platform, which the manifest list resolves at pull time.
+###############################################################################
 FROM node:20-alpine AS builder
 
 WORKDIR /app

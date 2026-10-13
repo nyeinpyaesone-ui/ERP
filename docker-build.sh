@@ -109,7 +109,37 @@ preflight() {
     done
 
     if [ -z "${PLATFORMS}" ]; then
-        PLATFORMS="$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}' 2>/dev/null || echo linux/amd64)"
+        # Pushing without an explicit --platform should publish the same
+        # amd64+arm64 manifest list CI produces; otherwise a tag pushed from
+        # an x86 host silently overwrites the multi-arch tag with a single-
+        # arch image and ARM Linux hosts (Graviton, Pi 64-bit, Cobalt) fail
+        # to pull or exec it. Local builds stay on the host platform because
+        # `--load` cannot represent a manifest list.
+        if [ "${PUSH}" = true ] && buildx_available; then
+            PLATFORMS="linux/amd64,linux/arm64"
+            erp_info "Defaulting to multi-platform ${PLATFORMS} for push"
+        else
+            # Validate the detected value: a docker that prints something
+            # unexpected (old CLI, wrapper script) would otherwise be passed
+            # verbatim as --platform and fail deep inside buildx.
+            local detected
+            detected="$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}' 2>/dev/null || true)"
+            case "${detected}" in
+                linux/*|windows/*) PLATFORMS="${detected}" ;;
+                *)                 PLATFORMS="linux/$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/; s/armv7l/arm/')" ;;
+            esac
+        fi
+    fi
+
+    # Multi-platform builds need binfmt/QEMU registration unless native
+    # arm64 runners are attached to the builder. Fail early with the exact
+    # fix instead of dying mid-build on "exec format error".
+    if multi_platform && [ "${DRY_RUN}" != true ]; then
+        if ! update-binfmts --enable qemu-aarch64 >/dev/null 2>&1 \
+           && ! ls /proc/sys/fs/binfmt_misc/qemu-aarch64 >/dev/null 2>&1; then
+            erp_warn "QEMU binfmt for arm64 not detected; cross-building linux/arm64 may fail."
+            erp_warn "Register it once with: docker run --privileged --rm tonistiigi/binfmt --install arm64"
+        fi
     fi
 }
 
@@ -172,8 +202,9 @@ multi_platform() {
 #   single-arch, no --push     buildx --load        (lands in the local store)
 #
 # `--load` and `--push` are mutually exclusive, and `--load` cannot represent a
-# manifest list, so a multi-arch local build cannot produce a usable image. That
-# case is reported rather than silently collapsing to one architecture.
+# manifest list. A multi-arch local build therefore warms the build cache and
+# verifies every platform compiles, without pretending to land an image — the
+# registry copy is created by re-running with --push.
 build_image() {
     local context="$1" image="$2" description="$3"
 
@@ -183,9 +214,9 @@ build_image() {
         if [ "${PUSH}" = true ]; then
             cmd+=(--push)
         elif multi_platform; then
-            erp_error "Multi-platform build (${PLATFORMS}) cannot be loaded into the local image store."
-            erp_error "Re-run with --push, or with a single --platform value."
-            return 1
+            erp_warn "Multi-platform build (${PLATFORMS}) without --push: exporting to cache only."
+            erp_warn "No local image will be created; re-run with --push to publish the manifest list."
+            cmd+=(--output=type=cacheonly)
         else
             cmd+=(--load)
         fi

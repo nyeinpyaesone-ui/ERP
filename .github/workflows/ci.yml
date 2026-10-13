@@ -279,12 +279,24 @@ jobs:
 
       # Builds either way. Without a PAT the result is loaded locally so the
       # image is still verified; nothing is published.
+      #
+      # Multi-arch: when pushing, build linux/amd64 + linux/arm64 so the same
+      # tag is pullable on ARM Linux hosts (AWS Graviton/Azure Cobalt/Raspberry
+      # Pi OS 64-bit and Termux proot-distro hosts with a Docker daemon). The
+      # base images are manifest lists and all pinned wheels ship manylinux
+      # aarch64 builds, so no cross-compilation flags are needed. QEMU for the
+      # arm64 stage comes from docker/setup-buildx-action's default
+      # qemu-static installation. A local (non-push) build stays single-arch
+      # because `--load` cannot represent a manifest list.
       - name: Build backend image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ./backend
           push: ${{ needs.config.outputs.can_push == 'true' }}
           load: ${{ needs.config.outputs.can_push != 'true' }}
+          platforms: ${{ needs.config.outputs.can_push == 'true' && 'linux/amd64,linux/arm64' || '' }}
+          provenance: mode=min
+          sbom: ${{ needs.config.outputs.can_push == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -324,12 +336,16 @@ jobs:
       # Builds from source (npm ci + vite build) rather than consuming the
       # frontend-build job's dist/: .dockerignore excludes dist/ from the
       # build context, so a downloaded bundle would be silently dropped.
+      # Multi-arch and provenance/SBOM mirror the backend job (see there).
       - name: Build frontend image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ./backend/frontend-react
           push: ${{ needs.config.outputs.can_push == 'true' }}
           load: ${{ needs.config.outputs.can_push != 'true' }}
+          platforms: ${{ needs.config.outputs.can_push == 'true' && 'linux/amd64,linux/arm64' || '' }}
+          provenance: mode=min
+          sbom: ${{ needs.config.outputs.can_push == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
