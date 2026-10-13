@@ -66,8 +66,12 @@ services:
       - backend
 
   # Ollama AI Service
+  # Pinned to a digest-stable release tag instead of :latest — an unpinned
+  # latest makes dev environments non-reproducible and can pull in breaking
+  # model-runtime changes silently. ollama/ollama publishes linux/amd64 and
+  # linux/arm64 manifests, so this works on ARM Linux hosts out of the box.
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.9.6
     container_name: erp_solution-ollama
     ports:
       - "11434:11434"
