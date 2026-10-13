@@ -28,14 +28,12 @@ fi
 
 # Build and push images
 echo "Building Docker images..."
-docker build -t ghcr.io/nyeinpyaesone-ui/erp_solution-api:${VERSION} -f docker/Dockerfile.api ../
-docker build -t ghcr.io/nyeinpyaesone-ui/erp_solution-web:${VERSION} -f docker/Dockerfile.web ../
-docker build -t ghcr.io/nyeinpyaesone-ui/erp_solution-worker:${VERSION} -f docker/Dockerfile.worker ../
+docker build -t ${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION} ../backend
+docker build -t ${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION} ../frontend-react
 
 echo "Pushing Docker images..."
-docker push ghcr.io/nyeinpyaesone-ui/erp_solution-api:${VERSION}
-docker push ghcr.io/nyeinpyaesone-ui/erp_solution-web:${VERSION}
-docker push ghcr.io/nyeinpyaesone-ui/erp_solution-worker:${VERSION}
+docker push ${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION}
+docker push ${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION}
 
 # Update image tags in overlay
 if [ "$VERSION" != "latest" ]; then
@@ -50,7 +48,6 @@ kubectl apply -k overlays/${ENVIRONMENT}/
 echo "Waiting for deployment rollout..."
 kubectl rollout status deployment/${ENVIRONMENT}-erp_solution-api -n ${NAMESPACE} --timeout=300s
 kubectl rollout status deployment/${ENVIRONMENT}-erp_solution-web -n ${NAMESPACE} --timeout=300s
-kubectl rollout status deployment/${ENVIRONMENT}-erp_solution-worker -n ${NAMESPACE} --timeout=300s
 
 # Verify deployment
 echo ""

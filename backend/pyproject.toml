@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "erp-solution-backend"
-version = "1.0.0"
+version = "1.8.0"  # keep in sync with app.__version__ / config.APP_VERSION / package.json
 description = "ERP Solution Backend API"
 readme = "README.md"
 requires-python = ">=3.11"

@@ -13,6 +13,12 @@ All versions follow Semantic Versioning. The canonical package version is `1.8.0
 - **Repo hygiene**: removed orphan root `package-lock.json` and added ignore rule; pytest plugin crash fixed via `-p no:libtmux` in `pytest.ini` (full suite green: 289 backend + 105 frontend tests).
 - **Version alignment**: unified all package version strings on `1.8.0` (was drifting 2.2.0 / 1.8.0 / 1.8.0 / 2.5.0).
 
+### Architecture Alignment (post-tag, still 1.8.0)
+- **Single source of truth for orchestration**: deleted the stale duplicate `backend/docker-compose.yml` (broken relative build paths after the frontend move); the repo-root compose is now the only dev stack definition. `backend/README.md` quick-start updated accordingly.
+- **Dead worker deployment removed from Kubernetes**: no worker image is built by CI and no task queue exists in the backend. `worker-deployment.yaml` archived to `_archive/k8s-worker/`; stripped from base kustomization, all overlays (replicas, image transformers, prod HPA patch), deploy/rollback scripts, and the k8s README.
+- **Registry drift eliminated**: k8s manifests and scripts now reference the images CI actually publishes (`docker.io/<user>/erp-solution-backend|frontend`) instead of nonexistent `ghcr.io/.../erp_solution-api|web|worker`. Production overlay tag corrected from phantom `v3.0.0` to the real release `v1.8.0`.
+- **Version completeness**: `backend/pyproject.toml` aligned to 1.8.0 (was 1.0.0) — all five version locations now agree.
+
 ## [1.0.0] — 2026-06-19
 
 ### Initial Release

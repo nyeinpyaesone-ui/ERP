@@ -14,8 +14,6 @@ replicas:
     count: 5
   - name: erp_solution-web
     count: 3
-  - name: erp_solution-worker
-    count: 3
 
 patches:
   - target:
@@ -93,22 +91,9 @@ patches:
         path: /spec/maxReplicas
         value: 20
 
-  - target:
-      kind: HorizontalPodAutoscaler
-      name: erp_solution-worker-hpa
-    patch: |-
-      - op: replace
-        path: /spec/minReplicas
-        value: 3
-      - op: replace
-        path: /spec/maxReplicas
-        value: 20
-
 images:
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-api
-    newTag: v3.0.0
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-web
-    newTag: v3.0.0
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-worker
-    newTag: v3.0.0
+  - name: docker.io/powerrangeranikg/erp-solution-backend
+    newTag: v1.8.0
+  - name: docker.io/powerrangeranikg/erp-solution-frontend
+    newTag: v1.8.0
 

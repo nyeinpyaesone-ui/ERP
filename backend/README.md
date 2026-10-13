@@ -90,7 +90,7 @@ erp_solution-system/
 в”‚   в”њв”Ђв”Ђ tailwind.config.js
 в”‚   в”њв”Ђв”Ђ Dockerfile
 в”‚   в””в”Ђв”Ђ nginx.conf
-в””в”Ђв”Ђ docker-compose.yml
+в””в”Ђв”Ђ (see repo-root docker-compose.yml)
 ```
 
 ## Quick Start
@@ -98,8 +98,10 @@ erp_solution-system/
 ### Local Development
 
 ```bash
+# (run from the repository root)
+
 # 1. Start PostgreSQL and Redis
-docker-compose up -d postgres redis
+docker compose up -d postgres redis
 
 # 2. Backend
 cd backend
@@ -118,9 +120,12 @@ npm run dev
 
 ### Docker (Full Stack)
 
+Uses the repo-root `docker-compose.yml` (postgres + redis + backend + frontend + ollama):
+
 ```bash
-docker-compose up -d
-docker-compose exec ollama ollama pull qwen3.6
+# from the repository root
+docker compose up -d --build
+docker compose exec ollama ollama pull qwen3.6
 ```
 
 ### First Time Setup

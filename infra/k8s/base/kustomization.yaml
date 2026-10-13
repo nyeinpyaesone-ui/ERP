@@ -14,7 +14,7 @@ resources:
   - redis.yaml
   - api-deployment.yaml
   - web-deployment.yaml
-  - worker-deployment.yaml
+  # worker-deployment removed: no worker image is built by CI (see _archive/k8s-worker/)
   - ingress.yaml
   - cronjob.yaml
 
@@ -23,10 +23,8 @@ commonLabels:
   app.kubernetes.io/managed-by: kustomize
 
 images:
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-api
+  - name: docker.io/powerrangeranikg/erp-solution-backend
     newTag: latest
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-web
-    newTag: latest
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-worker
+  - name: docker.io/powerrangeranikg/erp-solution-frontend
     newTag: latest
 
