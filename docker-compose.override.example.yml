@@ -1,0 +1,8 @@
+# Copy to docker-compose.override.yml for local hot-reload development.
+# WARNING: the ./backend:/app mount hides the image's installed site-packages.
+# Only use this if you also mount a pre-populated venv or accept import errors.
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

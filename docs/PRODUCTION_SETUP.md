@@ -120,7 +120,7 @@ docker compose -f docker-compose.prod.yml exec postgres pg_dump -U erp erp_solut
 
 - **Health checks**: `curl https://api.yourdomain.com/api/v1/health`
 - **Logs**: `docker compose -f docker-compose.prod.yml logs -f`
-- **Metrics**: not implemented yet — there is no `/metrics` endpoint
+- **Metrics**: Prometheus text format exposed at `GET /metrics` (HTTP request counter, latency histogram, in-flight gauge, DB pool connections). Scrape it with Prometheus as usual.
 
 ## Support
 

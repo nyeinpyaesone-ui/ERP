@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Runtime stage
 FROM python:3.11-slim AS runtime
@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --shell /bin/bash app
 
-COPY --from=builder /root/.local /home/app/.local
+COPY --from=builder /install /usr/local
 COPY --chown=app:app . .
 
 RUN chmod +x /app/entrypoint.sh
@@ -29,7 +29,6 @@ RUN mkdir -p uploads static && chown -R app:app uploads static
 
 USER app
 
-ENV PATH="/home/app/.local/bin:${PATH}"
 ENV PYTHONPATH=/app
 
 EXPOSE 8000

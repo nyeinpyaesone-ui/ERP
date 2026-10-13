@@ -35,6 +35,11 @@ httpx==0.28.1
 redis==8.1.0
 stripe==8.0.0
 
+# ── Observability ────────────────────────────────────────────────────────────
+# Powers GET /metrics (app/routers/metrics.py): request count/latency/in-flight
+# and DB pool gauges in Prometheus text format.
+prometheus-client==0.26.0
+
 # Used by app/routers/reports.py:/chart/revenue (lazy import, graceful
 # fallback when absent).
 matplotlib==3.11.2

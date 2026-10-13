@@ -29,7 +29,7 @@ spec:
         runAsUser: 1000
       containers:
       - name: web
-        image: ghcr.io/nyeinpyaesone-ui/erp_solution-web:latest
+        image: docker.io/powerrangeranikg/erp-solution-frontend:latest
         imagePullPolicy: Always
         ports:
         - name: http
@@ -49,13 +49,13 @@ spec:
             cpu: "500m"
         livenessProbe:
           httpGet:
-            path: /api/health
+            path: /healthz
             port: 80
           initialDelaySeconds: 10
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /api/health
+            path: /healthz
             port: 80
           initialDelaySeconds: 5
           periodSeconds: 5

@@ -27,13 +27,11 @@ fi
 echo "Rolling back deployments..."
 kubectl rollout undo deployment/${ENVIRONMENT}-erp_solution-api -n ${NAMESPACE}
 kubectl rollout undo deployment/${ENVIRONMENT}-erp_solution-web -n ${NAMESPACE}
-kubectl rollout undo deployment/${ENVIRONMENT}-erp_solution-worker -n ${NAMESPACE}
 
 # Wait for rollback
 echo "Waiting for rollback to complete..."
 kubectl rollout status deployment/${ENVIRONMENT}-erp_solution-api -n ${NAMESPACE} --timeout=300s
 kubectl rollout status deployment/${ENVIRONMENT}-erp_solution-web -n ${NAMESPACE} --timeout=300s
-kubectl rollout status deployment/${ENVIRONMENT}-erp_solution-worker -n ${NAMESPACE} --timeout=300s
 
 echo ""
 echo "Rollback completed successfully!"

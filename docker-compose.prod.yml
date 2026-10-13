@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-erp}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       POSTGRES_DB: ${DB_NAME:-erp_solution}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -25,12 +25,12 @@ services:
     image: redis:7-alpine
     container_name: erp-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
     volumes:
       - redis_data:/data
     # No ports published in production
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -46,11 +46,11 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
     environment:
       DATABASE_URL: postgresql://${DB_USER:-erp}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-erp_solution}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
-      SECRET_KEY: ${SECRET_KEY}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
       ENVIRONMENT: prod
       OLLAMA_BASE_URL: http://ollama:11434
-      CORS_ORIGINS: ${CORS_ORIGINS}
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS in .env}
     volumes:
       - backend_logs:/app/logs
       - ./backend/uploads:/app/uploads
@@ -77,11 +77,11 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
     environment:
       DATABASE_URL: postgresql://${DB_USER:-erp}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-erp_solution}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
-      SECRET_KEY: ${SECRET_KEY}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
       ENVIRONMENT: prod
       OLLAMA_BASE_URL: http://ollama:11434
-      CORS_ORIGINS: ${CORS_ORIGINS}
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS in .env}
     volumes:
       - backend_logs:/app/logs
       - ./backend/uploads:/app/uploads
@@ -135,6 +135,18 @@ services:
     networks:
       - erp-network
 
+  # Prometheus — scrapes /metrics from the active backend for monitoring.
+  # See docs/PRODUCTION_DEPLOYMENT.md (Monitoring section).
+  prometheus:
+    image: prom/prometheus:v2.53.4
+    container_name: erp-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - erp-network
+
   # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
@@ -159,6 +171,7 @@ volumes:
   redis_data:
   ollama_data:
   backend_logs:
+  prometheus_data:
 
 networks:
   erp-network:

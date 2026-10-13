@@ -22,6 +22,7 @@ from app.routers import (
     integrations,
     inventory,
     llm,
+    metrics,
     payments,
     permissions,
     projects,
@@ -54,6 +55,7 @@ ROUTER_MOUNTS: tuple[tuple[object, str, list[str]], ...] = (
     (llm.router, "/api/v1/llm", ["LLM"]),
     (health.router, "/api/v1", ["Health"]),
     (health_root.router, "", ["Health"]),
+    (metrics.router, "", ["Metrics"]),
 )
 
 
@@ -101,6 +103,10 @@ def create_app(
 
     for router, prefix, tags in mounts if mounts is not None else ROUTER_MOUNTS:
         app.include_router(router, prefix=prefix, tags=tags)
+
+    # Prometheus instrumentation (erp_http_requests_total / _duration_seconds).
+    # Added after routers so request.scope["route"] is resolved for labels.
+    app.add_middleware(metrics.PrometheusMetricsMiddleware)
 
     os.makedirs("static", exist_ok=True)
     app.mount("/static", StaticFiles(directory="static"), name="static")

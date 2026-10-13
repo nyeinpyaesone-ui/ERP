@@ -21,7 +21,7 @@ thread (T-0xx) or gap (G-xx) so MEMORY and this file stay in sync.
 | Write `ENVIRONMENT=production` anywhere | D-014 — `Literal["dev","test","prod"]`; `production` raises at import |
 | Reintroduce Snyk / `SNYK_TOKEN` | D-016 — Trivy is the only container scanner |
 | Replace `backend/pytest.ini` or add asyncpg fixtures | D-003/D-011 — sync SQLAlchemy + SQLite-in-memory tests are the working design |
-| Build `/frontend` instead of `backend/frontend-react` | D-001 |
+| Build `/frontend` instead of `frontend-react` | D-001 |
 | Delete `staging`/`production` GitHub environments or skip branch/tag protection | D-017 — deploy jobs die without them |
 | Run containers on this host as a plan step | D-013/D-018 — proot/Termux aarch64; native PG18/Redis or CI is the path |
 

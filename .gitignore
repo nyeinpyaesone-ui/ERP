@@ -1,83 +1,20 @@
-# Dependencies
 node_modules/
-backend/venv/
-**/__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Build outputs
-backend/frontend-react/dist/
-backend/frontend-react/build/
-mobile/dist/
-mobile/.expo/
-
-# Environment files
+dist/
+build/
+.vite/
+coverage/
+htmlcov/
+*.tsbuildinfo
 .env
 .env.local
-.env.*.local
-backend/.env
-
-# IDE
-.idea/
+.env.development.local
+.env.test.local
+.env.production.local
 .vscode/
+.idea/
 *.swp
 *.swo
-
-# OS
+*~
 .DS_Store
 Thumbs.db
-
-# Logs
 *.log
-logs/
-backend/logs/
-
-# Database
-*.db
-*.sqlite
-backend/test.db
-
-# Docker (.dockerignore files are intentionally tracked)
-
-# Test
-.coverage
-htmlcov/
-.pytest_cache/
-.venv/
-
-# Heap dumps
-*.heapsnapshot
-
-# Opencode session dumps
-session-*.md
-.opencode/session*
-
-# Backup artifacts
-scripts/backups/
-*.tar.gz
-.env.production
-
-# Python tool caches (explicit)
-.ruff_cache/
-.mypy_cache/
-
-# Virtualenvs at any location
-venv/
-
-# Coverage extras
-coverage.xml
-
-# Packaging
-*.egg-info/
-
-# TLS material & runtime secrets
-ssl/
-*.pem
-*.key
-*.crt
-*.p12
-.env.*
-!.env.example
-!.env.production.template
-!backend/.env.example

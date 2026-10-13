@@ -16,8 +16,6 @@ replicas:
     count: 2
   - name: erp_solution-web
     count: 1
-  - name: erp_solution-worker
-    count: 1
 
 patches:
   - target:
@@ -75,10 +73,8 @@ patches:
         value: 5
 
 images:
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-api
+  - name: docker.io/powerrangeranikg/erp-solution-backend
     newTag: staging
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-web
-    newTag: staging
-  - name: ghcr.io/nyeinpyaesone-ui/erp_solution-worker
+  - name: docker.io/powerrangeranikg/erp-solution-frontend
     newTag: staging
 

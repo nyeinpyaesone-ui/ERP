@@ -50,7 +50,6 @@ k8s/
 │   ├── redis.yaml                # Redis StatefulSet
 │   ├── api-deployment.yaml       # API server
 │   ├── web-deployment.yaml       # Web frontend
-│   ├── worker-deployment.yaml    # Background workers
 │   ├── ingress.yaml              # Ingress rules
 │   └── cronjob.yaml              # Backup jobs
 │
@@ -62,7 +61,6 @@ k8s/
 ├── docker/
 │   ├── Dockerfile.api
 │   ├── Dockerfile.web
-│   ├── Dockerfile.worker
 │   └── docker-compose.yml        # Local development
 │
 ├── scripts/
@@ -123,7 +121,6 @@ kubectl get pods -n erp_solution-staging
 # Monitor rollout
 kubectl rollout status deployment/erp_solution-api -n erp_solution
 kubectl rollout status deployment/erp_solution-web -n erp_solution
-kubectl rollout status deployment/erp_solution-worker -n erp_solution
 ```
 
 ## Configuration
@@ -355,7 +352,6 @@ kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
 # Or manual rollback
 kubectl rollout undo deployment/erp_solution-api -n erp_solution
 kubectl rollout undo deployment/erp_solution-web -n erp_solution
-kubectl rollout undo deployment/erp_solution-worker -n erp_solution
 ```
 
 ## Cost Optimization

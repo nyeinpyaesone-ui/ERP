@@ -18,7 +18,7 @@ Integration tests that need PostgreSQL are marked `integration`; none exist yet.
 Vitest, via the `test` script. This is the only script the package defines for
 testing — there is no `test:coverage` or `lint` script.
 ```bash
-cd backend/frontend-react
+cd frontend-react
 npm ci
 npm test
 ```

@@ -63,7 +63,7 @@ aarch64):
 | Component | How |
 |-----------|-----|
 | Backend + tests | `python3 -m venv venv && . venv/bin/activate && pip install -r backend/requirements.txt && pytest` (all 285 tests pass; psycopg2-binary and bcrypt ship aarch64 wheels) |
-| Frontend build | `cd backend/frontend-react && npm ci && npm run build` |
+| Frontend build | `cd frontend-react && npm ci && npm run build` |
 | PostgreSQL / Redis | Native binaries (`apt install postgresql redis-server` inside proot-distro, or Termux packages) — point `DATABASE_URL` / `REDIS_URL` at them |
 | API server | `uvicorn app.main:app --reload` against the native DB/Redis |
 

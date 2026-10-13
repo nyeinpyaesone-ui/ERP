@@ -94,7 +94,7 @@ actually declares — verify against `Settings` before trusting a row:
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | S3-compatible object storage | **Not read** — uploads go to local `UPLOAD_DIR`; no boto3 installed |
 
 Frontend: the browser bundle reads `VITE_API_URL` at build time
-(see `backend/frontend-react/.env.example`); unset means same-origin
+(see `frontend-react/.env.example`); unset means same-origin
 `/api/v1`, which is correct for the packaged nginx setup.
 
 ## 4. Setting secrets
