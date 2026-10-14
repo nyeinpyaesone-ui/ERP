@@ -44,12 +44,17 @@ def upgrade() -> None:
     op.create_index(
         "ix_search_indexes_entity_type", "search_indexes", ["entity_type"], unique=False
     )
-    op.create_index(
-        "ix_search_indexes_searchable_text",
-        "search_indexes",
-        ["searchable_text"],
-        unique=False,
-        postgresql_using="gin",
+    # GIN needs an operator class. Plain `text` has none, so
+    # `USING gin (searchable_text)` is rejected by PostgreSQL with
+    # "data type text has no default operator class for access method gin",
+    # which aborted `alembic upgrade head` at 004. An expression index over
+    # to_tsvector() is the form that actually matches how search_service.py
+    # queries (to_tsvector('english', ...) @@ to_tsquery(...)), and it needs no
+    # extension. 007 drops this index along with the column.
+    op.execute(
+        "CREATE INDEX ix_search_indexes_searchable_text "
+        "ON search_indexes "
+        "USING gin (to_tsvector('english', searchable_text))"
     )
 
     # Search queries analytics table

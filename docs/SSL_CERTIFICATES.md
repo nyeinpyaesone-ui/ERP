@@ -24,11 +24,11 @@ This guide covers Let's Encrypt certificate management for ERP SOLUTION producti
                              │
               ┌──────────────┼──────────────┐
               ▼              ▼              ▼
-       /etc/letsencrypt/  /opt/erp-solution/  nginx container
-       live/domain/       ssl/
-       ├─ cert.pem        ├─ cert.pem         Mounted at
-       ├─ privkey.pem     ├─ key.pem          /etc/nginx/ssl/
-       ├─ chain.pem
+       /etc/letsencrypt/  /opt/erp-solution/     nginx container
+       live/<domain>/     ssl/live/<domain>/     reads
+       │                  │                      /etc/nginx/ssl/
+       ├─ privkey.pem     ├─ privkey.pem         /live/<domain>/
+       ├─ chain.pem       └─ fullchain.pem
        └─ fullchain.pem
 ```
 
@@ -44,10 +44,16 @@ sudo ./install.sh yourdomain.com admin@yourdomain.com
 ```
 
 **What happens:**
-1. Stops any service on port 80
-2. Runs `certbot certonly --standalone -d api.yourdomain.com -d app.yourdomain.com`
-3. Copies certificates to `/opt/erp-solution/ssl/`
-4. Configures daily auto-renewal cron job
+1. Requires that `api.<domain>` and `app.<domain>` already resolve to this host
+2. Stops `erp-nginx` (which owns port 80 in this stack) for the ACME challenge,
+   then restarts it
+3. Runs `certbot certonly --standalone` writing straight into
+   `ssl/live/api.<domain>/`, which is the layout the generated nginx block reads
+4. Schedules daily renewal at 03:00 with a hook that copies the renewed files
+   into that layout and reloads nginx
+
+Re-running the installer reuses an existing certificate rather than requesting a
+second one. If issuance fails the install still completes on HTTP only.
 
 ### Manual Issuance (if needed)
 ```bash
@@ -63,9 +69,9 @@ sudo certbot certonly --standalone \
   -d api.yourdomain.com -d app.yourdomain.com
 
 # Copy to ERP directory
-sudo cp /etc/letsencrypt/live/api.yourdomain.com/fullchain.pem /opt/erp-solution/ssl/cert.pem
-sudo cp /etc/letsencrypt/live/api.yourdomain.com/privkey.pem /opt/erp-solution/ssl/key.pem
-sudo chown $USER:$USER /opt/erp-solution/ssl/*.pem
+sudo cp /etc/letsencrypt/live/api.yourdomain.com/fullchain.pem /opt/erp-solution/ssl/live/api.yourdomain.com/fullchain.pem
+sudo cp /etc/letsencrypt/live/api.yourdomain.com/privkey.pem /opt/erp-solution/ssl/live/api.yourdomain.com/privkey.pem
+sudo chmod 600 /opt/erp-solution/ssl/live/api.yourdomain.com/*.pem
 ```
 
 ---
@@ -84,7 +90,7 @@ server {
     listen 443 ssl http2;
     server_name api.yourdomain.com;
 
-    ssl_certificate /etc/nginx/ssl/cert.pem;
+    ssl_certificate /etc/nginx/ssl/live/api.yourdomain.com/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/key.pem;
     
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -105,8 +111,8 @@ server {
 ```bash
 # /etc/cron.d/erp-certbot-renewal
 0 3 * * * root certbot renew --quiet \
-  --post-hook "cp /etc/letsencrypt/live/api.yourdomain.com/fullchain.pem /opt/erp-solution/ssl/cert.pem \
-               && cp /etc/letsencrypt/live/api.yourdomain.com/privkey.pem /opt/erp-solution/ssl/key.pem \
+  --post-hook "cp /etc/letsencrypt/live/api.yourdomain.com/fullchain.pem /opt/erp-solution/ssl/live/api.yourdomain.com/fullchain.pem \
+               && cp /etc/letsencrypt/live/api.yourdomain.com/privkey.pem /opt/erp-solution/ssl/live/api.yourdomain.com/privkey.pem \
                && docker exec erp-nginx nginx -s reload"
 ```
 
@@ -123,7 +129,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/certbot renew --quiet \
-  --post-hook "cp /etc/letsencrypt/live/api.yourdomain.com/fullchain.pem /opt/erp-solution/ssl/cert.pem && cp /etc/letsencrypt/live/api.yourdomain.com/privkey.pem /opt/erp-solution/ssl/key.pem && docker exec erp-nginx nginx -s reload"
+  --post-hook "cp /etc/letsencrypt/live/api.yourdomain.com/fullchain.pem /opt/erp-solution/ssl/live/api.yourdomain.com/fullchain.pem && cp /etc/letsencrypt/live/api.yourdomain.com/privkey.pem /opt/erp-solution/ssl/live/api.yourdomain.com/privkey.pem && docker exec erp-nginx nginx -s reload"
 StandardOutput=journal
 StandardError=journal
 EOF
@@ -152,10 +158,10 @@ sudo systemctl enable --now erp-certbot-renewal.timer
 ### Check Certificate Details
 ```bash
 # View certificate info
-openssl x509 -in /opt/erp-solution/ssl/cert.pem -text -noout | grep -E "Subject:|Issuer:|Not Before:|Not After:|DNS:"
+openssl x509 -in /opt/erp-solution/ssl/live/api.yourdomain.com/fullchain.pem -text -noout | grep -E "Subject:|Issuer:|Not Before:|Not After:|DNS:"
 
 # Check expiry
-openssl x509 -in /opt/erp-solution/ssl/cert.pem -noout -enddate
+openssl x509 -in /opt/erp-solution/ssl/live/api.yourdomain.com/fullchain.pem -noout -enddate
 
 # Test TLS connection
 openssl s_client -connect api.yourdomain.com:443 -servername api.yourdomain.com </dev/null 2>/dev/null | openssl x509 -noout -dates
@@ -174,7 +180,7 @@ sudo certbot renew --dry-run 2>&1 | grep -E "cert|renew"
 ```bash
 # Force renew even if not near expiry
 sudo certbot renew --force-renewal \
-  --post-hook "cp /etc/letsencrypt/live/api.yourdomain.com/fullchain.pem /opt/erp-solution/ssl/cert.pem && cp /etc/letsencrypt/live/api.yourdomain.com/privkey.pem /opt/erp-solution/ssl/key.pem && docker exec erp-nginx nginx -s reload"
+  --post-hook "cp /etc/letsencrypt/live/api.yourdomain.com/fullchain.pem /opt/erp-solution/ssl/live/api.yourdomain.com/fullchain.pem && cp /etc/letsencrypt/live/api.yourdomain.com/privkey.pem /opt/erp-solution/ssl/live/api.yourdomain.com/privkey.pem && docker exec erp-nginx nginx -s reload"
 ```
 
 ---
@@ -251,7 +257,7 @@ sudo certbot certonly --dns-cloudflare \
 ### Certificate Expired
 ```bash
 # Check expiry
-openssl x509 -in /opt/erp-solution/ssl/cert.pem -noout -enddate
+openssl x509 -in /opt/erp-solution/ssl/live/api.yourdomain.com/fullchain.pem -noout -enddate
 
 # Force renew
 sudo certbot renew --force-renewal
@@ -303,8 +309,8 @@ docker exec erp-nginx nginx -s reload
 ### Certificate/Key Mismatch
 ```bash
 # Verify cert and key match
-openssl x509 -noout -modulus -in /opt/erp-solution/ssl/cert.pem | openssl md5
-openssl rsa -noout -modulus -in /opt/erp-solution/ssl/key.pem | openssl md5
+openssl x509 -noout -modulus -in /opt/erp-solution/ssl/live/api.yourdomain.com/fullchain.pem | openssl md5
+openssl rsa -noout -modulus -in /opt/erp-solution/ssl/live/api.yourdomain.com/privkey.pem | openssl md5
 # Both MD5 hashes must be identical
 ```
 
@@ -325,7 +331,7 @@ openssl rsa -noout -modulus -in /opt/erp-solution/ssl/key.pem | openssl md5
 #!/bin/bash
 # /opt/erp-solution/scripts/check-ssl-expiry.sh
 
-CERT_FILE="/opt/erp-solution/ssl/cert.pem"
+CERT_FILE="/opt/erp-solution/ssl/live/api.yourdomain.com/fullchain.pem"
 WARN_DAYS=30
 CRIT_DAYS=7
 
@@ -358,8 +364,8 @@ fi
 
 | File | Path | Purpose | Permissions |
 |------|------|---------|-------------|
-| Full Chain | `/opt/erp-solution/ssl/cert.pem` | Server cert + intermediate CA | 644 |
-| Private Key | `/opt/erp-solution/ssl/key.pem` | Private key (KEEP SECRET) | 600 |
+| Full Chain | `/opt/erp-solution/ssl/live/api.yourdomain.com/fullchain.pem` | Server cert + intermediate CA | 644 |
+| Private Key | `/opt/erp-solution/ssl/live/api.yourdomain.com/privkey.pem` | Private key (KEEP SECRET) | 600 |
 | Let's Encrypt Live | `/etc/letsencrypt/live/api.yourdomain.com/` | Source of truth | root:root 700 |
 
 ---
