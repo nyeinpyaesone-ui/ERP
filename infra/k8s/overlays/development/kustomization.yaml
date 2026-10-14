@@ -4,7 +4,7 @@ kind: Kustomization
 namespace: erp_solution-dev
 
 resources:
-  - ../base
+  - ../../base
 
 namePrefix: dev-
 nameSuffix: -dev

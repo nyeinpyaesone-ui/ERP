@@ -8,53 +8,44 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.prod.yml"
-NGINX_UPSTREAM_DIR_HOST="${PROJECT_ROOT}/nginx"
+# shellcheck source=lib.sh
+. "${SCRIPT_DIR}/lib.sh"
+PROJECT_ROOT="${ERP_PROJECT_ROOT}"
+COMPOSE_FILE="${ERP_COMPOSE_FILE}"
+NGINX_UPSTREAM_DIR_HOST="${ERP_NGINX_DIR}"
 NGINX_UPSTREAM_DIR_CONTAINER="/etc/nginx/conf.d"
-SSL_DIR="/opt/erp-solution/ssl"
-ERP_DIR="/opt/erp-solution"
+SSL_DIR="${ERP_SSL_DIR}"
+# State files live beside the env file, so an install outside /opt/erp-solution
+# keeps its own blue/green bookkeeping instead of reading another tree's.
+ACTIVE_COLOR_FILE="${ERP_DIR}/.active_color"
+PREVIOUS_VERSION_FILE="${ERP_DIR}/.previous_version"
+PREVIOUS_IMAGE_FILE="${ERP_DIR}/.previous_image"
 
-ENVIRONMENT="${1:-production}"
-VERSION="${2:-latest}"
+# CLI arguments, captured before load_env runs. .env.production also defines
+# ENVIRONMENT for the backend (dev|test|prod), so exporting it would overwrite
+# the deploy target and validate_environment would reject "prod".
+DEPLOY_TARGET_ENVIRONMENT="${1:-production}"
+DEPLOY_TARGET_VERSION="${2:-latest}"
 ROLLBACK="${3:-false}"
 
-ACTIVE_COLOR_FILE="/opt/erp-solution/.active_color"
-PREVIOUS_VERSION_FILE="/opt/erp-solution/.previous_version"
-PREVIOUS_IMAGE_FILE="/opt/erp-solution/.previous_image"
+mkdir -p "${ERP_DIR}/logs"
+LOG_FILE="${ERP_DIR}/logs/deploy-$(date +%Y%m%d-%H%M%S).log"
 
-LOG_FILE="/opt/erp-solution/logs/deploy-$(date +%Y%m%d-%H%M%S).log"
-
-DOCKER_COMPOSE_CMD=""
-if docker compose version &> /dev/null; then
-    DOCKER_COMPOSE_CMD="docker compose"
-elif command -v docker-compose &> /dev/null; then
-    DOCKER_COMPOSE_CMD="docker-compose"
-else
-    DOCKER_COMPOSE_CMD="docker-compose"
-fi
+# compose detection lives in lib.sh; export the result under the historical name
+# so the $DOCKER_COMPOSE_CMD call sites below are unchanged.
+erp_detect_compose || { echo "docker compose not available" >&2; exit 1; }
+DOCKER_COMPOSE_CMD="${ERP_COMPOSE_CMD}"
 
 # Export VERSION so docker-compose can interpolate it
 export VERSION
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log() {
-    local level="$1"
-    shift
-    local msg="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${timestamp} [${level}] ${msg}" | tee -a "${LOG_FILE}"
-}
-
-info() { log "INFO" "${BLUE}$*${NC}"; }
-success() { log "SUCCESS" "${GREEN}$*${NC}"; }
-warn() { log "WARN" "${YELLOW}$*${NC}"; }
-error() { log "ERROR" "${RED}$*${NC}"; }
+# Log through lib.sh so this script and install.sh write identically formatted
+# records into the same log directory.
+log()       { erp_log "$@"; }
+info()      { erp_info "$@"; }
+success()   { erp_success "$@"; }
+warn()      { erp_warn "$@"; }
+error()     { erp_error "$@"; }
 
 cleanup() {
     local exit_code=$?
@@ -88,7 +79,20 @@ validate_environment() {
         error "docker-compose not available"
         exit 1
     fi
-    
+
+    # Every compose call below interpolates ${DB_PASSWORD}, ${SECRET_KEY} and
+    # ${VERSION} from this file. Without it compose substitutes blanks, and the
+    # backend then fails closed at boot with an opaque error.
+    if [ -z "${ERP_ENV_FILE:-}" ] || [ ! -f "${ERP_ENV_FILE}" ]; then
+        error "Environment file not resolved; refusing to deploy with blank secrets."
+        exit 1
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        error "Docker daemon is not reachable. Start it and retry."
+        exit 1
+    fi
+
     success "Environment validation passed"
 }
 
@@ -120,11 +124,11 @@ pull_images() {
     info "Pulling images for ${color} environment (version: ${VERSION})"
     
     # Pull blue images (always)
-    $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" pull backend frontend 2>&1 | tee -a "${LOG_FILE}"
+    ${ERP_COMPOSE_CMD} --env-file "${ERP_ENV_FILE}" -f "${ERP_COMPOSE_FILE}" pull backend frontend 2>&1 | tee -a "${LOG_FILE}"
     
     # Pull green images if using blue-green
     if [ "${color}" = "green" ]; then
-        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" --profile blue-green pull backend-green frontend-green 2>&1 | tee -a "${LOG_FILE}"
+        ${ERP_COMPOSE_CMD} --env-file "${ERP_ENV_FILE}" -f "${ERP_COMPOSE_FILE}" --profile blue-green pull backend-green frontend-green 2>&1 | tee -a "${LOG_FILE}"
     fi
     
     success "Images pulled successfully"
@@ -137,10 +141,10 @@ start_inactive_environment() {
     
     if [ "${color}" = "blue" ]; then
         # Blue is default profile - always running
-        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" up -d backend frontend 2>&1 | tee -a "${LOG_FILE}"
+        ${ERP_COMPOSE_CMD} --env-file "${ERP_ENV_FILE}" -f "${ERP_COMPOSE_FILE}" up -d backend frontend 2>&1 | tee -a "${LOG_FILE}"
     else
         # Green uses blue-green profile
-        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" --profile blue-green up -d backend-green frontend-green 2>&1 | tee -a "${LOG_FILE}"
+        ${ERP_COMPOSE_CMD} --env-file "${ERP_ENV_FILE}" -f "${ERP_COMPOSE_FILE}" --profile blue-green up -d backend-green frontend-green 2>&1 | tee -a "${LOG_FILE}"
     fi
     
     success "${color} environment started"
@@ -257,10 +261,10 @@ stop_old_environment() {
     
     if [ "${color}" = "blue" ]; then
         # Blue is default - just stop services
-        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" stop backend frontend 2>&1 | tee -a "${LOG_FILE}"
+        ${ERP_COMPOSE_CMD} --env-file "${ERP_ENV_FILE}" -f "${ERP_COMPOSE_FILE}" stop backend frontend 2>&1 | tee -a "${LOG_FILE}"
     else
         # Green uses blue-green profile
-        $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" --profile blue-green stop backend-green frontend-green 2>&1 | tee -a "${LOG_FILE}"
+        ${ERP_COMPOSE_CMD} --env-file "${ERP_ENV_FILE}" -f "${ERP_COMPOSE_FILE}" --profile blue-green stop backend-green frontend-green 2>&1 | tee -a "${LOG_FILE}"
     fi
     
     success "Old ${color} environment stopped"
@@ -324,20 +328,34 @@ perform_rollback() {
 }
 
 load_env() {
-    local env_file="${ERP_DIR}/.env.production"
-    if [ -f "${env_file}" ]; then
-        info "Loading environment from ${env_file}"
-        set -a
-        source "${env_file}"
-        set +a
+    if erp_detect_env_file; then
+        info "Loading environment from ${ERP_ENV_FILE}"
+        # Parsed rather than sourced: an env file is data, and a value holding
+        # a space or a $ must not be able to run code as a side effect.
+        erp_load_env "${ERP_ENV_FILE}"
+        export ERP_ENV_FILE
     else
-        warn "Environment file not found: ${env_file}"
+        error "No environment file found under ${ERP_DIR} (expected .env.production)."
+        error "Create it with ./install.sh, or copy .env.production.template and fill it in."
+        return 1
     fi
+    # The env file's ENVIRONMENT/VERSION describe the application, not this
+    # deploy. Restore the CLI arguments so validation and image selection see
+    # what the operator asked for. CI depends on the second one when rolling
+    # back to an older tag.
+    ENVIRONMENT="${DEPLOY_TARGET_ENVIRONMENT}"
+    VERSION="${DEPLOY_TARGET_VERSION}"
+    export VERSION
 }
 
 main() {
     # Create log directory FIRST before any logging
     mkdir -p "$(dirname "${LOG_FILE}")"
+
+    # Live values used throughout; load_env keeps these in sync with the CLI
+    # arguments after it imports the env file.
+    ENVIRONMENT="${DEPLOY_TARGET_ENVIRONMENT}"
+    VERSION="${DEPLOY_TARGET_VERSION}"
     
     info "=========================================="
     info "ERP SOLUTION — Blue-Green Deployment"
@@ -371,7 +389,7 @@ main() {
     if ! wait_for_health "${inactive_color}"; then
         error "Inactive environment failed health checks"
         if [ "${inactive_color}" = "green" ]; then
-            $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" --profile blue-green stop backend-green frontend-green
+            ${ERP_COMPOSE_CMD} --env-file "${ERP_ENV_FILE}" -f "${ERP_COMPOSE_FILE}" --profile blue-green stop backend-green frontend-green
         fi
         exit 1
     fi
@@ -380,7 +398,7 @@ main() {
     if ! run_smoke_tests "${inactive_color}"; then
         error "Smoke tests failed"
         if [ "${inactive_color}" = "green" ]; then
-            $DOCKER_COMPOSE_CMD -f "${COMPOSE_FILE}" --profile blue-green stop backend-green frontend-green
+            ${ERP_COMPOSE_CMD} --env-file "${ERP_ENV_FILE}" -f "${ERP_COMPOSE_FILE}" --profile blue-green stop backend-green frontend-green
         fi
         exit 1
     fi

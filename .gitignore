@@ -70,3 +70,14 @@ coverage.xml
 
 # Packaging
 *.egg-info/
+
+# TLS material & runtime secrets
+ssl/
+*.pem
+*.key
+*.crt
+*.p12
+.env.*
+!.env.example
+!.env.production.template
+!backend/.env.example
