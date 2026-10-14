@@ -136,7 +136,7 @@ docker logs erp-green-backend-1 --tail 100
 # Common causes:
 # - DATABASE_URL points to wrong host
 # - SECRET_KEY mismatch
-# - Migration pending (run: docker-compose run --rm backend alembic upgrade head)
+# - Migration pending (run: docker compose run --rm backend alembic upgrade head)
 # - Port 8000 already in use
 ```
 
@@ -219,9 +219,9 @@ tail -f /opt/erp-solution/logs/deploy-$(date +%Y%m%d)*.log
 ### Deploy Specific Services Only
 ```bash
 # The script only deploys backend + frontend (shared services stay running)
-# To update shared services, use docker-compose directly:
-docker-compose -f docker-compose.prod.yml pull postgres redis ollama
-docker-compose -f docker-compose.prod.yml up -d postgres redis ollama
+# To update shared services, use docker compose directly:
+docker compose -f docker-compose.prod.yml pull postgres redis ollama
+docker compose -f docker-compose.prod.yml up -d postgres redis ollama
 ```
 
 ### Emergency Hotfix (Skip Version Tag)

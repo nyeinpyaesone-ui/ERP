@@ -7,7 +7,7 @@
 │   ├── app/
 │   │   ├── main.py         # App entrypoint, lifespan, router registration
 │   │   ├── models.py       # SQLAlchemy models (27+ tables)
-│   │   ├── routers/        # 16 API routers (auth, crm, hr, inventory, finance, etc.)
+│   │   ├── routers/        # 20 API routers (auth, crm, hr, inventory, finance, payments, etc.)
 │   │   ├── services/       # Business logic (search, llm, permissions, activity_log)
 │   │   ├── database.py     # SQLAlchemy engine/session
 │   │   ├── config.py       # Pydantic Settings (.env)
@@ -22,10 +22,11 @@
 ├── mobile/                  # Expo SDK 50 (React Native) - unverified
 ├── docker-compose.yml       # Dev stack (postgres, redis, backend, frontend, ollama)
 ├── docker-compose.prod.yml  # Prod stack with nginx, networks, secrets
-├── deploy.sh               # Manual SSH deploy (needs blue-green replacement)
+├── deploy.sh               # Remote deploy: rsync + remote bootstrap/blue-green
+├── scripts/lib.sh          # Shared shell helpers (compose/env/ssl detection)
 ├── scripts/                # deploy-blue-green.sh, backup.sh (created during fixes)
 ├── nginx/                  # nginx.conf, upstream configs (created during fixes)
-└── .github/workflows/      # CI (Gitleaks gate, advisory lint), CodeQL, Snyk
+└── .github/workflows/      # CI (Gitleaks gate, quality gates, Trivy), CodeQL, release
 ```
 
 ## Critical Context
@@ -36,7 +37,7 @@
 
 **Database not running** — PostgreSQL/Redis only exist in docker-compose. Backend boots but fails on DB connection (expected). Run `docker compose up -d postgres redis` first.
 
-**Tests exist and pass** — `backend/app/tests/` (`unit/` plus top-level files): 285 tests, coverage 58.84%. Run with `make test` or `cd backend && . venv/bin/activate && pytest`. Note `pythonpath` and `testpaths` live in `pytest.ini`, not `pyproject.toml` — pytest.ini wins. CI enforces `--cov-fail-under=58`. No PostgreSQL needed: fixtures use SQLite in-memory or mocks.
+**Tests exist and pass** — `backend/app/tests/` (`unit/` plus top-level files): 285 tests, coverage 58.89%. Run with `make test` or `cd backend && . venv/bin/activate && pytest`. Note `pythonpath` and `testpaths` live in `pytest.ini`, not `pyproject.toml` — pytest.ini wins. The coverage floor (58) is declared once in `backend/pyproject.toml`; CI passes no `--cov-fail-under`. No PostgreSQL needed: fixtures use SQLite in-memory or mocks.
 
 **Alembic chain is intact** — 001 through 008. `005` reconciles the permissions table against the catalogue; `007`/`008` bring the migrated schema level with `app/models.py` (verified: all 39 tables, columns and primary keys match). `alembic/env.py` imports `app.models`, so `revision --autogenerate` now works. Still only exercised in offline `--sql` mode — no live PostgreSQL here.
 
@@ -88,6 +89,8 @@ cd backend && source venv/bin/activate && alembic revision --autogenerate -m "in
 | Trivy reports no findings | It scanned `sha-<40>` while `metadata-action` pushes `sha-<7>`; `security` now consumes `needs.docker-*.outputs.image_tag` |
 | Action version bump needed | Workflows pin `uses:` to a 40-char SHA + `# vX.Y.Z`; Dependabot updates those natively |
 | Container runtime won't start here | `/proc/self` reports uid 0 → `newuidmap` fails for rootlesskit/podman; use native PG18 + Redis binaries |
+| Deploy script says daemon is DOWN | Real, not a bug. `install.sh --preflight` provisions packages/Docker/compose and reports what is missing |
+| Scripts complain about blank secrets | They read `.env.production`, not `.env`. Run `./install.sh` once to generate it |
 | `npx: not found` in Makefile | npm/npx 10.9.2 should be on PATH (`~/.local/bin`); else use `node /tmp/opencode/npm10/package/bin/npm-cli.js …` |
 | pytest `ModuleNotFoundError: app` | `pythonpath` must be in `pytest.ini`; `pyproject.toml` `[tool.pytest.ini_options]` is ignored |
 | Postgres MCP queries fail | `POSTGRES_MCP_URL` unset **and** Postgres not running. `export POSTGRES_MCP_URL=...` then `docker compose up -d postgres` |
@@ -127,6 +130,11 @@ CORS_ORIGINS=https://app.domain.com
 - `~/.config/opencode/opencode.jsonc` (global) — `share: disabled`, compaction, `mcp_timeout`
 - MCP servers: `postgres` (via `scripts/mcp-postgres.sh`), `filesystem`, `playwright`, `sequential-thinking`
 - `POSTGRES_MCP_URL` must be exported for the Postgres MCP server; wrapper exits 1 if unset
+- Project skills (auto-discovered from `.opencode/skills/`): `@erp-backend` (app factory,
+  20 router mounts, test/lint battery, pitfalls), `@erp-frontend` (single-client rule,
+  env contract, build/test), `@erp-ops` (CI job graph, can_push/can_deploy secrets
+  contract, Trivy specifics, deploy checklist). Load with `@skill-id` when working
+  those areas; keep them updated when the micro-details change.
 
 ## Agent Profile
 
@@ -151,7 +159,7 @@ state there — cross-link, never duplicate.
 - `backend/app/main.py` — App wiring, all routers
 - `backend/app/models.py` — Complete schema
 - `backend/app/permissions_catalogue.py` — Permission source of truth
-- `scripts/deploy-blue-green.sh` — New deploy automation
+- `scripts/deploy-blue-green.sh` — Blue-green deploy automation (sources `scripts/lib.sh`)
 - `scripts/mcp-postgres.sh` — Postgres MCP wrapper (reads `POSTGRES_MCP_URL`)
 - `.github/workflows/ci.yml` — Current CI (Gitleaks secret gate first; backend ruff+black enforced, mypy advisory; frontend real eslint enforced). All actions SHA-pinned with `concurrency` + `timeout-minutes`.
 - `.github/workflows/release.yml` — Tag or manual dispatch → verify pushed images → publish GitHub Release from CHANGELOG.md

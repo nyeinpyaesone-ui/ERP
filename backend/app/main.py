@@ -1,3 +1,4 @@
+import os
 from collections.abc import Iterable
 from contextlib import asynccontextmanager
 
@@ -101,6 +102,7 @@ def create_app(
     for router, prefix, tags in mounts if mounts is not None else ROUTER_MOUNTS:
         app.include_router(router, prefix=prefix, tags=tags)
 
+    os.makedirs("static", exist_ok=True)
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
     @app.get("/")
