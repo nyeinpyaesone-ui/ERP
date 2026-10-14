@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 @layer base {
   :root {
@@ -44,7 +42,7 @@
 
 @layer components {
   .card {
-    @apply bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm;
+    @apply bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xs;
     background-color: var(--color-card);
     border-color: var(--color-border);
   }
@@ -70,7 +68,7 @@
   }
 
   .input-field {
-    @apply w-full px-4 py-2 border rounded-lg outline-none transition-all duration-200;
+    @apply w-full px-4 py-2 border rounded-lg outline-hidden transition-all duration-200;
     border-color: var(--color-border);
     background-color: var(--color-card);
     color: var(--color-text);

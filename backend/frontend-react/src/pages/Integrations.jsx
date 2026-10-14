@@ -35,7 +35,7 @@ export default function Integrations() {
       <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
         {[{id:'integrations',label:'Services',icon:Plug},{id:'webhooks',label:'Webhooks',icon:Webhook}].map(t => (
           <button key={t.id} onClick={()=>setActiveTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${activeTab===t.id?'bg-white text-indigo-600 shadow-sm':'text-gray-600'}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${activeTab===t.id?'bg-white text-indigo-600 shadow-xs':'text-gray-600'}`}>
             <t.icon className="w-4 h-4" />{t.label}
           </button>
         ))}

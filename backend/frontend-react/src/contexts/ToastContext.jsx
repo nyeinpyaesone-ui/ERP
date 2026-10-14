@@ -43,7 +43,7 @@ export function ToastProvider({ children }) {
               key={toast.id}
               className={`flex items-start gap-3 p-4 rounded-xl border shadow-lg animate-in slide-in-from-right-full fade-in duration-300 ${styles[toast.type]}`}
             >
-              <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <Icon className="w-5 h-5 shrink-0 mt-0.5" />
               <p className="text-sm flex-1">{toast.message}</p>
               <button onClick={() => removeToast(toast.id)} className="p-1 hover:bg-black/5 rounded">
                 <X className="w-4 h-4" />
