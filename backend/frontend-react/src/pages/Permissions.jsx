@@ -4,9 +4,8 @@ import {
   Plus, Trash2, Save, CheckCircle, AlertTriangle, Search, Filter,
   ToggleLeft, ToggleRight, Settings, UserCheck, Database, ArrowRight
 } from 'lucide-react';
-import axios from 'axios';
+import api from '../api/axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const resources = [
   'contacts', 'companies', 'deals', 'products', 'employees', 'departments',
@@ -40,9 +39,6 @@ export default function PermissionsManager() {
   const [userRoles, setUserRoles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
-
   useEffect(() => {
     fetchAllData();
   }, []);
@@ -51,11 +47,11 @@ export default function PermissionsManager() {
     setLoading(true);
     try {
       const [rolesRes, permsRes, fpRes, dpRes, myRes] = await Promise.all([
-        axios.get(`${API_URL}/api/v1/permissions/roles`, axiosConfig),
-        axios.get(`${API_URL}/api/v1/permissions/permissions`, axiosConfig),
-        axios.get(`${API_URL}/api/v1/permissions/field-permissions`, axiosConfig),
-        axios.get(`${API_URL}/api/v1/permissions/data-policies`, axiosConfig),
-        axios.get(`${API_URL}/api/v1/permissions/me`, axiosConfig),
+        api.get(`/permissions/roles`),
+        api.get(`/permissions/permissions`),
+        api.get(`/permissions/field-permissions`),
+        api.get(`/permissions/data-policies`),
+        api.get(`/permissions/me`),
       ]);
       setRoles(rolesRes.data);
       setPermissions(permsRes.data);
@@ -72,7 +68,7 @@ export default function PermissionsManager() {
   const createRole = async () => {
     if (!newRole.name || !newRole.display_name) return;
     try {
-      await axios.post(`${API_URL}/api/v1/permissions/roles`, newRole, axiosConfig);
+      await api.post(`/permissions/roles`, newRole);
       setNewRole({ name: '', display_name: '', description: '' });
       setSuccess('Role created successfully');
       fetchAllData();
@@ -84,7 +80,7 @@ export default function PermissionsManager() {
   const deleteRole = async (id) => {
     if (!confirm('Delete this role?')) return;
     try {
-      await axios.delete(`${API_URL}/api/v1/permissions/roles/${id}`, axiosConfig);
+      await api.delete(`/permissions/roles/${id}`);
       setSuccess('Role deleted');
       fetchAllData();
     } catch (err) {
@@ -94,7 +90,7 @@ export default function PermissionsManager() {
 
   const togglePolicy = async (id) => {
     try {
-      await axios.put(`${API_URL}/api/v1/permissions/data-policies/${id}/toggle`, {}, axiosConfig);
+      await api.put(`/permissions/data-policies/${id}/toggle`, {});
       fetchAllData();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to toggle policy');
@@ -104,7 +100,7 @@ export default function PermissionsManager() {
   const deletePolicy = async (id) => {
     if (!confirm('Delete this policy?')) return;
     try {
-      await axios.delete(`${API_URL}/api/v1/permissions/data-policies/${id}`, axiosConfig);
+      await api.delete(`/permissions/data-policies/${id}`);
       setSuccess('Policy deleted');
       fetchAllData();
     } catch (err) {
@@ -114,7 +110,7 @@ export default function PermissionsManager() {
 
   const assignPermissionsToRole = async (roleId, permIds) => {
     try {
-      await axios.post(`${API_URL}/api/v1/permissions/roles/${roleId}/permissions`, { permission_ids: permIds }, axiosConfig);
+      await api.post(`/permissions/roles/${roleId}/permissions`, { permission_ids: permIds });
       setSuccess('Permissions updated');
       fetchAllData();
     } catch (err) {

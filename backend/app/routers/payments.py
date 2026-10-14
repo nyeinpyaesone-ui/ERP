@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -57,7 +57,7 @@ def create_payment_intent(
             "amount": amount,
             "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
         }
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
@@ -82,7 +82,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
-    except (ValueError, stripe.error.SignatureVerificationError) as err:
+    except (ValueError, stripe.SignatureVerificationError) as err:
         raise HTTPException(status_code=400, detail="Invalid signature") from err
 
     if event["type"] == "payment_intent.succeeded":
@@ -99,7 +99,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                     invoice_id=invoice.id,
                     amount=amount,
                     payment_method="stripe",
-                    payment_date=datetime.now().date(),
+                    payment_date=datetime.now(UTC).date(),
                     stripe_payment_intent_id=intent["id"],
                     stripe_charge_id=(
                         intent["charges"]["data"][0]["id"]

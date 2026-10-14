@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Save, Key, Mail, Database, CreditCard, Shield, Bell, Globe, Trash2 } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState([]);
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
   const [newCategory, setNewCategory] = useState('general');
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => {
     fetchSettings();
@@ -17,7 +14,7 @@ export default function SettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/v1/admin/settings`, axiosConfig);
+      const res = await api.get(`/admin/settings`);
       setSettings(res.data);
     } catch (e) { console.error(e); }
   };
@@ -25,11 +22,11 @@ export default function SettingsPage() {
   const addSetting = async () => {
     if (!newKey || !newValue) return;
     try {
-      await axios.post(`${API_URL}/api/v1/admin/settings`, {
+      await api.post(`/admin/settings`, {
         key: newKey,
         value: newValue,
         category: newCategory
-      }, axiosConfig);
+      });
       setNewKey(''); setNewValue(''); setNewCategory('general');
       fetchSettings();
     } catch (e) { console.error(e); }
@@ -38,7 +35,7 @@ export default function SettingsPage() {
   const deleteSetting = async (key) => {
     if (!confirm(`Delete setting "${key}"?`)) return;
     try {
-      await axios.delete(`${API_URL}/api/v1/admin/settings/${key}`, axiosConfig);
+      await api.delete(`/admin/settings/${key}`);
       fetchSettings();
     } catch (e) { console.error(e); }
   };

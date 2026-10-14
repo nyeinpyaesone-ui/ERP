@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -254,7 +254,7 @@ def update_contact(
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(contact, key, value)
-    contact.updated_at = datetime.utcnow()
+    contact.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(contact)
     return contact
@@ -409,7 +409,7 @@ def update_deal(
     if deal.stage == "closed_won" and not deal.actual_close_date:
         deal.actual_close_date = date.today()
 
-    deal.updated_at = datetime.utcnow()
+    deal.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(deal)
     log_activity(

@@ -1,11 +1,9 @@
 import React from 'react'
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import axios from 'axios'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import api from '../api/axios'
 import { AuthProvider, useAuth } from './AuthContext'
 
-vi.mock('axios', () => ({ default: { post: vi.fn() } }))
 vi.mock('../api/axios', () => ({ default: { get: vi.fn(), post: vi.fn() } }))
 
 const user = { id: 7, full_name: 'Alex', role: 'user' }
@@ -20,10 +18,8 @@ async function renderAuth() {
 beforeEach(() => {
   vi.resetAllMocks()
   localStorage.clear()
-  vi.stubEnv('VITE_API_URL', '')
-  axios.post.mockResolvedValue({ data: { access_token: 'synthetic-token', user } })
+  api.post.mockResolvedValue({ data: { access_token: 'synthetic-token', user } })
 })
-afterEach(() => vi.unstubAllEnvs())
 
 describe('authentication requests', () => {
   it.each([
@@ -34,32 +30,30 @@ describe('authentication requests', () => {
     let loggedIn
     await act(async () => { loggedIn = await result.current.login(credentials) })
 
-    const [url, body, options] = axios.post.mock.calls[0]
-    expect(url).toBe('/api/v1/auth/login')
+    const [url, body, options] = api.post.mock.calls[0]
+    expect(url).toBe('/auth/login')
     expect(body).toBeInstanceOf(URLSearchParams)
     expect(Object.fromEntries(new URLSearchParams(body.toString()))).toEqual({
       username: 'alex+test@example.com', password: 'a&b=+ c',
     })
     expect(options.headers['Content-Type']).toBe('application/x-www-form-urlencoded')
-    expect(api.post).not.toHaveBeenCalled()
     expect(loggedIn).toEqual(user)
     expect(result.current.user).toEqual(user)
     expect(localStorage.getItem('token')).toBe('synthetic-token')
   })
 
-  it('prefers username and honors the configured API URL', async () => {
-    vi.stubEnv('VITE_API_URL', 'https://example.invalid/api/v1')
+  it('prefers username over email for form login', async () => {
     const { result } = await renderAuth()
     await act(async () => {
       await result.current.login({ username: 'preferred', email: 'fallback@example.com', password: 'password' })
     })
-    expect(axios.post.mock.calls[0][0]).toBe('https://example.invalid/api/v1/auth/login')
-    expect(axios.post.mock.calls[0][1].get('username')).toBe('preferred')
+    expect(api.post.mock.calls[0][0]).toBe('/auth/login')
+    expect(api.post.mock.calls[0][1].get('username')).toBe('preferred')
   })
 
   it('waits for JSON registration before logging in with the registered email', async () => {
     let finishRegistration
-    api.post.mockReturnValue(new Promise(resolve => { finishRegistration = resolve }))
+    api.post.mockReturnValueOnce(new Promise(resolve => { finishRegistration = resolve }))
     const { result } = await renderAuth()
     let pending
     act(() => {
@@ -68,9 +62,8 @@ describe('authentication requests', () => {
     expect(api.post).toHaveBeenCalledWith('/auth/register', {
       email: 'alex@example.com', password: 'password', full_name: 'Alex',
     })
-    expect(axios.post).not.toHaveBeenCalled()
     await act(async () => { finishRegistration({}); await pending })
-    expect(axios.post.mock.calls[0][1].get('username')).toBe('alex@example.com')
+    expect(api.post.mock.calls[1][1].get('username')).toBe('alex@example.com')
     expect(result.current.user).toEqual(user)
   })
 
@@ -81,23 +74,22 @@ describe('authentication requests', () => {
       credentials.full_name = 'Alex'
       api.post.mockRejectedValue(error)
     } else {
-      axios.post.mockRejectedValue(error)
+      api.post.mockRejectedValue(error)
     }
     const { result } = await renderAuth()
     await act(async () => { await expect(result.current.login(credentials)).rejects.toBe(error) })
     expect(result.current.user).toBeNull()
     expect(localStorage.getItem('token')).toBeNull()
-    if (phase === 'registration') expect(axios.post).not.toHaveBeenCalled()
   })
 
   it('does not retain a session when login after successful registration fails', async () => {
-    api.post.mockResolvedValue({ data: user })
-    axios.post.mockRejectedValue(new Error('login failed'))
+    api.post.mockResolvedValueOnce({ data: user })
+    api.post.mockRejectedValue(new Error('login failed'))
     const { result } = await renderAuth()
     await act(async () => {
       await expect(result.current.login({ email: 'alex@example.com', password: 'password', full_name: 'Alex' })).rejects.toThrow('login failed')
     })
-    expect(api.post).toHaveBeenCalledOnce()
+    expect(api.post).toHaveBeenCalledTimes(2)
     expect(result.current.user).toBeNull()
     expect(localStorage.getItem('token')).toBeNull()
   })
