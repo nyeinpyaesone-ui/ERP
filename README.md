@@ -128,6 +128,11 @@ cd mobile && npx expo start
 ./scripts/gh-manager.sh verify     # Full verification
 ./scripts/gh-manager.sh tag v1.1.0 # Create release
 
+# Release gates (auto-dynamic: discovers versions, suites, linters, tag prefix)
+./scripts/release-check.sh         # All 9 pre-release gates (tests included)
+./scripts/release-check.sh --quick # Skip test suites — fast CI smoke gate
+GATE_PREFIX=v ./scripts/release-check.sh   # enforce tag naming convention
+
 # Development
 make dev        # Start dev environment
 make test       # Run tests
