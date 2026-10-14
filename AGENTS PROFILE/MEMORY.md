@@ -4,7 +4,7 @@ Durable cross-session state. Companion to [`AGENTS.md`](../AGENTS.md)
 (AGENTS.md = **how the repo works**; this file = **what is true right now**).
 Append-only ledger; never store secrets (env var *names* only).
 
-**Last verified:** 2026-10-14 (session: AGENTS.md rewrite + full drift re-verification — see §3)
+**Last verified:** 2026-10-15 (session: T-009 majors to audit 0, gitleaks PR-scan fix, image hygiene — see §3)
 
 ---
 
@@ -12,16 +12,16 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | Fact | Value | Source |
 |------|-------|--------|
-| Git HEAD | `45535ed0` (project skills); **in sync with `origin/main`** | `git status -sb`, `git rev-parse` |
-| Worktree | **Dirty (3)** — pre-existing uncommitted vitest bump in `frontend-react/{package.json,package-lock.json}` (see T-020) + `AGENTS.md` rewritten this session | `git status --porcelain` |
-| Tracked files | **277** (+3 from the skills commit); README/STATUS no longer hardcode current-HEAD counts (T-018 closed permanently) | `git ls-files \| wc -l` |
-| Commits | **116** | `git rev-list --count HEAD` |
+| Git HEAD | `7d23e367` (image hygiene) with `f63edc7b` (gitleaks fix) + `ced1f9dc` (T-009 majors) beneath it; **in sync with `origin/main`** (this ledger entry rides the follow-up docs commit) | `git status -sb`, `git rev-parse` |
+| Worktree | **Clean (0)** — T-020 drift resolved: the dependency upgrade was committed, verified, and CI-proven | `git status --porcelain` |
+| Tracked files | **276** (−1: dead `tailwind.config.js` removed in the v4 migration) | `git ls-files \| wc -l` |
+| Commits | **121** (116 → 121 this session) | `git rev-list --count HEAD` |
 | Node | **v24.21.0** at `/usr/bin/node` (was v22.22.1 — the environment moved; the old AGENTS.md hardcoded the stale version, now removed) | `node --version` |
 | npm / npx | **10.9.2 on PATH** at `/home/admin/.local/bin` | `which npm npx` |
 | npm fallback | `/tmp/opencode/npm10/…` volatile — re-bootstrap if gone. Makefile is now **portable** (PATH-first, `/tmp` fallback only), fixed in `be57ca36` — the earlier "hardcodes this path" claim is stale | `ls`, `Makefile:18` |
 | Python | 3.14.4 (venv) — runs 285 tests; Docker image is 3.11-slim | `python --version` |
 | Alembic chain | **001 → 008** (offline SQL emits; GIN index fixed in `bb7295f2` so live PG works) | `alembic upgrade head --sql` |
-| Frontend (canonical) | `backend/frontend-react` — **105 vitest tests**, eslint 0 errors/127 warnings, vite build green | `npm test`/`lint`/`build` |
+| Frontend (canonical) | `backend/frontend-react` — **105 vitest tests** (vitest 5.0.4), eslint 0 errors/127 warnings, vite build green, **npm audit 0 vulnerabilities** (tailwind 4.3.3 / react-router-dom 7.18.4) | `npm test`/`lint`/`build`/`audit` |
 | CI workflows | `ci.yml`, `codeql.yml`, `opencode.yml`, `release.yml` (**snyk-container.yml removed** `ad13f2bb`) | `ls .github/workflows` |
 | GitHub auth | **gh authenticated** as `nyeinpyaesone-ui` (was unauthenticated) | `gh auth status` |
 | GitHub secrets | **2 configured** — `DOCKER_PAT_BACKEND` + `DOCKER_PAT_FRONTEND` (set 2026-10-11T09:18Z); `SSH_PRIVATE_KEY` + `STAGING_*`/`PRODUCTION_*` known_hosts **still missing** (T-004) | `gh secret list` |
@@ -55,6 +55,44 @@ Append-only ledger; never store secrets (env var *names* only).
 
 ## 3. Progress log
 
+- **Done (2026-10-15 T-009 complete → npm audit 0):** the whole triage landed
+  in three verified steps — **vitest 1.6.1→5.0.4** (3 criticals: vitest,
+  tinypool, @vitest/mocker; 105/105 green at each of 3.2.7 then 5.0.4),
+  **react-router-dom 6.21→7.18.4** (2 moderate open-redirects; v6 APIs
+  unchanged), **tailwindcss 3.4.19→4.3.3** (7 vulns in the
+  braces/micromatch/chokidar/postcss-selector-parser chain) via the
+  `@tailwindcss/vite` plugin — v4 migration done properly: `@import
+  "tailwindcss"` replaces the directives, parity renames applied
+  (`flex-shrink-0`→`shrink-0` ×7, `shadow-sm`→`shadow-xs` ×7,
+  `outline-none`→`outline-hidden` ×3), dead `primary` palette config and
+  unused `tailwind-merge` dep pruned. **Verified:** 105/105, build green
+  (6 precache entries), eslint 0/127, `npm audit` **0** (from 12 mid-session),
+  GitHub Dependabot alerts API **0** (server-side), `make test` + `make lint`
+  end-to-end green, `npm ci --dry-run` lockfile-consistent. Committed
+  `ced1f9dc`; **CI run 38600994090 = success** (T-020's parity requirement —
+  npm ci from the new lockfile passed CI). Options not taken: react 19 /
+  vite 7+ majors (no advisory; left to Dependabot PRs).
+- **Done (2026-10-15 gitleaks PR-scan fix):** Dependabot PR #136's red
+  Secret Scan root-caused to gitleaks-action **v3.0.0 breaking change** —
+  "GITHUB_TOKEN is now required to scan pull requests" (push scans on main
+  never hit it, which is why main stayed green). Fix `f63edc7b`: explicit
+  `env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}` on the step + workflow
+  `pull-requests: read`. Re-running the OLD run did NOT pick it up (reruns
+  reuse the original workflow snapshot — same error), but a **fresh PR event
+  verified it**: the Dependabot docker PR run (node-26-alpine, 38602759242)
+  shows Secret Scan **success** on `pull_request`. CI run 38601648055 (push)
+  = success. PR #136 left to Dependabot's recreate/schedule to go green.
+- **Done (2026-10-15 image hygiene):** `7d23e367` — frontend image
+  `node:20-alpine` (EOL April 2026) → **`node:24-alpine`** (matches local/CI
+  node v24.21.0), backend image now `pip install --upgrade pip setuptools
+  wheel` (bundled pip 24.0/setuptools 79/wheel carried the "…/python3.11/
+  site-packages" code-scanning findings). **CI run 38602493260 + CodeQL =
+  success** (both images rebuilt on the new bases, Trivy re-scanned).
+- **Done (2026-10-14/15 AGENTS.md rewrite + sessions):** AGENTS.md rewritten
+  against the current tree (e6877fb1) with the 2026-10-14 re-verified
+  baselines; vitest 3.2.7 bump committed as 899cf16d (superseded next day
+  by the full T-009 work). Session survived ~6 server restarts — see
+  anomalyco/opencode#54567; repo-guard ran clean (277 → 276 files).
 - **Done (repo history):** permissions catalogue + RBAC tests + migrations 005–006 +
   CI/deploy hardening (`c4f512ed`); pycache/dockerignore consolidation (`328ad9d7`);
   blue-green deploy + backup scripts + nginx configs created (per AGENTS.md).
@@ -277,8 +315,8 @@ Append-only ledger; never store secrets (env var *names* only).
 | T-004 | **partially resolved 2026-10-11 (09:18Z):** `DOCKER_PAT_BACKEND` + `DOCKER_PAT_FRONTEND` now set → image push + Trivy activate on the **next main push** (verify on that run's jobs). Still missing: `SSH_PRIVATE_KEY`, `STAGING_KNOWN_HOSTS`, `PRODUCTION_KNOWN_HOSTS` → deploy jobs still fail closed | `gh secret set` per docs/GITHUB_SECRETS.md §1 (values only the user has); then re-check `can_push` + deploy jobs on the next CI run |
 | T-005 | Production server not provisioned (`.env.production`, services) | docs/END_USER_INSTALL.md |
 | T-007 | ~~Commits not pushed~~ **resolved 2026-10-11** — 10 commits pushed (`bb7295f2`…`59156a96`), CI green | none (closed) |
-| T-008 | GitHub Dependabot banner (refreshed 2026-10-12): **10 vulnerabilities — 3 critical, 1 high, 6 moderate** (was 96/10/50; the drop is real). Plus 5 Trivy code-scanning alerts from the first successful SARIF upload | T-009 epic; decide whether to gate CI on Trivy `exit-code` |
-| T-009 | Frontend moderate prod vulns remain — need breaking majors (react 19 / router 7 / tailwind 4, vite 7/8 in PRs) | batch upgrade epic after B1 |
+| T-008 | **npm half RESOLVED 2026-10-15:** local `npm audit` = 0 and GitHub Dependabot alerts API = **0 open** after T-009 landed. **Trivy half still open:** ~100 code-scanning alerts of container/base-image class (backend image OS packages ~88, frontend image 6, python site-packages 6 — paths shift as images rebuild); hygiene started (`7d23e367`: node 20→24, pip/setuptools/wheel refresh) but expect the count to drop only across the next few SARIF uploads | Re-measure code-scanning count next session; **user policy call pending:** gate CI on Trivy `exit-code` (findings are advisory today) |
+| T-009 | ~~breaking majors~~ **resolved 2026-10-15** — audit 12→**0** via vitest 5.0.4 (criticals), react-router-dom 7.18.4 (moderates), tailwindcss 4.3.3 (chain of 7); all three majors verified (105/105, build, lint, CI 38600994090). Stale vite/esbuild alerts never needed action (installed already past fix) | Closed. Optional non-security majors (react 19, vite 7+, node:26-alpine Dependabot PRs) remain available via Dependabot — user's call |
 | T-010 | `backend/.env` created (random SECRET_KEY, gitignored) — local dev only; Docker/CI use their own env | none (informational) |
 | T-014 | **"Compact the whole repo, make it easy to reuse for client UI/UX"** — requested late in a prior session, no scope agreed | Needs an agreed target: which of the 12 modules to keep, and whether "reusable" means a theming layer, a template scaffold, or stripping the dead Legacy v1.8/v2.1 trees |
 | T-015 | ~~Doc-drift batch~~ **resolved 2026-10-11** — README counts + infra row (ES/S3 → Ollama/Docker/GHA), STATUS_CHECKLIST 259/64→272/103, 56 `docker-compose ` v1 CLI refs → v2 across 10 docs, AGENTS.md 16→20 routers, profile 001–006→001–008 / strict-TS→eslint / 80%→58% claims, GITHUB_SECRETS §3 rewritten to actual `Settings` wiring (SMTP reserved-unwired, SENTRY/OPENAI/AWS not read) | Re-open if new drift appears; keep AGENTS.md + profiles in the same sweep |
@@ -286,7 +324,7 @@ Append-only ledger; never store secrets (env var *names* only).
 | T-017 | ~~junk PR #135 open~~ **resolved 2026-10-11** — closed on user approval, head `secure-github-env-setup-92546` + base `ci-cd-pipeline-basics-cf366` deleted. Same class as #85 (qwen-chat task bot, +25.7k/−18.3k, re-added deleted `frontend/`) | Re-open if another task-bot PR appears; treat >20k-line CONFLICTING diffs as junk by default |
 | T-018 | ~~README/STATUS doc counts stale~~ **resolved 2026-10-11, made permanent 2026-10-12** — counts bumped to 273/107/58.89%, then drifting current-HEAD counts removed from README/STATUS entirely (kept only the immutable v1.0.0 tag facts + a `git ls-files` pointer) | Nothing — recurrence structurally prevented |
 | T-019 | **qwen-chat task bot may be operating on this host** — same actor opened junk PR #135 (~14:52Z) and likely left an empty `git init` in `scripts/` that wiped 14 tracked scripts (~23:26). Files restored; **guard added 2026-10-12**: `make guard` → `scripts/repo-guard.sh` fails on nested `.git`, missing tracked files, or empty `scripts/*.sh` | Identify what automation/token that task uses (PR body says "task 0c24ebdf-…"); consider disabling it. Run `make guard` after any long background job or before commits |
-| T-020 | **Uncommitted frontend dependency drift:** `backend/frontend-react/package.json` + `package-lock.json` bump `vitest` `^1.0.0` → `^3.2.7` (local `node_modules` is on 3.2.7, suites green — 105/105). **Not user-approved work; pre-dates the 2026-10-14 session.** Danger: `npm ci` (CI + `frontend-react/Dockerfile`) still resolves the committed 1.x lockfile, so CI and local test *different* vitest majors | Decide with the user: commit the bump (needs a CI run to prove 1.x→3.x parity) or `git checkout` both files to restore the pinned 1.x state. Do not commit half the pair. AGENTS.md deliberately records the count, not the version |
+| T-020 | ~~Uncommitted frontend dependency drift~~ **resolved 2026-10-15** — superseded by the full user-directed T-009 upgrade (`ced1f9dc`): package.json + lockfile committed with vitest 5.0.4 / react-router-dom 7.18.4 / tailwindcss 4.3.3. Parity requirement satisfied three ways: CI `npm ci` passed (run 38600994090 Frontend Build ✅), local `npm ci --dry-run` resolves clean, suites green | none (closed) |
 
 ## 5. Verification ledger
 
@@ -336,7 +374,17 @@ Append-only ledger; never store secrets (env var *names* only).
 | `npm run dev` port / proxy wiring | ✅ `vite.config.js` `server.port: 3000`, proxy `/api`→`localhost:8000` with `ws: true` | 2026-10-14 |
 | `gh pr list` / `gh auth status` | ✅ 29 open (27 Dependabot + 2 repo-owner); authenticated `nyeinpyaesone-ui` | 2026-10-14 |
 | `docker info` | ⬜ daemon unusable on this host (proot/Termux class, D-013) — re-confirmed | 2026-10-14 |
-| `make test` / `make lint` end-to-end | ⬜ not run as a whole; every underlying command verified individually above | 2026-10-14 |
+| `make test` / `make lint` end-to-end | ✅ both exit 0 — backend pytest + vitest 105/105; ruff+black + mypy(advisory) + eslint 0/127 | 2026-10-15 |
+| `npm audit` (frontend, post T-009) | ✅ **0 vulnerabilities** (was 12 mid-session: 2 critical/5 high/5 moderate) | 2026-10-15 |
+| GitHub Dependabot alerts API | ✅ **0 open** (server-side; npm half of T-008 cleared after push) | 2026-10-15 |
+| vitest 5.0.4 + react-router-dom 7.18.4 + tailwindcss 4.3.3 | ✅ suite 105/105, build green (6 entries), eslint 0/127 after every major | 2026-10-15 |
+| `npm ci --dry-run` lockfile consistency | ✅ resolves clean — T-020's drift danger disproven locally | 2026-10-15 |
+| built CSS contains custom classes post-v4 | ✅ `.card`/`.btn-primary`/`.input-field`/`shadow-xs`/`shrink-0`/`outline-hidden` + `--color-primary` all present in `dist/assets/*.css` | 2026-10-15 |
+| **CI run 38600994090 (main, `ced1f9dc`)** | ✅ **success** — T-009 majors: gitleaks, quality, tests, frontend (npm ci from new lockfile), both images, Trivy | 2026-10-15 |
+| **CI run 38601648055 (main, `f63edc7b`)** | ✅ **success** — gitleaks GITHUB_TOKEN fix | 2026-10-15 |
+| **CI run 38602493260 + CodeQL (main, `7d23e367`)** | ✅ both **success** — node:24-alpine + pip/setuptools/wheel image hygiene, full pipeline green | 2026-10-15 |
+| gitleaks PR-context proof (fresh `pull_request` run 38602759242, Dependabot docker PR) | ✅ Secret Scan **success** — rerunning PR #136's old run failed (reruns reuse the original workflow snapshot); the fresh PR event is the real proof | 2026-10-15 |
+| code-scanning (Trivy) open alerts | ⚠️ ~100 of container/base-image class — hygiene started (`7d23e367`), re-measure after next SARIF uploads; exit-code gating = pending policy call (T-008) | 2026-10-15 |
 
 > Rule: mark ⬜/⏳ honestly. Never upgrade a claim to ✅ without tool output.
 
