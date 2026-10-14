@@ -70,7 +70,7 @@ module = [
     "pydantic.*",
     "fastapi.*",
     "starlette.*",
-    "jose.*",
+    "jwt.*",
     "passlib.*",
     "redis.*",
 ]

@@ -1,3 +1,4 @@
+from datetime import UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -295,7 +296,7 @@ def get_popular_queries(
 
     from sqlalchemy import func
 
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = datetime.now(UTC) - timedelta(days=days)
 
     queries = (
         db.query(
