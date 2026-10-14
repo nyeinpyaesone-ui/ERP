@@ -1,15 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Package, AlertTriangle, Plus, ArrowDown, ArrowUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Package, AlertTriangle, ArrowDown, ArrowUp } from 'lucide-react';
 import api from '../api/axios';
 
-export default function Inventory() {
-  const [products, setProducts] = useState([]);
+export default function Inventory() { const [products, setProducts] = useState([]);
   const [lowStock, setLowStock] = useState([]);
 
-  useEffect(() => {
-    api.get(`/inventory/products`).then(r => setProducts(r.data));
-    api.get(`/inventory/products?low_stock=true`).then(r => setLowStock(r.data));
-  }, []);
+  useEffect(() => { api.get(`/inventory/products`).then(r => setProducts(r.data));
+    api.get(`/inventory/products?low_stock=true`).then(r => setLowStock(r.data)); }, []);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -45,6 +42,5 @@ export default function Inventory() {
         </table>
       </div>
     </div>
-  );
-}
+  ); }
 

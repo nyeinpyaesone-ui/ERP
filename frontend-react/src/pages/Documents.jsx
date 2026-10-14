@@ -1,53 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { FileText, Upload, Trash2, Download, Search, File, Image, FileSpreadsheet } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { FileText, Upload, Trash2, Download, File, Image, FileSpreadsheet } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import api from '../api/axios';
 
-export default function Documents() {
-  const [documents, setDocuments] = useState([]);
+export default function Documents() { const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const onDrop = useCallback(async (acceptedFiles) => {
-    for (const file of acceptedFiles) {
-      const formData = new FormData();
+  const onDrop = useCallback(async (acceptedFiles) => { for (const file of acceptedFiles) { const formData = new FormData();
       formData.append('file', file);
       formData.append('title', file.name);
-      try {
-        await api.post(`/documents/upload`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      } catch (e) { console.error(e); }
-    }
-    fetchDocuments();
-  }, []);
+      try { await api.post(`/documents/upload`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }); } catch (e) { console.error(e); } }
+    fetchDocuments(); }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { 'application/*': [], 'image/*': [], 'text/*': [] }
-  });
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop,
+    accept: { 'application/*': [], 'image/*': [], 'text/*': [] } });
 
-  const fetchDocuments = async () => {
-    try {
-      const res = await api.get(`/documents/documents`);
-      setDocuments(res.data);
-    } catch (e) { console.error(e); }
-  };
+  const fetchDocuments = async () => { try { const res = await api.get(`/documents/documents`);
+      setDocuments(res.data); } catch (e) { console.error(e); } };
 
   useEffect(() => { fetchDocuments(); }, []);
 
-  const deleteDoc = async (id) => {
-    if (!confirm('Delete this document?')) return;
-    try {
-      await api.delete(`/documents/documents/${id}`);
-      fetchDocuments();
-    } catch (e) { console.error(e); }
-  };
+  const deleteDoc = async (id) => { if (!confirm('Delete this document?')) return;
+    try { await api.delete(`/documents/documents/${id}`);
+      fetchDocuments(); } catch (e) { console.error(e); } };
 
-  const getFileIcon = (mimeType) => {
-    if (mimeType?.includes('image')) return <Image className="w-5 h-5 text-purple-600" />;
+  const getFileIcon = (mimeType) => { if (mimeType?.includes('image')) return <Image className="w-5 h-5 text-purple-600" />;
     if (mimeType?.includes('spreadsheet') || mimeType?.includes('excel')) return <FileSpreadsheet className="w-5 h-5 text-green-600" />;
-    return <FileText className="w-5 h-5 text-indigo-600" />;
-  };
+    return <FileText className="w-5 h-5 text-indigo-600" />; };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -80,6 +59,5 @@ export default function Documents() {
         ))}
       </div>
     </div>
-  );
-}
+  ); }
 

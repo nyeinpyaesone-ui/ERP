@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Cpu, BarChart3, FileText, Plus, Trash2, ToggleLeft, ToggleRight,
+import { Cpu, BarChart3, FileText, Plus, Trash2, ToggleLeft, ToggleRight,
   Download, CheckCircle, AlertTriangle, Clock, Zap, TrendingUp,
-  Database, ArrowLeft, RefreshCw, Settings, MessageSquare, Layers
-} from 'lucide-react';
+  Database, ArrowLeft, RefreshCw, Settings, MessageSquare, Layers } from 'lucide-react';
 import api from '../api/axios';
 
-export default function LLMManager() {
-  const [activeTab, setActiveTab] = useState('models');
+export default function LLMManager() { const [activeTab, setActiveTab] = useState('models');
   const [models, setModels] = useState([]);
   const [availableModels, setAvailableModels] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -20,14 +17,10 @@ export default function LLMManager() {
   const [pulling, setPulling] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchAllData();
-  }, []);
+  useEffect(() => { fetchAllData(); }, []);
 
-  const fetchAllData = async () => {
-    setLoading(true);
-    try {
-      const [modelsRes, templatesRes, usageRes, convRes] = await Promise.all([
+  const fetchAllData = async () => { setLoading(true);
+    try { const [modelsRes, templatesRes, usageRes, convRes] = await Promise.all([
         api.get(`/llm/models`),
         api.get(`/llm/templates`),
         api.get(`/llm/analytics/usage?days=30`),
@@ -37,60 +30,24 @@ export default function LLMManager() {
       setAvailableModels(modelsRes.data.available_from_provider || []);
       setTemplates(templatesRes.data);
       setUsage(usageRes.data);
-      setConversations(convRes.data);
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load LLM data');
-    } finally {
-      setLoading(false);
-    }
-  };
+      setConversations(convRes.data); } catch (err) { setError(err.response?.data?.detail || 'Failed to load LLM data'); } finally { setLoading(false); } };
 
-  const pullModel = async (modelId) => {
-    setPulling(true);
-    try {
-      await api.post(`/llm/models/${modelId}/pull`, {});
+  const pullModel = async (modelId) => { setPulling(true);
+    try { await api.post(`/llm/models/${modelId}/pull`, {});
       setSuccess(`Model ${modelId} pulled successfully`);
-      fetchAllData();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to pull model');
-    } finally {
-      setPulling(false);
-    }
-  };
+      fetchAllData(); } catch (err) { setError(err.response?.data?.detail || 'Failed to pull model'); } finally { setPulling(false); } };
 
-  const toggleModel = async (modelId) => {
-    try {
-      const model = models.find(m => m.model_id === modelId);
-      await api.put(`/llm/models/${modelId}`, {
-        is_active: !model.is_active
-      });
-      fetchAllData();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to toggle model');
-    }
-  };
+  const toggleModel = async (modelId) => { try { const model = models.find(m => m.model_id === modelId);
+      await api.put(`/llm/models/${modelId}`, { is_active: !model.is_active });
+      fetchAllData(); } catch (err) { setError(err.response?.data?.detail || 'Failed to toggle model'); } };
 
-  const setDefault = async (modelId) => {
-    try {
-      await api.put(`/llm/models/${modelId}`, {
-        is_default: true
-      });
-      fetchAllData();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to set default');
-    }
-  };
+  const setDefault = async (modelId) => { try { await api.put(`/llm/models/${modelId}`, { is_default: true });
+      fetchAllData(); } catch (err) { setError(err.response?.data?.detail || 'Failed to set default'); } };
 
-  const deleteTemplate = async (id) => {
-    if (!confirm('Delete this template?')) return;
-    try {
-      await api.delete(`/llm/templates/${id}`);
+  const deleteTemplate = async (id) => { if (!confirm('Delete this template?')) return;
+    try { await api.delete(`/llm/templates/${id}`);
       setSuccess('Template deleted');
-      fetchAllData();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to delete template');
-    }
-  };
+      fetchAllData(); } catch (err) { setError(err.response?.data?.detail || 'Failed to delete template'); } };
 
   if (loading) return <div className="p-6 text-center">Loading LLM Manager...</div>;
 
@@ -168,9 +125,7 @@ export default function LLMManager() {
           <button
             key={tab.id}
             onClick={() => { setActiveTab(tab.id); setError(null); setSuccess(null); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${
-              activeTab === tab.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${ activeTab === tab.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900' }`}
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
@@ -368,6 +323,5 @@ export default function LLMManager() {
         </div>
       )}
     </div>
-  );
-}
+  ); }
 

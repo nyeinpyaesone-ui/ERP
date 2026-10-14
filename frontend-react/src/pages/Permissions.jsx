@@ -1,11 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Shield, Users, Key, Lock, Eye, EyeOff, FileText, ChevronDown, ChevronUp,
+import { useState, useEffect } from 'react';
+import { Shield, Users, Key, Lock, Eye, EyeOff, FileText, ChevronDown, ChevronUp,
   Plus, Trash2, Save, CheckCircle, AlertTriangle, Search, Filter,
-  ToggleLeft, ToggleRight, Settings, UserCheck, Database, ArrowRight
-} from 'lucide-react';
+  ToggleLeft, ToggleRight, Settings, UserCheck, Database, ArrowRight } from 'lucide-react';
 import api from '../api/axios';
-
 
 const resources = [
   'contacts', 'companies', 'deals', 'products', 'employees', 'departments',
@@ -19,8 +16,7 @@ const accessLevels = [
   { value: 'hidden', label: 'Hidden', color: 'text-red-600', bg: 'bg-red-50' },
 ];
 
-export default function PermissionsManager() {
-  const [activeTab, setActiveTab] = useState('roles');
+export default function PermissionsManager() { const [activeTab, setActiveTab] = useState('roles');
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [fieldPermissions, setFieldPermissions] = useState([]);
@@ -39,14 +35,10 @@ export default function PermissionsManager() {
   const [userRoles, setUserRoles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchAllData();
-  }, []);
+  useEffect(() => { fetchAllData(); }, []);
 
-  const fetchAllData = async () => {
-    setLoading(true);
-    try {
-      const [rolesRes, permsRes, fpRes, dpRes, myRes] = await Promise.all([
+  const fetchAllData = async () => { setLoading(true);
+    try { const [rolesRes, permsRes, fpRes, dpRes, myRes] = await Promise.all([
         api.get(`/permissions/roles`),
         api.get(`/permissions/permissions`),
         api.get(`/permissions/field-permissions`),
@@ -57,66 +49,30 @@ export default function PermissionsManager() {
       setPermissions(permsRes.data);
       setFieldPermissions(fpRes.data);
       setDataPolicies(dpRes.data);
-      setMyPerms(myRes.data);
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load permissions data');
-    } finally {
-      setLoading(false);
-    }
-  };
+      setMyPerms(myRes.data); } catch (err) { setError(err.response?.data?.detail || 'Failed to load permissions data'); } finally { setLoading(false); } };
 
-  const createRole = async () => {
-    if (!newRole.name || !newRole.display_name) return;
-    try {
-      await api.post(`/permissions/roles`, newRole);
+  const createRole = async () => { if (!newRole.name || !newRole.display_name) return;
+    try { await api.post(`/permissions/roles`, newRole);
       setNewRole({ name: '', display_name: '', description: '' });
       setSuccess('Role created successfully');
-      fetchAllData();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create role');
-    }
-  };
+      fetchAllData(); } catch (err) { setError(err.response?.data?.detail || 'Failed to create role'); } };
 
-  const deleteRole = async (id) => {
-    if (!confirm('Delete this role?')) return;
-    try {
-      await api.delete(`/permissions/roles/${id}`);
+  const deleteRole = async (id) => { if (!confirm('Delete this role?')) return;
+    try { await api.delete(`/permissions/roles/${id}`);
       setSuccess('Role deleted');
-      fetchAllData();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to delete role');
-    }
-  };
+      fetchAllData(); } catch (err) { setError(err.response?.data?.detail || 'Failed to delete role'); } };
 
-  const togglePolicy = async (id) => {
-    try {
-      await api.put(`/permissions/data-policies/${id}/toggle`, {});
-      fetchAllData();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to toggle policy');
-    }
-  };
+  const togglePolicy = async (id) => { try { await api.put(`/permissions/data-policies/${id}/toggle`, {});
+      fetchAllData(); } catch (err) { setError(err.response?.data?.detail || 'Failed to toggle policy'); } };
 
-  const deletePolicy = async (id) => {
-    if (!confirm('Delete this policy?')) return;
-    try {
-      await api.delete(`/permissions/data-policies/${id}`);
+  const deletePolicy = async (id) => { if (!confirm('Delete this policy?')) return;
+    try { await api.delete(`/permissions/data-policies/${id}`);
       setSuccess('Policy deleted');
-      fetchAllData();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to delete policy');
-    }
-  };
+      fetchAllData(); } catch (err) { setError(err.response?.data?.detail || 'Failed to delete policy'); } };
 
-  const assignPermissionsToRole = async (roleId, permIds) => {
-    try {
-      await api.post(`/permissions/roles/${roleId}/permissions`, { permission_ids: permIds });
+  const assignPermissionsToRole = async (roleId, permIds) => { try { await api.post(`/permissions/roles/${roleId}/permissions`, { permission_ids: permIds });
       setSuccess('Permissions updated');
-      fetchAllData();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to assign permissions');
-    }
-  };
+      fetchAllData(); } catch (err) { setError(err.response?.data?.detail || 'Failed to assign permissions'); } };
 
   if (loading) return <div className="p-6 text-center">Loading permissions...</div>;
   if (error) return <div className="p-6 text-center text-red-600">{error}</div>;
@@ -181,9 +137,7 @@ export default function PermissionsManager() {
           <button
             key={tab.id}
             onClick={() => { setActiveTab(tab.id); setError(null); setSuccess(null); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${
-              activeTab === tab.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${ activeTab === tab.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900' }`}
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
@@ -287,8 +241,7 @@ export default function PermissionsManager() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {permissions.map(p => {
-                  const rolesWithPerm = roles.filter(r => r.permissions?.some(rp => rp.id === p.id));
+                {permissions.map(p => { const rolesWithPerm = roles.filter(r => r.permissions?.some(rp => rp.id === p.id));
                   return (
                     <tr key={p.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 capitalize text-gray-900">{p.resource}</td>
@@ -302,8 +255,7 @@ export default function PermissionsManager() {
                         </div>
                       </td>
                     </tr>
-                  );
-                })}
+                  ); })}
               </tbody>
             </table>
           </div>
@@ -332,8 +284,7 @@ export default function PermissionsManager() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {fieldPermissions.map(fp => {
-                    const level = accessLevels.find(l => l.value === fp.access_level) || accessLevels[0];
+                  {fieldPermissions.map(fp => { const level = accessLevels.find(l => l.value === fp.access_level) || accessLevels[0];
                     return (
                       <tr key={fp.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 font-medium">{roles.find(r => r.id === fp.role_id)?.display_name || fp.role_id}</td>
@@ -345,8 +296,7 @@ export default function PermissionsManager() {
                           </span>
                         </td>
                       </tr>
-                    );
-                  })}
+                    ); })}
                 </tbody>
               </table>
             </div>
@@ -414,6 +364,5 @@ export default function PermissionsManager() {
         </div>
       )}
     </div>
-  );
-}
+  ); }
 

@@ -1,21 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Receipt, DollarSign, Plus, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { DollarSign, Plus, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import api from '../api/axios';
 
-export default function Finance() {
-  const [invoices, setInvoices] = useState([]);
+export default function Finance() { const [invoices, setInvoices] = useState([]);
 
-  useEffect(() => {
-    api.get(`/finance/invoices`).then(r => setInvoices(r.data));
-  }, []);
+  useEffect(() => { api.get(`/finance/invoices`).then(r => setInvoices(r.data)); }, []);
 
-  const statusColors = {
-    draft: 'bg-gray-100 text-gray-800',
+  const statusColors = { draft: 'bg-gray-100 text-gray-800',
     sent: 'bg-blue-100 text-blue-800',
     paid: 'bg-green-100 text-green-800',
     overdue: 'bg-red-100 text-red-800',
-    cancelled: 'bg-gray-100 text-gray-500',
-  };
+    cancelled: 'bg-gray-100 text-gray-500', };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -48,6 +43,5 @@ export default function Finance() {
         </table>
       </div>
     </div>
-  );
-}
+  ); }
 

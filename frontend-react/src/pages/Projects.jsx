@@ -1,21 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { FolderKanban, CheckCircle, Clock, AlertCircle, Plus, Calendar, BarChart3 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { CheckCircle, Clock, AlertCircle, Plus, Calendar, BarChart3 } from 'lucide-react';
 import api from '../api/axios';
 
-export default function Projects() {
-  const [projects, setProjects] = useState([]);
+export default function Projects() { const [projects, setProjects] = useState([]);
 
-  useEffect(() => {
-    api.get(`/projects/projects`).then(r => setProjects(r.data));
-  }, []);
+  useEffect(() => { api.get(`/projects/projects`).then(r => setProjects(r.data)); }, []);
 
-  const statusColors = {
-    planning: 'bg-gray-100 text-gray-800',
+  const statusColors = { planning: 'bg-gray-100 text-gray-800',
     active: 'bg-blue-100 text-blue-800',
     on_hold: 'bg-amber-100 text-amber-800',
     completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
-  };
+    cancelled: 'bg-red-100 text-red-800', };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -46,6 +41,5 @@ export default function Projects() {
         ))}
       </div>
     </div>
-  );
-}
+  ); }
 

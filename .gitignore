@@ -83,3 +83,10 @@ ssl/
 !.env.example
 !.env.production.template
 !backend/.env.example
+
+# Local build artifacts & coverage (added during v1.8.0 hardening)
+backend/.coverage
+frontend-react/dist/
+
+# CI/prod env templates: real values stay out; committed ones use .example suffix
+.env.production

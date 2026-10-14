@@ -1,18 +1,14 @@
-import React from 'react';
 
-export function Skeleton({ className = '', count = 1, width, height, circle = false }) {
-  const items = Array.from({ length: count }, (_, i) => (
+export function Skeleton({ className = '', count = 1, width, height, circle = false }) { const items = Array.from({ length: count }, (_, i) => (
     <div
       key={i}
       className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${circle ? 'rounded-full' : ''} ${className}`}
       style={{ width, height }}
     />
   ));
-  return count === 1 ? items[0] : <div className="space-y-2">{items}</div>;
-}
+  return count === 1 ? items[0] : <div className="space-y-2">{items}</div>; }
 
-export function SkeletonCard({ className = '' }) {
-  return (
+export function SkeletonCard({ className = '' }) { return (
     <div className={`card p-5 space-y-4 ${className}`}>
       <div className="flex items-center gap-4">
         <Skeleton width={40} height={40} circle />
@@ -27,11 +23,9 @@ export function SkeletonCard({ className = '' }) {
         <Skeleton width={80} height={28} />
       </div>
     </div>
-  );
-}
+  ); }
 
-export function SkeletonTable({ rows = 5, columns = 4 }) {
-  return (
+export function SkeletonTable({ rows = 5, columns = 4 }) { return (
     <div className="card overflow-hidden">
       <div className="bg-gray-50 dark:bg-gray-800 px-4 py-3 flex gap-4">
         {Array.from({ length: columns }).map((_, i) => (
@@ -48,11 +42,9 @@ export function SkeletonTable({ rows = 5, columns = 4 }) {
         ))}
       </div>
     </div>
-  );
-}
+  ); }
 
-export function SkeletonStats({ count = 4 }) {
-  return (
+export function SkeletonStats({ count = 4 }) { return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="card p-6 space-y-3">
@@ -64,11 +56,9 @@ export function SkeletonStats({ count = 4 }) {
         </div>
       ))}
     </div>
-  );
-}
+  ); }
 
-export function SkeletonChat() {
-  return (
+export function SkeletonChat() { return (
     <div className="space-y-4">
       <div className="flex gap-3">
         <Skeleton width={32} height={32} circle />
@@ -89,6 +79,5 @@ export function SkeletonChat() {
         </div>
       </div>
     </div>
-  );
-}
+  ); }
 

@@ -1,8 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, Download } from 'lucide-react';
 
-export default function DataTable({
-  data = [],
+export default function DataTable({ data = [],
   columns = [],
   keyField = 'id',
   searchable = true,
@@ -13,57 +12,37 @@ export default function DataTable({
   onRowClick,
   emptyMessage = 'No data available',
   loading = false,
-  actions,
-}) {
-  const [searchQuery, setSearchQuery] = useState('');
+  actions, }) { const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({});
 
   // Filter and sort data
-  const processedData = useMemo(() => {
-    let result = [...data];
+  const processedData = useMemo(() => { let result = [...data];
 
     // Apply search
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    if (searchQuery) { const q = searchQuery.toLowerCase();
       result = result.filter(row =>
-        columns.some(col => {
-          const val = getValue(row, col.key);
-          return val != null && String(val).toLowerCase().includes(q);
-        })
-      );
-    }
+        columns.some(col => { const val = getValue(row, col.key);
+          return val != null && String(val).toLowerCase().includes(q); })
+      ); }
 
     // Apply column filters
-    Object.entries(filters).forEach(([key, filterVal]) => {
-      if (filterVal) {
-        result = result.filter(row => {
-          const val = getValue(row, key);
-          return String(val).toLowerCase().includes(filterVal.toLowerCase());
-        });
-      }
-    });
+    Object.entries(filters).forEach(([key, filterVal]) => { if (filterVal) { result = result.filter(row => { const val = getValue(row, key);
+          return String(val).toLowerCase().includes(filterVal.toLowerCase()); }); } });
 
     // Apply sorting
-    if (sortConfig.key) {
-      result.sort((a, b) => {
-        const aVal = getValue(a, sortConfig.key);
+    if (sortConfig.key) { result.sort((a, b) => { const aVal = getValue(a, sortConfig.key);
         const bVal = getValue(b, sortConfig.key);
         if (aVal == null) return 1;
         if (bVal == null) return -1;
-        if (typeof aVal === 'number' && typeof bVal === 'number') {
-          return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
-        }
+        if (typeof aVal === 'number' && typeof bVal === 'number') { return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal; }
         return sortConfig.direction === 'asc'
           ? String(aVal).localeCompare(String(bVal))
-          : String(bVal).localeCompare(String(aVal));
-      });
-    }
+          : String(bVal).localeCompare(String(aVal)); }); }
 
-    return result;
-  }, [data, searchQuery, filters, sortConfig, columns]);
+    return result; }, [data, searchQuery, filters, sortConfig, columns]);
 
   // Pagination
   const totalPages = Math.ceil(processedData.length / pageSize);
@@ -71,21 +50,14 @@ export default function DataTable({
     ? processedData.slice((currentPage - 1) * pageSize, currentPage * pageSize)
     : processedData;
 
-  const handleSort = (key) => {
-    if (!sortable) return;
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
+  const handleSort = (key) => { if (!sortable) return;
+    setSortConfig(prev => ({ key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' })); };
 
-  const handleExport = () => {
-    const headers = columns.map(c => c.label || c.key).join(',');
+  const handleExport = () => { const headers = columns.map(c => c.label || c.key).join(',');
     const rows = processedData.map(row =>
-      columns.map(col => {
-        const val = getValue(row, col.key);
-        return val != null ? `"${String(val).replace(/"/g, '""')}"` : '';
-      }).join(',')
+      columns.map(col => { const val = getValue(row, col.key);
+        return val != null ? `"${String(val).replace(/"/g, '""')}"` : ''; }).join(',')
     ).join('\n');
     const csv = `${headers}\n${rows}`;
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -94,11 +66,9 @@ export default function DataTable({
     a.href = url;
     a.download = `export_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
-  };
+    URL.revokeObjectURL(url); };
 
-  if (loading) {
-    return (
+  if (loading) { return (
       <div className="card overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 flex gap-4">
           {columns.map((_, i) => (
@@ -115,8 +85,7 @@ export default function DataTable({
           ))}
         </div>
       </div>
-    );
-  }
+    ); }
 
   return (
     <div className="space-y-3">
@@ -136,11 +105,9 @@ export default function DataTable({
         )}
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors ${
-            showFilters
+          className={`flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors ${ showFilters
               ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300'
-              : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-          }`}
+              : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800' }`}
         >
           <SlidersHorizontal className="w-4 h-4" /> Filters
         </button>
@@ -186,9 +153,7 @@ export default function DataTable({
                   <th
                     key={col.key}
                     onClick={() => handleSort(col.key)}
-                    className={`px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 ${
-                      sortable && col.sortable !== false ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none' : ''
-                    }`}
+                    className={`px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 ${ sortable && col.sortable !== false ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none' : '' }`}
                   >
                     <div className="flex items-center gap-1">
                       {col.label || col.key}
@@ -243,8 +208,7 @@ export default function DataTable({
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let pageNum;
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => { let pageNum;
               if (totalPages <= 5) pageNum = i + 1;
               else if (currentPage <= 3) pageNum = i + 1;
               else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
@@ -253,16 +217,13 @@ export default function DataTable({
                 <button
                   key={pageNum}
                   onClick={() => setCurrentPage(pageNum)}
-                  className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
-                    currentPage === pageNum
+                  className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${ currentPage === pageNum
                       ? 'bg-indigo-600 text-white'
-                      : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
+                      : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800' }`}
                 >
                   {pageNum}
                 </button>
-              );
-            })}
+              ); })}
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
@@ -274,17 +235,12 @@ export default function DataTable({
         </div>
       )}
     </div>
-  );
-}
+  ); }
 
-function getValue(obj, path) {
-  return path.split('.').reduce((o, p) => o?.[p], obj);
-}
+function getValue(obj, path) { return path.split('.').reduce((o, p) => o?.[p], obj); }
 
-function formatValue(val) {
-  if (val == null) return '—';
+function formatValue(val) { if (val == null) return '—';
   if (typeof val === 'boolean') return val ? 'Yes' : 'No';
   if (val instanceof Date) return val.toLocaleDateString();
-  return String(val);
-}
+  return String(val); }
 

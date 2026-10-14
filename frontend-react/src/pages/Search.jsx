@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Search as SearchIcon, Loader2, Filter, X } from 'lucide-react';
 import { useSearch } from '../hooks/useSearch';
 
@@ -14,63 +14,41 @@ const entityTypes = [
   { value: 'documents', label: 'Documents' },
 ];
 
-export default function Search() {
-  const { query, setQuery, results, total, facets, loading, error, search, clearSearch } = useSearch();
+export default function Search() { const { query, setQuery, results, total, facets, loading, error, search, clearSearch } = useSearch();
   const [selectedType, setSelectedType] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (query.trim()) {
-        search({ types: selectedType !== 'all' ? selectedType : undefined });
-      } else {
-        clearSearch();
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [query, selectedType, search, clearSearch]);
+  useEffect(() => { const timer = setTimeout(() => { if (query.trim()) { search({ types: selectedType !== 'all' ? selectedType : undefined }); } else { clearSearch(); } }, 300);
+    return () => clearTimeout(timer); }, [query, selectedType, search, clearSearch]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (query.trim()) {
-      search({ types: selectedType !== 'all' ? selectedType : undefined });
-    }
-  };
+  const handleSubmit = (e) => { e.preventDefault();
+    if (query.trim()) { search({ types: selectedType !== 'all' ? selectedType : undefined }); } };
 
-  const renderResults = () => {
-    if (loading) {
-      return (
+  const renderResults = () => { if (loading) { return (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         </div>
-      );
-    }
+      ); }
 
-    if (error) {
-      return (
+    if (error) { return (
         <div className="text-center py-12 text-red-600">
           Error: {error}
         </div>
-      );
-    }
+      ); }
 
-    if (!query.trim()) {
-      return (
+    if (!query.trim()) { return (
         <div className="text-center py-12 text-gray-500">
           <SearchIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>Enter a search query to find records across all modules</p>
         </div>
-      );
-    }
+      ); }
 
-    if (total === 0) {
-      return (
+    if (total === 0) { return (
         <div className="text-center py-12 text-gray-500">
           <SearchIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>No results found for "{query}"</p>
         </div>
-      );
-    }
+      ); }
 
     return (
       <div className="space-y-4">
@@ -116,8 +94,7 @@ export default function Search() {
           </div>
         ))}
       </div>
-    );
-  };
+    ); };
 
   return (
     <div className="p-6 space-y-6">
@@ -180,5 +157,4 @@ export default function Search() {
 
       <div className="mt-6">{renderResults()}</div>
     </div>
-  );
-}
+  ); }

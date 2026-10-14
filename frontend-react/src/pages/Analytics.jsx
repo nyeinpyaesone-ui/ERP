@@ -1,17 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Users, Package, DollarSign, Activity, Calendar, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BarChart3, TrendingUp, Users, Package, DollarSign, Activity, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import api from '../api/axios';
 
-export default function Analytics() {
-  const [data, setData] = useState(null);
+export default function Analytics() { const [data, setData] = useState(null);
   const [trends, setTrends] = useState(null);
   const [forecast, setForecast] = useState(null);
 
-  useEffect(() => {
-    api.get(`/analytics/dashboard`).then(r => setData(r.data));
+  useEffect(() => { api.get(`/analytics/dashboard`).then(r => setData(r.data));
     api.get(`/analytics/monthly-trends`).then(r => setTrends(r.data));
-    api.get(`/ai/forecast/revenue`).then(r => setForecast(r.data)).catch(() => {});
-  }, []);
+    api.get(`/ai/forecast/revenue`).then(r => setForecast(r.data)).catch(() => {}); }, []);
 
   if (!data) return <div className="p-6 text-center">Loading analytics...</div>;
 
@@ -111,6 +108,5 @@ export default function Analytics() {
         </div>
       </div>
     </div>
-  );
-}
+  ); }
 

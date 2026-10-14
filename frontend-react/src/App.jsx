@@ -1,4 +1,3 @@
-import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
@@ -29,11 +28,9 @@ import Search from './pages/Search';
  * Show a spinner while loading, redirect signed-out users to /login, and send
  * users with a disallowed role to /.
  */
-function RequireRole({ children, allowedRoles = [] }) {
-  const { user, loading } = useAuth();
+function RequireRole({ children, allowedRoles = [] }) { const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
+  if (loading) { return (
       <div className="min-h-screen flex items-center justify-center">
         <div
           role="status"
@@ -41,35 +38,25 @@ function RequireRole({ children, allowedRoles = [] }) {
           className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"
         />
       </div>
-    );
-  }
+    ); }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!user) { return <Navigate to="/login" replace />; }
 
   // If no specific roles required, just check authenticated
-  if (allowedRoles.length === 0) {
-    return children;
-  }
+  if (allowedRoles.length === 0) { return children; }
 
   // Check if user has one of the allowed roles
   const userRole = user?.role?.toLowerCase() || 'user';
   const hasAccess = allowedRoles.some(role => role.toLowerCase() === userRole || role === '*');
 
-  if (!hasAccess) {
-    return <Navigate to="/" replace />;
-  }
+  if (!hasAccess) { return <Navigate to="/" replace />; }
 
-  return children;
-}
+  return children; }
 
 /** Render a loading state, login form, or the authenticated application routes. */
-function AppRoutes() {
-  const { user, loading, login, logout } = useAuth();
+function AppRoutes() { const { user, loading, login, logout } = useAuth();
 
-  if (loading) {
-    return (
+  if (loading) { return (
       <div className="min-h-screen flex items-center justify-center">
         <div
           role="status"
@@ -77,12 +64,9 @@ function AppRoutes() {
           className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"
         />
       </div>
-    );
-  }
+    ); }
 
-  if (!user) {
-    return <Login onLogin={login} />;
-  }
+  if (!user) { return <Login onLogin={login} />; }
 
   return (
     <Layout onLogout={logout}>
@@ -109,13 +93,10 @@ function AppRoutes() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
-  );
-}
+  ); }
 
-export default function App() {
-  return (
+export default function App() { return (
     <AuthProvider>
       <AppRoutes />
     </AuthProvider>
-  );
-}
+  ); }

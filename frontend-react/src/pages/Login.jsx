@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, UserPlus, Loader } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 /** Render login or registration using AuthContext; the onLogin prop is unused. */
-export default function Login({ onLogin }) {
-  const [isRegister, setIsRegister] = useState(false);
+export default function Login({ onLogin }) { const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -19,24 +18,12 @@ export default function Login({ onLogin }) {
    * Submit the selected authentication flow and navigate home on success.
    * Display caught failures in the form and clear the loading state afterward.
    */
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e) => { e.preventDefault();
     setLoading(true);
     setError('');
 
-    try {
-      if (isRegister) {
-        await authLogin({ email, password, full_name: fullName });
-      } else {
-        await authLogin({ username: email, password });
-      }
-      navigate('/');
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Authentication failed');
-    } finally {
-      setLoading(false);
-    }
-  };
+    try { if (isRegister) { await authLogin({ email, password, full_name: fullName }); } else { await authLogin({ username: email, password }); }
+      navigate('/'); } catch (err) { setError(err.response?.data?.detail || 'Authentication failed'); } finally { setLoading(false); } };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-100 p-4">
@@ -116,5 +103,4 @@ export default function Login({ onLogin }) {
         </div>
       </div>
     </div>
-  );
-}
+  ); }
