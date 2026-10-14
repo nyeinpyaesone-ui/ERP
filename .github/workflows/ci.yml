@@ -22,6 +22,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
   security-events: write
   deployments: write
 
@@ -38,6 +39,11 @@ jobs:
 
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        # v3.0.0 breaking change: PR scans refuse to run without an explicit
+        # token (push scans still pass without it) — this is what turned the
+        # Dependabot github-actions PR red while main stayed green.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: "detect --verbose --no-banner --redact"
 
