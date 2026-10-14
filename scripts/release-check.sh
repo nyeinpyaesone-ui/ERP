@@ -84,6 +84,8 @@ if [ -z "$TAG" ]; then
     TAG=$(git describe --tags 2>/dev/null || true)   # nearest reachable tag
     TAG_MODE="behind-HEAD"
 fi
+# strip describe suffix (e.g. v1.8.0-2-gd31d8fe -> v1.8.0)
+TAG="${TAG%%-[0-9]*-g*}"
 PREFIX="${GATE_PREFIX:-v}"
 if [ -z "$TAG" ]; then
     fail "no reachable tag on HEAD (expected ${PREFIX}<version>)" "release-tag"
