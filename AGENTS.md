@@ -1,165 +1,97 @@
 # ERP SOLUTION — Agent Instructions
 
-## Repository Structure
+FastAPI backend + Vite/React PWA (canonical frontend) + Expo mobile, deployed by GitHub Actions blue-green.
+This file owns **repo facts**. `AGENTS PROFILE/MEMORY.md` (auto-loaded via `opencode.json`) owns **live state and drift** — never duplicate state here.
+
+## Layout & ownership
+
 ```
-/home/admin/ERP/
-├── backend/                 # FastAPI application (Python 3.11+)
-│   ├── app/
-│   │   ├── main.py         # App entrypoint, lifespan, router registration
-│   │   ├── models.py       # SQLAlchemy models (27+ tables)
-│   │   ├── routers/        # 20 API routers (auth, crm, hr, inventory, finance, payments, etc.)
-│   │   ├── services/       # Business logic (search, llm, permissions, activity_log)
-│   │   ├── database.py     # SQLAlchemy engine/session
-│   │   ├── config.py       # Pydantic Settings (.env)
-│   │   └── auth.py         # JWT, bcrypt, RBAC dependencies
-│   ├── alembic/            # Migrations 001-008 (chain intact; 007-008 reconcile DB to models)
-│   ├── Dockerfile          # Multi-stage (builder + runtime AS stages)
-│   ├── pytest.ini          # Active pytest config — TAKES PRECEDENCE over pyproject.toml
-│   ├── pyproject.toml      # ruff/black/mypy/coverage/isort config
-│   ├── requirements.txt    # Pinned to installed versions; local == Docker == CI
-│   └── venv/               # Local venv (gitignored)
-├── backend/frontend-react/  # WORKING Vite+React PWA — canonical frontend (D-001)
-├── mobile/                  # Expo SDK 50 (React Native) - unverified
-├── docker-compose.yml       # Dev stack (postgres, redis, backend, frontend, ollama)
-├── docker-compose.prod.yml  # Prod stack with nginx, networks, secrets
-├── deploy.sh               # Remote deploy: rsync + remote bootstrap/blue-green
-├── scripts/lib.sh          # Shared shell helpers (compose/env/ssl detection)
-├── scripts/                # deploy-blue-green.sh, backup.sh (created during fixes)
-├── nginx/                  # nginx.conf, upstream configs (created during fixes)
-└── .github/workflows/      # CI (Gitleaks gate, quality gates, Trivy), CodeQL, release
+backend/                       # the only backend (FastAPI)
+  app/main.py                  # create_app() factory + ROUTER_MOUNTS — the single router registry (20 mounts)
+  app/models.py                # ALL 39 SQLAlchemy models (sync Session). Never split without updating alembic/env.py
+  app/config.py                # Pydantic Settings; reads ./.env
+  app/permissions_catalogue.py # single source of truth: resources, actions, role grants
+  app/services/permissions.py  # has_permission / get_user_permissions live ONLY here
+  app/routers/ (20) · app/services/ · app/tests/ · alembic/versions/ (001→008)
+  pytest.ini                   # the ACTIVE pytest config — see Testing
+  frontend-react/              # canonical frontend (see below)
+  docker-compose.yml           # nested and UNUSED — the root compose file is the real one
+backend/frontend-react/        # the ONLY real frontend (Vite 6 + React 18 PWA)
+mobile/                        # Expo app — unverified, no app.json, never built in CI
+scripts/lib.sh                 # shared helpers sourced by deploy/backup/rollback scripts
+infra/k8s/                     # kustomize base + overlays (not exercised in this environment)
 ```
 
-## Critical Context
+- **`backend/frontend-react` is the only frontend.** `/frontend` was deleted (it was broken). Never recreate it, never repoint CI at it.
+- Workflows: `ci.yml`, `codeql.yml`, `opencode.yml`, `release.yml`. Every `uses:` is pinned to a 40-char SHA with a `# vX.Y.Z` comment — Dependabot updates those natively. Do not add unpinned actions or reintroduce Snyk (removed; Trivy is the only container scanner).
 
-**Single canonical frontend:**
-- `/backend/frontend-react` — **WORKING**: Vite 6.4.3, React 18, PWA, builds successfully (2068 modules)
-- `/frontend` — **deleted** (was broken: no package.json, no nginx.conf). CI builds `backend/frontend-react/dist/`.
+## Commands
 
-**Database not running** — PostgreSQL/Redis only exist in docker-compose. Backend boots but fails on DB connection (expected). Run `docker compose up -d postgres redis` first.
+```sh
+# Backend — the suite needs no database
+cd backend && . venv/bin/activate          # shell is sh: use ".", never "source"
+pytest -q                                  # 285 passed, ~35s
+coverage run -m pytest -q && coverage report   # 58.89% — the floor (58) lives ONLY in pyproject.toml
+ruff check . && black --check .            # clean, 67 files (CI enforces both)
+alembic upgrade head --sql                 # offline chain check 001→008, no DB needed
+uvicorn app.main:app --reload              # needs postgres + redis reachable
+pytest app/tests/unit/test_auth.py -q      # single file
+pytest app/tests -k permission -q          # single area
 
-**Tests exist and pass** — `backend/app/tests/` (`unit/` plus top-level files): 285 tests, coverage 58.89%. Run with `make test` or `cd backend && . venv/bin/activate && pytest`. Note `pythonpath` and `testpaths` live in `pytest.ini`, not `pyproject.toml` — pytest.ini wins. The coverage floor (58) is declared once in `backend/pyproject.toml`; CI passes no `--cov-fail-under`. No PostgreSQL needed: fixtures use SQLite in-memory or mocks.
+# Frontend
+cd backend/frontend-react
+npm run dev        # http://localhost:3000, proxies /api → localhost:8000 (ws enabled)
+npm test           # vitest run → 105 passed (7 files), ~25s, no backend needed
+npm run lint       # eslint src → must stay 0 errors (127 warnings are tolerated)
+npm run build      # vite build + PWA service worker
+npx vitest run src/api/axios.test.js       # single frontend test
 
-**Alembic chain is intact** — 001 through 008. `005` reconciles the permissions table against the catalogue; `007`/`008` bring the migrated schema level with `app/models.py` (verified: all 39 tables, columns and primary keys match). `alembic/env.py` imports `app.models`, so `revision --autogenerate` now works. Still only exercised in offline `--sql` mode — no live PostgreSQL here.
-
-**npm/npx on PATH** — npm/npx 10.9.2 live at `/home/admin/.local/bin` (Node v22.22.1). If a shell still lacks them, fall back to `node /tmp/opencode/npm10/package/bin/npm-cli.js …` (volatile `/tmp` — re-bootstrap if gone).
-
-**Permissions have a single source of truth** — `backend/app/permissions_catalogue.py` defines all resources, actions, and role grants. `has_permission`/`get_user_permissions` live only in `app/services/permissions.py` (removed from `auth.py` to break a circular import). Any router calling `require_permission()` must reference a catalogue entry or `test_permission_consistency.py` fails.
-
-## Key Commands
-
-```bash
-# Backend dev (after docker compose up -d postgres redis)
-cd backend && source venv/bin/activate && uvicorn app.main:app --reload
-
-# Frontend dev (WORKING portal)
-cd backend/frontend-react && node /tmp/opencode/npm10/package/bin/npm-cli.js run dev
-
-# Frontend build (WORKING)
-cd backend/frontend-react && node /tmp/opencode/npm10/package/bin/npm-cli.js run build
-
-# Mobile (unverified)
-cd mobile && npm install && npx expo start
-
-# Docker dev stack
-docker compose up -d postgres redis
-docker compose up -d backend frontend
-
-# Docker prod stack
-docker compose -f docker-compose.prod.yml up -d
-
-# Blue-green deploy (NEW)
-./scripts/deploy-blue-green.sh production v1.2.3
-./scripts/deploy-blue-green.sh production v1.2.2 --rollback
-
-# Alembic (after DB running)
-cd backend && source venv/bin/activate && alembic upgrade head
-cd backend && source venv/bin/activate && alembic revision --autogenerate -m "initial"
+# Repo-wide
+make test          # backend pytest + frontend vitest
+make lint          # ruff+black (enforced) + mypy (advisory `|| true`) + eslint
+make guard         # scripts/repo-guard.sh — run before pushes and after long background jobs
 ```
 
-## Common Pitfalls
+Numbers above are the verified baseline (re-verified 2026-10-14). If a count or state differs, investigate rather than assume.
 
-| Issue | Solution |
-|-------|----------|
-| `ModuleNotFoundError: psycopg2` | `pip install psycopg2-binary` in venv |
-| `npm ENOENT rename` cache errors | Use npm 10: `node /tmp/opencode/npm10/package/bin/npm-cli.js install` |
-| Frontend build fails | Use `/backend/frontend-react`, not `/frontend` |
-| Backend won't start | Start postgres/redis first: `docker compose up -d postgres redis` |
-| Alembic "target database not up to date" | Run `alembic upgrade head` or create 001_initial migration |
-| CI builds broken frontend | Already fixed — `ci.yml` builds `backend/frontend-react`; do not repoint it |
-| Trivy reports no findings | It scanned `sha-<40>` while `metadata-action` pushes `sha-<7>`; `security` now consumes `needs.docker-*.outputs.image_tag` |
-| Action version bump needed | Workflows pin `uses:` to a 40-char SHA + `# vX.Y.Z`; Dependabot updates those natively |
-| Container runtime won't start here | `/proc/self` reports uid 0 → `newuidmap` fails for rootlesskit/podman; use native PG18 + Redis binaries |
-| Deploy script says daemon is DOWN | Real, not a bug. `install.sh --preflight` provisions packages/Docker/compose and reports what is missing |
-| Scripts complain about blank secrets | They read `.env.production`, not `.env`. Run `./install.sh` once to generate it |
-| `npx: not found` in Makefile | npm/npx 10.9.2 should be on PATH (`~/.local/bin`); else use `node /tmp/opencode/npm10/package/bin/npm-cli.js …` |
-| pytest `ModuleNotFoundError: app` | `pythonpath` must be in `pytest.ini`; `pyproject.toml` `[tool.pytest.ini_options]` is ignored |
-| Postgres MCP queries fail | `POSTGRES_MCP_URL` unset **and** Postgres not running. `export POSTGRES_MCP_URL=...` then `docker compose up -d postgres` |
+## Runtime gotchas that cost time
 
-## Environment Variables
+- **Docker cannot run on this host.** `/usr/bin/docker` exists but the daemon is unusable (proot/Termux-class aarch64; uid 0 → `newuidmap` fails for rootlesskit and podman). Local DB path = native PostgreSQL/Redis binaries only. Container behaviour is verified by CI, not locally.
+- **Two `.env` files must agree.** The backend loads `backend/.env` (relative to CWD); `docker-compose.yml` interpolates `${VAR}` from the **repo-root** `.env`. Keep `SECRET_KEY` identical in both or tokens signed by one are invalid under the other.
+- **`ENVIRONMENT` is `Literal["dev","test","prod"]`** — `production`/`development` raise at import. In `prod`, Settings refuses the placeholder `SECRET_KEY`, any key under 32 chars, and the example DB credentials (fail-closed).
+- **`backend/static/` is created at import time** by `main.py` before the `StaticFiles` mount. Fresh checkouts lack it — don't remove the `os.makedirs`.
+- **The backend container runs `alembic upgrade head` + `python -m app.scripts.seed_defaults` on boot** (`backend/entrypoint.sh`), so schema/seed drift surfaces as a container boot failure, not a test failure.
+- **No local DB by default**: the app boots, but DB-backed routes fail until PostgreSQL/Redis are reachable. Tests are unaffected (SQLite in-memory / mocks; `token_store` fails open when Redis is down).
+- **npm/npx 10.9.2 are on PATH at `~/.local/bin`** (node at `/usr/bin/node`). `~/.local/bin/npm` is a *shell wrapper* — never invoke it as `node ~/.local/bin/npm`. The Makefile's `NPM` var already falls back to `node /tmp/opencode/npm10/package/bin/npm-cli.js`, which is volatile and may need re-bootstrapping.
+- The Postgres MCP server (`scripts/mcp-postgres.sh`) exits 1 unless `POSTGRES_MCP_URL` is exported.
 
-Required for backend (`.env` or docker-compose):
-```
-DATABASE_URL=postgresql://user:pass@host:5432/db
-REDIS_URL=redis://:pass@host:6379/0
-SECRET_KEY=change-in-production
-ENVIRONMENT=dev|test|prod
-OLLAMA_BASE_URL=http://ollama:11434
-STRIPE_SECRET_KEY=sk_...
-CORS_ORIGINS=https://app.domain.com
-```
+## Testing
 
-## Architecture Notes
+- `backend/pytest.ini` is the active config (`pythonpath = .`, `testpaths = app/tests`, `asyncio_mode = auto`). `[tool.pytest.ini_options]` in `pyproject.toml` is **ignored** — edit `pytest.ini`.
+- Plain `pytest` does **not** collect coverage (no `--cov` in `addopts`), and a stale `backend/.coverage` under-reports. Always `coverage run -m pytest`.
+- CI's Tests job starts `postgres:15` purely for `alembic upgrade head`; Redis is deliberately absent. Markers: `unit`, `integration` (needs DB), `slow`.
+- Frontend: mock the API through `src/api/axios`, never `fetch`/`axios` directly — `src/api/single-client.test.js` fails the suite otherwise.
 
-- **Auth**: JWT (HS256) access + refresh tokens (rotation, `jti` denylist via `services/token_store.py`), bcrypt passwords, RBAC via `require_admin`, `require_superadmin`, `require_permission` (catalogue-driven)
-- **Models**: All in `app/models.py` — User, Company, Contact, Deal, Employee, Product, Invoice, Project, Task, Document, Workflow, Webhook, Integration, ActivityLog, Notification, Report, Forecast, Setting, Role, Permission, SearchIndex, SearchQuery, SearchSuggestion, LLMModel, AIConversation, AIMessage, LLMUsage, AIPromptTemplate
-- **Search**: PostgreSQL full-text via `search_service.py`, endpoint `/api/v1/search/`
-- **LLM**: Ollama integration via `llm_service.py`, tools, streaming, templates
-- **PWA**: Vite plugin generates service worker, offline support
-- **Nginx**: Two layers. `backend/frontend-react/nginx.conf` (dev image, port 80) routes `/api` → `backend:8000` with WebSocket upgrade headers and `/` → SPA. `nginx.conf` at the repo root (mounted as `/etc/nginx/nginx.conf` by `docker-compose.prod.yml`) does the same against the blue/green `upstream backend`/`upstream frontend`, includes `nginx/ssl.conf` for TLS, and sets `client_max_body_size 50m` for uploads. The API's WebSocket lives at `/api/v1/ws` — there is no separate `/ws` route.
+## CI & deploy contract
 
-## File Conventions
+`ci.yml`: gitleaks → quality (ruff+black enforced, mypy advisory) → tests → {frontend-build, docker-backend, docker-frontend} → security (Trivy, advisory SARIF) → deploy-staging / deploy-production.
 
-- Python: `ruff`/`black` style (configured in `backend/pyproject.toml`), type hints required
-- TypeScript: **eslint 10 flat config** (`eslint.config.js`) + `npm run lint` — fails on errors (currently 0 errors / 127 warnings); CI enforces it. No tsc/prettier (JSX project, no tsconfig). The old `.github/workflows/package.json.devops-snippet.json` config was removed with the nested-workflow cleanup.
-- Migrations: `alembic revision --autogenerate -m "description"` (works now that `env.py` imports `app.models`; check the generated diff against `Base.metadata` before committing)
-- Docker: Multi-stage builds preferred (backend Dockerfile: builder + runtime `AS` stages — already multi-stage)
+- The `config` job publishes `can_push` (DOCKER_USER var + both `DOCKER_PAT_*` secrets) and `can_deploy` (additionally SSH key, both hosts, both `*_KNOWN_HOSTS`). **Deploy jobs skip when these are false — fail-closed by design, not a bug.**
+- Trivy consumes the **first line only** of `needs.docker-*.outputs.image_tag` (metadata-action emits one ref per line); `exit-code` is unset, so findings are advisory.
+- Deploys SSH to `scripts/deploy-blue-green.sh <env> <version> [--rollback]` (sources `scripts/lib.sh`); root `deploy.sh` is legacy. Staging = pushes to `main`, production = `v*` tags; both require their GitHub environment.
+- Pushing needs retry loops here (intermittent GnuTLS failures to github.com); `gh api` usually still works. Commits: Conventional Commits.
 
-## OpenCode Config
+## Conventions
 
-- `opencode.json` (project) — watcher ignores, permissions, 4 MCP servers
-- `~/.config/opencode/opencode.jsonc` (global) — `share: disabled`, compaction, `mcp_timeout`
-- MCP servers: `postgres` (via `scripts/mcp-postgres.sh`), `filesystem`, `playwright`, `sequential-thinking`
-- `POSTGRES_MCP_URL` must be exported for the Postgres MCP server; wrapper exits 1 if unset
-- Project skills (auto-discovered from `.opencode/skills/`): `@erp-backend` (app factory,
-  20 router mounts, test/lint battery, pitfalls), `@erp-frontend` (single-client rule,
-  env contract, build/test), `@erp-ops` (CI job graph, can_push/can_deploy secrets
-  contract, Trivy specifics, deploy checklist). Load with `@skill-id` when working
-  those areas; keep them updated when the micro-details change.
+- Add a route by appending to `ROUTER_MOUNTS` in `main.py` (the factory and the module-level `app` share the table by construction). Guard it with `require_permission` referencing a **catalogue entry**, or `app/tests/test_permission_consistency.py` fails.
+- New permissions: edit `permissions_catalogue.py` only. `has_permission`/`get_user_permissions` must not move back into `auth.py` (that was a circular-import fix).
+- Datetimes are tz-aware UTC everywhere — never reintroduce naive `utcnow`.
+- Frontend env contract: **only `VITE_API_URL`** is read (default `/api/v1`, same-origin through the nginx/Vite proxy). Do not add `VITE_*` vars without wiring them.
+- Frontend is JSX-only: eslint flat config (`eslint.config.js`) + `npm run lint`. There is no tsconfig and no tsc step — don't add one.
+- Never hardcode file/test/commit counts in README or STATUS_CHECKLIST — use `git ls-files | wc -l`.
 
-## Agent Profile
+## Where the deep detail lives
 
-Companion profile set in `AGENTS PROFILE/` (identity, memory, coordination —
-non-overlapping with this file; see its `README.md` for load order & sync rules):
-
-- `AGENTS PROFILE/MEMORY.md` — durable state: verified snapshot, decisions, open threads, verification ledger (auto-loaded via `opencode.json → instructions`)
-- `AGENTS PROFILE/SOUL.md` — identity, values, tone, anti-patterns
-- `AGENTS PROFILE/SUB-AGENTS.md` — sub-agent roster & delegation rules
-- `AGENTS PROFILE/TOOLS.md` — tool/MCP inventory, permission gates, cheatsheet
-- `AGENTS PROFILE/HEARTBEATS.md` — start/edit/done/end checklists & verification gates
-- `AGENTS PROFILE/SKILLS.md` — task → skill → verification matrix
-- `AGENTS PROFILE/IMPROVEMENTS.md` — prioritized system-improvement backlog (P0–P2)
-
-Rule: **this file owns repo facts**; MEMORY owns live state/drift. Keep facts here,
-state there — cross-link, never duplicate.
-
-## References
-
-- `README.md` — Project overview
-- `docker-compose.yml` / `docker-compose.prod.yml` — Service definitions
-- `backend/app/main.py` — App wiring, all routers
-- `backend/app/models.py` — Complete schema
-- `backend/app/permissions_catalogue.py` — Permission source of truth
-- `scripts/deploy-blue-green.sh` — Blue-green deploy automation (sources `scripts/lib.sh`)
-- `scripts/mcp-postgres.sh` — Postgres MCP wrapper (reads `POSTGRES_MCP_URL`)
-- `.github/workflows/ci.yml` — Current CI (Gitleaks secret gate first; backend ruff+black enforced, mypy advisory; frontend real eslint enforced). All actions SHA-pinned with `concurrency` + `timeout-minutes`.
-- `.github/workflows/release.yml` — Tag or manual dispatch → verify pushed images → publish GitHub Release from CHANGELOG.md
+- `.opencode/skills/erp-backend`, `erp-frontend`, `erp-ops` — per-area micro-details (router table, single-API-client rule, CI job graph, first-deploy checklist). Load with `@erp-backend` etc. before editing those areas, and keep them in sync when the micro-details change.
+- `AGENTS PROFILE/README.md` — the agent profile (MEMORY, SOUL, SUB-AGENTS, TOOLS, HEARTBEATS, SKILLS, IMPROVEMENTS). Only `MEMORY.md` is auto-loaded; read the rest on demand.
+- `README.md`, `docs/` (ONBOARDING, API_SUMMARY, BLUE_GREEN_DEPLOYMENT, TROUBLESHOOTING), and `.env.example` — generated from `backend/app/config.py`, so every key there must be a real `Settings` field or an explicit compose interpolation.

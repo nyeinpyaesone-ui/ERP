@@ -4,7 +4,7 @@ Durable cross-session state. Companion to [`AGENTS.md`](../AGENTS.md)
 (AGENTS.md = **how the repo works**; this file = **what is true right now**).
 Append-only ledger; never store secrets (env var *names* only).
 
-**Last verified:** 2026-10-12 (session: drift refresh + fixes — see §3)
+**Last verified:** 2026-10-14 (session: AGENTS.md rewrite + full drift re-verification — see §3)
 
 ---
 
@@ -12,12 +12,13 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | Fact | Value | Source |
 |------|-------|--------|
-| Git HEAD | `a210f1df` (drift-proof README counts); **in sync with `origin/main`**; CI **fully green** on it incl. Security Scan (38161680076) | `git status -sb`, `gh run list` |
-| Worktree | **Clean** (0 dirty) | `git status --porcelain` |
-| Tracked files | **274** (+`scripts/repo-guard.sh` 2026-10-12); README/STATUS no longer hardcode current-HEAD counts (T-018 closed permanently) | `git ls-files \| wc -l` |
-| Node | v22.22.1 at `/usr/bin/node` | `node --version` |
+| Git HEAD | `45535ed0` (project skills); **in sync with `origin/main`** | `git status -sb`, `git rev-parse` |
+| Worktree | **Dirty (3)** — pre-existing uncommitted vitest bump in `frontend-react/{package.json,package-lock.json}` (see T-020) + `AGENTS.md` rewritten this session | `git status --porcelain` |
+| Tracked files | **277** (+3 from the skills commit); README/STATUS no longer hardcode current-HEAD counts (T-018 closed permanently) | `git ls-files \| wc -l` |
+| Commits | **116** | `git rev-list --count HEAD` |
+| Node | **v24.21.0** at `/usr/bin/node` (was v22.22.1 — the environment moved; the old AGENTS.md hardcoded the stale version, now removed) | `node --version` |
 | npm / npx | **10.9.2 on PATH** at `/home/admin/.local/bin` | `which npm npx` |
-| npm fallback | `/tmp/opencode/npm10/…` volatile — re-bootstrap if gone; **Makefile still hardcodes this path** | `ls`, `Makefile:18` |
+| npm fallback | `/tmp/opencode/npm10/…` volatile — re-bootstrap if gone. Makefile is now **portable** (PATH-first, `/tmp` fallback only), fixed in `be57ca36` — the earlier "hardcodes this path" claim is stale | `ls`, `Makefile:18` |
 | Python | 3.14.4 (venv) — runs 285 tests; Docker image is 3.11-slim | `python --version` |
 | Alembic chain | **001 → 008** (offline SQL emits; GIN index fixed in `bb7295f2` so live PG works) | `alembic upgrade head --sql` |
 | Frontend (canonical) | `backend/frontend-react` — **105 vitest tests**, eslint 0 errors/127 warnings, vite build green | `npm test`/`lint`/`build` |
@@ -27,7 +28,7 @@ Append-only ledger; never store secrets (env var *names* only).
 | GitHub variables | `DOCKER_USER=powerrangeranikg` set; **STAGING_DOMAIN / PRODUCTION_DOMAIN unset** | `gh api .../actions/variables` |
 | GitHub environments | `staging` (main only) + `production` (v* tags only) **created 2026-10-11**, fail-closed; `Docker` orphan deleted; `copilot` auto-managed, left alone | `gh api .../environments` |
 | Docker daemon | **Down** — host is **proot/Termux class on aarch64** (no uid_map, `/data/data/com.termux` exists) | `docker ps`, new `erp_detect_runtime_class` |
-| Open PRs | **28** = 27 Dependabot + **PR #135 junk** (qwen-chat task bot; +25,677/−18,283, CONFLICTING; re-adds deleted `frontend/` → close+delete pending, T-017). PR #85 already closed + branch deleted | `gh pr list`, `gh pr view 135` |
+| Open PRs | **29** = 27 Dependabot + **2 from `nyeinpyaesone-ui`** (one is the qwen-chat task-bot class, T-017/T-019 — re-triage on next session) | `gh pr list` |
 
 ## 2. Decisions ledger
 
@@ -185,6 +186,27 @@ Append-only ledger; never store secrets (env var *names* only).
   6 moderate)** — replaces the stale 96/10/50 in T-008. One Dependabot PR
   (`dependabot/github_actions/github-actions-a79bd13708`, run 38161704324)
   is red on Gitleaks — triage with T-009, not on main.
+- **Done (2026-10-14 AGENTS.md rewrite + full drift sweep):** rewrote root
+  `AGENTS.md` 165→97 lines against the current tree — every claim re-verified by
+  running it, not by trusting prose: pytest **285 passed** (6 warnings, ~35s),
+  `coverage run -m pytest` → **58.89%** (after deleting the stale `.coverage`
+  artifact), ruff+black clean (67 files), vitest **105/105** (7 files), eslint
+  **0 errors / 127 warnings**, vite build green, `alembic upgrade head --sql` →
+  001→008, `repo-guard` OK (277 tracked files, no nested `.git`). Corrections:
+  Node **v22.22.1→v24.21.0** (old file hardcoded a stale version — now just
+  "node at /usr/bin/node"), Vite 6.4.3→**installed 6.4.4** ("Vite 6" now),
+  models **27+ vs 39** conflict unified to 39, Docker "only in compose" →
+  daemon genuinely unusable here (D-013), stale `npm ENOENT rename` pitfall
+  replaced by the real `~/.local/bin/npm`-is-a-shell-wrapper trap. Added: the
+  two-`.env`-files-must-agree rule (app reads `backend/.env`, compose reads the
+  root one), `ENVIRONMENT` `Literal` + prod fail-closed matrix, `entrypoint.sh`
+  running alembic+seed at container boot, the **unused nested
+  `backend/docker-compose.yml`** trap, `pytest.ini`-beats-`pyproject.toml`, no
+  `--cov` in `addopts`, single-file/single-area test invocations, `make guard`
+  as a pre-push gate, the full `can_push`/`can_deploy` contract. Removed fluff:
+  exhaustive file tree, the 27-model enumeration, generic Docker/PWA advice,
+  the env-var dump, the 7-file Agent-Profile listing. §1/§5 updated in the same
+  sweep (T-020 filed for the pre-existing worktree drift).
 - **Done (2026-10-12 project skills):** created `.opencode/skills/` with
   `@erp-backend` (factory + 20 ROUTER_MOUNTS, auth/RBAC, alembic, test/lint
   battery + pitfalls), `@erp-frontend` (D-001/D-008 rules, env contract,
@@ -264,6 +286,7 @@ Append-only ledger; never store secrets (env var *names* only).
 | T-017 | ~~junk PR #135 open~~ **resolved 2026-10-11** — closed on user approval, head `secure-github-env-setup-92546` + base `ci-cd-pipeline-basics-cf366` deleted. Same class as #85 (qwen-chat task bot, +25.7k/−18.3k, re-added deleted `frontend/`) | Re-open if another task-bot PR appears; treat >20k-line CONFLICTING diffs as junk by default |
 | T-018 | ~~README/STATUS doc counts stale~~ **resolved 2026-10-11, made permanent 2026-10-12** — counts bumped to 273/107/58.89%, then drifting current-HEAD counts removed from README/STATUS entirely (kept only the immutable v1.0.0 tag facts + a `git ls-files` pointer) | Nothing — recurrence structurally prevented |
 | T-019 | **qwen-chat task bot may be operating on this host** — same actor opened junk PR #135 (~14:52Z) and likely left an empty `git init` in `scripts/` that wiped 14 tracked scripts (~23:26). Files restored; **guard added 2026-10-12**: `make guard` → `scripts/repo-guard.sh` fails on nested `.git`, missing tracked files, or empty `scripts/*.sh` | Identify what automation/token that task uses (PR body says "task 0c24ebdf-…"); consider disabling it. Run `make guard` after any long background job or before commits |
+| T-020 | **Uncommitted frontend dependency drift:** `backend/frontend-react/package.json` + `package-lock.json` bump `vitest` `^1.0.0` → `^3.2.7` (local `node_modules` is on 3.2.7, suites green — 105/105). **Not user-approved work; pre-dates the 2026-10-14 session.** Danger: `npm ci` (CI + `frontend-react/Dockerfile`) still resolves the committed 1.x lockfile, so CI and local test *different* vitest majors | Decide with the user: commit the bump (needs a CI run to prove 1.x→3.x parity) or `git checkout` both files to restore the pinned 1.x state. Do not commit half the pair. AGENTS.md deliberately records the count, not the version |
 
 ## 5. Verification ledger
 
@@ -303,6 +326,17 @@ Append-only ledger; never store secrets (env var *names* only).
 | `docker build` backend + frontend on **this host** | ⬜ impossible — proot class (D-013/D-018); CI builds are the verification | — |
 | pytest local re-run after static-dir fix | ✅ 285 passed with `static/` removed (CI-faithful), ruff+black clean on `main.py` | 2026-10-11 |
 | frontend lint/build **local re-run** | ✅ 105/105 vitest, 0 errors/127 warnings, vite build green (6 entries, 838.26 KiB) | 2026-10-11 |
+| `pytest` (backend), stale `.coverage` deleted first | ✅ **285 passed**, 6 warnings, ~35s | 2026-10-14 |
+| `coverage run -m pytest` → `coverage report` | ✅ **58.89%** ≥ 58 floor | 2026-10-14 |
+| backend `ruff check` + `black --check` | ✅ clean (67 files) | 2026-10-14 |
+| `backend/frontend-react` vitest / lint | ✅ 105/105 (7 files) / 0 errors, 127 warnings | 2026-10-14 |
+| installed toolchain versions | ✅ vite **6.4.4** (manifest says `^6.4.3`), node **v24.21.0**, npm 10.9.2 | 2026-10-14 |
+| `alembic upgrade head --sql` (offline) | ✅ emits through `008` | 2026-10-14 |
+| `make guard` (`scripts/repo-guard.sh`) | ✅ OK — 277 tracked files, no nested `.git` | 2026-10-14 |
+| `npm run dev` port / proxy wiring | ✅ `vite.config.js` `server.port: 3000`, proxy `/api`→`localhost:8000` with `ws: true` | 2026-10-14 |
+| `gh pr list` / `gh auth status` | ✅ 29 open (27 Dependabot + 2 repo-owner); authenticated `nyeinpyaesone-ui` | 2026-10-14 |
+| `docker info` | ⬜ daemon unusable on this host (proot/Termux class, D-013) — re-confirmed | 2026-10-14 |
+| `make test` / `make lint` end-to-end | ⬜ not run as a whole; every underlying command verified individually above | 2026-10-14 |
 
 > Rule: mark ⬜/⏳ honestly. Never upgrade a claim to ✅ without tool output.
 
