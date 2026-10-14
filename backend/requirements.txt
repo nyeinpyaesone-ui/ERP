@@ -3,19 +3,19 @@
 # Docker image (python:3.11-slim) and CI.  Run `make venv` after changing.
 
 # ── Core ─────────────────────────────────────────────────────────────────────
-fastapi==0.142.2
+fastapi==0.143.0
 # starlette pinned explicitly for local == Docker == CI parity (transitive
 # via fastapi; 1.7.0 drops the anyio.abc testclient deprecation).
 starlette==1.7.0
-uvicorn[standard]==0.52.4
+uvicorn[standard]==0.54.0
 # SQLAlchemy 2.1.x NOT yet: its postgresql:// default now imports psycopg3,
 # which we cannot verify without a live PostgreSQL (docker daemon down).
-SQLAlchemy==2.0.52
+SQLAlchemy==2.1.4
 psycopg2-binary==2.9.13
 alembic==1.20.0
 
 # ── Validation / settings ────────────────────────────────────────────────────
-pydantic==2.13.5
+pydantic==2.14.0
 pydantic-settings==2.15.0
 email-validator==2.3.0
 python-multipart==0.0.32
@@ -47,5 +47,5 @@ httpx2==2.13.1
 pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
-black==26.10.0
-ruff==0.16.10
+black==26.10.1
+ruff==0.17.0
