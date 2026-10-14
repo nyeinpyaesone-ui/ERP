@@ -119,19 +119,19 @@ systemctl list-timers --all | grep erp-backup
 
 ### Database Only
 ```bash
-# Using docker-compose (production-blue project)
-docker-compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
+# Using docker compose (production-blue project)
+docker compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
   pg_dump -U erp -Fc erp_solution > backup_$(date +%Y%m%d_%H%M%S).dump
 
 # Or using backup script's internal method
-docker-compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
+docker compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
   pg_dump -U erp erp_solution > backup_$(date +%Y%m%d).sql
 ```
 
 ### Compressed Custom Format (Recommended)
 ```bash
 # Custom format allows parallel restore and selective table restore
-docker-compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
+docker compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
   pg_dump -U erp -Fc -Z9 erp_solution > erp_backup_$(date +%Y%m%d).dump
 ```
 
@@ -162,43 +162,43 @@ tar -czf nginx_configs_$(date +%Y%m%d).tar.gz /opt/erp-solution/ERP/nginx/
 #### From SQL Dump
 ```bash
 # 1. Stop application (keep DB running)
-docker-compose -p production-blue -f docker-compose.prod.yml stop backend frontend
+docker compose -p production-blue -f docker-compose.prod.yml stop backend frontend
 
 # 2. Drop and recreate database
-docker-compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
+docker compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
   psql -U erp -c "DROP DATABASE IF EXISTS erp_solution; CREATE DATABASE erp_solution;"
 
 # 3. Restore
-cat backup_20240115.sql | docker-compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
+cat backup_20240115.sql | docker compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
   psql -U erp erp_solution
 
 # 4. Run migrations (in case schema differs)
-docker-compose -p production-blue -f docker-compose.prod.yml run --rm backend alembic upgrade head
+docker compose -p production-blue -f docker-compose.prod.yml run --rm backend alembic upgrade head
 
 # 5. Restart application
-docker-compose -p production-blue -f docker-compose.prod.yml start backend frontend
+docker compose -p production-blue -f docker-compose.prod.yml start backend frontend
 ```
 
 #### From Custom Format Dump (Faster, Parallel)
 ```bash
 # 1. Stop application
-docker-compose -p production-blue -f docker-compose.prod.yml stop backend frontend
+docker compose -p production-blue -f docker-compose.prod.yml stop backend frontend
 
 # 2. Restore with pg_restore (4 parallel jobs)
-docker-compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
+docker compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
   pg_restore -U erp -d erp_solution -j4 -c < erp_backup_20240115.dump
 
 # 3. Run migrations
-docker-compose -p production-blue -f docker-compose.prod.yml run --rm backend alembic upgrade head
+docker compose -p production-blue -f docker-compose.prod.yml run --rm backend alembic upgrade head
 
 # 4. Restart
-docker-compose -p production-blue -f docker-compose.prod.yml start backend frontend
+docker compose -p production-blue -f docker-compose.prod.yml start backend frontend
 ```
 
 ### 2. Restore Single Table
 ```bash
 # Restore only 'users' table
-docker-compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
+docker compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
   pg_restore -U erp -d erp_solution -t users < erp_backup_20240115.dump
 ```
 
@@ -208,7 +208,7 @@ docker-compose -p production-blue -f docker-compose.prod.yml exec -T postgres \
 
 ```bash
 # 1. Stop application
-docker-compose -p production-blue -f docker-compose.prod.yml stop backend frontend
+docker compose -p production-blue -f docker-compose.prod.yml stop backend frontend
 
 # 2. Restore base backup
 pg_basebackup -D /var/lib/postgresql/data -Ft -z -P
@@ -224,10 +224,10 @@ recovery_target_action = 'promote'
 EOF
 
 # 4. Start PostgreSQL (will replay WAL to target time)
-docker-compose -p production-blue -f docker-compose.prod.yml up -d postgres
+docker compose -p production-blue -f docker-compose.prod.yml up -d postgres
 
 # 5. Wait for promotion, then restart app
-docker-compose -p production-blue -f docker-compose.prod.yml up -d backend frontend
+docker compose -p production-blue -f docker-compose.prod.yml up -d backend frontend
 ```
 
 ---
@@ -361,7 +361,7 @@ mc mirror /opt/erp-solution/backups/ myminio/erp-backups/production/
 | Command | Description |
 |---------|-------------|
 | `./scripts/backup.sh` | Full automated backup |
-| `docker-compose exec postgres pg_dump -U erp -Fc erp_solution > backup.dump` | Manual DB backup |
-| `docker-compose exec -T postgres psql -U erp erp_solution < backup.sql` | Restore from SQL |
-| `docker-compose exec -T postgres pg_restore -U erp -d erp_solution -j4 < backup.dump` | Restore from custom format |
+| `docker compose exec postgres pg_dump -U erp -Fc erp_solution > backup.dump` | Manual DB backup |
+| `docker compose exec -T postgres psql -U erp erp_solution < backup.sql` | Restore from SQL |
+| `docker compose exec -T postgres pg_restore -U erp -d erp_solution -j4 < backup.dump` | Restore from custom format |
 | `aws s3 sync /opt/erp-solution/backups/ s3://bucket/erp-backups/` | Upload to S3 |
