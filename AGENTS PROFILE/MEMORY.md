@@ -4,7 +4,7 @@ Durable cross-session state. Companion to [`AGENTS.md`](../AGENTS.md)
 (AGENTS.md = **how the repo works**; this file = **what is true right now**).
 Append-only ledger; never store secrets (env var *names* only).
 
-**Last verified:** 2026-10-08 (session: CI/CD hardening — pins, Trivy fix, release workflow)
+**Last verified:** 2026-10-12 (session: drift refresh + fixes — see §3)
 
 ---
 
@@ -12,20 +12,22 @@ Append-only ledger; never store secrets (env var *names* only).
 
 | Fact | Value | Source |
 |------|-------|--------|
-| Git HEAD | `80bf5c4a` docs sync; session landed `b2df79fd`→`7014a496` + docs (run `git log -10`) | `git log` |
-| Worktree | **Clean** (after this session's commit series) | `git status --short` |
-| Tracked files | 273 at HEAD; 274 at tag `v1.0.0` | `git ls-files \\| wc -l` |
+| Git HEAD | `a210f1df` (drift-proof README counts); **in sync with `origin/main`**; CI **fully green** on it incl. Security Scan (38161680076) | `git status -sb`, `gh run list` |
+| Worktree | **Clean** (0 dirty) | `git status --porcelain` |
+| Tracked files | **274** (+`scripts/repo-guard.sh` 2026-10-12); README/STATUS no longer hardcode current-HEAD counts (T-018 closed permanently) | `git ls-files \| wc -l` |
 | Node | v22.22.1 at `/usr/bin/node` | `node --version` |
 | npm / npx | **10.9.2 on PATH** at `/home/admin/.local/bin` | `which npm npx` |
-| npm fallback | `/tmp/opencode/npm10/…` volatile — re-bootstrap if gone | `ls` |
+| npm fallback | `/tmp/opencode/npm10/…` volatile — re-bootstrap if gone; **Makefile still hardcodes this path** | `ls`, `Makefile:18` |
 | Python | 3.14.4 (venv) — runs 285 tests; Docker image is 3.11-slim | `python --version` |
-| Alembic chain | **001 → 008** (offline `--sql` regenerates 47 DDL stmts under alembic 1.20) | `alembic upgrade head --sql` |
-| Frontend (canonical) | `backend/frontend-react` — scripts: `dev`, `build`, `preview`, `test`, `test:watch`; **105 vitest tests** | `package.json`, `npm run test` |
-| CI workflows | `ci.yml`, `codeql.yml`, `opencode.yml`, `snyk-container.yml`, `release.yml` | `ls .github/workflows` |
-| Docker daemon | **Down** — `docker compose` v2.40.3 present, but socket missing; start needs interactive sudo | `docker ps` |
-| Podman 5.7.0 | Present but **unusable** — rootless setup dies in `newuidmap` (D-013) | `podman info` |
-| Native PG18 / Redis | `/usr/lib/postgresql/18/bin/*` + `/usr/bin/redis-server` available; neither running | `which postgres redis-server` |
-| gh CLI | Installed, **not authenticated** — secrets/PR operations unavailable | `gh auth status` |
+| Alembic chain | **001 → 008** (offline SQL emits; GIN index fixed in `bb7295f2` so live PG works) | `alembic upgrade head --sql` |
+| Frontend (canonical) | `backend/frontend-react` — **105 vitest tests**, eslint 0 errors/127 warnings, vite build green | `npm test`/`lint`/`build` |
+| CI workflows | `ci.yml`, `codeql.yml`, `opencode.yml`, `release.yml` (**snyk-container.yml removed** `ad13f2bb`) | `ls .github/workflows` |
+| GitHub auth | **gh authenticated** as `nyeinpyaesone-ui` (was unauthenticated) | `gh auth status` |
+| GitHub secrets | **2 configured** — `DOCKER_PAT_BACKEND` + `DOCKER_PAT_FRONTEND` (set 2026-10-11T09:18Z); `SSH_PRIVATE_KEY` + `STAGING_*`/`PRODUCTION_*` known_hosts **still missing** (T-004) | `gh secret list` |
+| GitHub variables | `DOCKER_USER=powerrangeranikg` set; **STAGING_DOMAIN / PRODUCTION_DOMAIN unset** | `gh api .../actions/variables` |
+| GitHub environments | `staging` (main only) + `production` (v* tags only) **created 2026-10-11**, fail-closed; `Docker` orphan deleted; `copilot` auto-managed, left alone | `gh api .../environments` |
+| Docker daemon | **Down** — host is **proot/Termux class on aarch64** (no uid_map, `/data/data/com.termux` exists) | `docker ps`, new `erp_detect_runtime_class` |
+| Open PRs | **28** = 27 Dependabot + **PR #135 junk** (qwen-chat task bot; +25,677/−18,283, CONFLICTING; re-adds deleted `frontend/` → close+delete pending, T-017). PR #85 already closed + branch deleted | `gh pr list`, `gh pr view 135` |
 
 ## 2. Decisions ledger
 
@@ -44,6 +46,11 @@ Append-only ledger; never store secrets (env var *names* only).
 | D-011 | **PostgreSQL service container in CI is required** (backs `alembic upgrade head`); Redis is intentionally absent | Tests mock `redis.from_url`; `token_store` fails open. Removing PG breaks migrations |
 | D-012 | **Deploy host verification uses `STAGING_KNOWN_HOSTS` / `PRODUCTION_KNOWN_HOSTS` secrets**; `ssh-keyscan` is banned | `ssh-keyscan` is unauthenticated/MITM-able. Empty secret must fail the deploy |
 | D-013 | **Container runtime cannot run on this host.** Native PG18/Redis binaries are the only viable local path | `/proc/self` reports uid 0 → `newuidmap` fails for both rootlesskit and podman; `sudo` needs an interactive password |
+| D-014 | **`ENVIRONMENT` accepts exactly `dev` \| `test` \| `prod`** — never `production`. This is not configurable | `Settings` uses a `Literal`; a bad value raises at import. Only surfaces on a real deploy, since CI/dev use `dev` |
+| D-015 | **`.env.example` is generated from `backend/app/config.py`**, not hand-maintained. Every key must be a real `Settings` field or an explicit `docker-compose.yml` interpolation | `extra="ignore"` meant 14 dead keys loaded as no-ops while 12 real ones silently fell back to defaults |
+| D-016 | **Trivy in `ci.yml` is the only container scanner**; `snyk-container.yml` + `SNYK_TOKEN` removed (`ad13f2bb`) | Snyk ran red on every build (token never configured) and duplicated Trivy; Dependabot's snyk bump stream dies with the file |
+| D-017 | **GitHub environments `staging`/`production` are part of the deploy contract** — staging = branch `main` only, production = tag `v*` only, fail-closed | ci.yml declares `environment:` on both deploy jobs; without the environments the jobs die at the deployment-record step. `Docker`/tool-named envs are banned (orphans) |
+| D-018 | **Hosts are classified before provisioning** (`erp_detect_runtime_class`: docker-capable / proot-termux / containerized / unknown) | This very host is proot/Termux aarch64 — Docker can never run here (D-013); installer must guide to native mode instead of `get.docker.com` + `systemctl` failing mid-flight |
 
 ## 3. Progress log
 
@@ -118,41 +125,184 @@ Append-only ledger; never store secrets (env var *names* only).
   local Dependabot branches removed, `bcrypt` exact-pinned, README/CONTRIBUTING
   counts corrected. Verified: pytest 285, vitest 105/105, ruff, black, eslint
   0 errors, vite build, all 5 workflows parse with zero unpinned actions.
+- **Done (2026-10-08 env/prod correctness):** found and fixed a
+  **production-blocking** bug — `ENVIRONMENT` is `Literal["dev","test","prod"]`
+  yet `docker-compose.prod.yml` hardcoded `production` in both backend
+  services, and `install.sh` / `setup-production.sh` /
+  `.env.production.template` all generated it, so the documented production
+  deploy could never boot (D-014). Also rebuilt `.env.example` from
+  `config.py`: the old file set `ENVIRONMENT=development` (raises at import)
+  and carried 14 keys the app never reads while omitting 12 it requires
+  (D-015); now 30 keys, verified 0 unread / 0 missing. Fixed
+  `JWT_ALGORITHM`→`ALGORITHM`, added the `DOCKER_USER`/`VERSION` keys that
+  compose interpolates, moved `API_URL`/`WS_URL`/`SENTRY_DSN` under a "NOT
+  read" heading. Rebuilt `docs/GITHUB_SECRETS.md` from the workflows (it
+  documented `DOCKER_USERNAME`/`KUBE_CONFIG` that nothing reads; now all 11
+  secrets + 3 variables, checked 14/14). Deleted the stray `list` tag from the
+  remote. 8 commits pushed, `main` in sync with `origin/main`.
+- **Deferred (requested, not started):** "/compact the whole repo, remodify
+  easy to reuse this ERP for client UI/UX" — no scoping or file list agreed
+  with the user before the session closed. Treat as an open thread, not work.
+- **Done (2026-10-11 hygiene + proot + env/CI):** deep audit then 8 commits
+  (all local, **unpushed** per ask-gate): `.gitignore` TLS/secrets rules
+  (`f6ffc7b1`); codeql.yml duplicate `timeout-minutes` removed — the file was
+  rejected at queue time, killing every CodeQL run at 0s (`4dfeb278`);
+  orphan root `package-lock.json` + superseded `docker-build-push.sh` deleted
+  (`1f80d6b6`); **Snyk workflow removed** (Trivy remains; 4 docs swept —
+  `ad13f2bb`); **`erp_detect_runtime_class`** + proot early-exit +
+  `install.sh --preflight` native-mode report (`794101a9`, smoke-tested here:
+  class=proot-termux, all native components ok, exit 0); Termux/arm64 docs +
+  GitHub-Environments contract (`3daa791b`). GitHub side: `staging`
+  (branch main) + `production` (tag v*) environments created fail-closed,
+  orphan `Docker` env deleted, PR #85 (inverted, 21k junk files) closed and
+  branch deleted. Root-caused all remote CI failures: Tests=alembic GIN bug
+  (fixed locally in `bb7295f2`, unpushed), codeql=dup key (fixed), snyk=no
+  token (workflow removed). Local env audited: `.env` 22 keys +
+  `backend/.env` 23 keys, all compose `:?` vars set, ENVIRONMENT=dev both,
+  gitignored — nothing to change.
+- **Done (2026-10-12 harness report):** filed upstream issue for this host's
+  service-restart aborts — anomalyco/opencode#54567 ("silent service restart
+  mid-session aborts tool calls with 'location shut down'"; diagnostics:
+  v2.0.26 latest, proot aarch64, no plugins; dmesg unreadable so OOM cause
+  unconfirmed). Note: `opencode-ai/opencode` is archived — issues live at
+  `anomalyco/opencode` now.
+- **Done (2026-10-12 code fixes):** Makefile — portable npm (PATH first,
+  volatile `/tmp/opencode/npm10` fallback), `make lint` now activates the venv
+  (black was missing from system PATH and half-failed into `|| true`), dead
+  `tsc` step dropped (no tsconfig), eslint failures no longer swallowed
+  (verified green: 0 errors/127 warnings); new `make guard` →
+  `scripts/repo-guard.sh` fails on nested `.git` / missing tracked files /
+  empty `scripts/*.sh` (T-019 class). All pushed (`be57ca36`).
+- **Done (2026-10-12 Trivy CI fix, via subagent):** Security Scan failed on
+  the first run that actually pushed images — `docker/metadata-action`
+  `tags` is one ref per line but trivy-action passes `image-ref` as ONE
+  argument; fixed by a "Resolve single image refs" step (`46055158`).
+  **Verified:** run 38161185098 + 38161680076 (a210f1df) = success, both
+  images scanned (backend debian 13.7 / frontend alpine 3.24.2), SARIF ×2
+  uploaded → **5 code-scanning alerts** now visible. trivy-action 0.35.0 has
+  no default `exit-code` so findings never fail CI — gating is a pending
+  policy call. Fresh Dependabot banner: **10 vulns (3 critical, 1 high,
+  6 moderate)** — replaces the stale 96/10/50 in T-008. One Dependabot PR
+  (`dependabot/github_actions/github-actions-a79bd13708`, run 38161704324)
+  is red on Gitleaks — triage with T-009, not on main.
+- **Done (2026-10-12 project skills):** created `.opencode/skills/` with
+  `@erp-backend` (factory + 20 ROUTER_MOUNTS, auth/RBAC, alembic, test/lint
+  battery + pitfalls), `@erp-frontend` (D-001/D-008 rules, env contract,
+  npm-wrapper trap), `@erp-ops` (CI job graph, can_push/can_deploy exact
+  secret names, Trivy single-line-ref, deploy checklist) — auto-discovered,
+  pointed to from AGENTS.md. T-009 triage started: vite 6.4.4/esbuild
+  0.25.12 alerts are STALE (installed already past fix); real work =
+  vitest 1.6.1→3.2.6 (dev-only, 3 criticals via tinypool) then
+  react-router 6.30.6→7 + postcss-selector-parser 6→7 (tailwind 3 chain).
+- **Done (2026-10-11 push + first green CI):** pushed 9 commits on user
+  approval (`3cce8346..bedd042e`), then fixed the one test failure the push
+  exposed — fresh checkouts lack `backend/static/` (empty dirs are invisible
+  to git) so `StaticFiles(directory="static")` raised on import and both
+  health tests errored (283 passed, 2 errors). `os.makedirs(exist_ok=True)`
+  before the mount (`59156a96`), pushed. **CI run 38116547621 = success**,
+  CodeQL 38116547575 = success. First verified full pass: gitleaks, quality,
+  tests (285 + **alembic 001→008 on a live postgres:15** — GIN fix
+  proven), frontend build, **both Docker images built in CI**. Trivy +
+  deploy jobs correctly skipped (  fail-closed: `can_push=false`, no
+  `DOCKER_PAT_*` secrets — T-004).
+- **Done (2026-10-11 integration audit + drift sweep):** audited every
+  third-party integration's wiring (config → code → compose → docs):
+  Stripe (payments.py, fail-closed 400) — modernized `stripe.error.*` to
+  top-level `stripe.StripeError`/`stripe.SignatureVerificationError` (v8
+  deprecation); Ollama (llm_service, 10/120s httpx timeouts) — wired;
+  SMTP_* — **declared but unwired** (no mail service exists); SENTRY_DSN /
+  OPENAI_API_KEY / AWS_* — **not read** (no SDKs); uploads = local
+  UPLOAD_DIR; frontend reads only `VITE_API_URL` (default `/api/v1`), now
+  documented in new `backend/frontend-react/.env.example`. T-015 drift
+  sweep: README/STATUS counts (272 files/103 commits), infra row fixed
+  (no ES/S3 in repo; Ollama/Docker/GHA are real), 56 v1 `docker-compose`
+  CLI refs → v2, AGENTS.md 16→20 routers, profile chain/lint/coverage
+  claims corrected, GITHUB_SECRETS §3 rebuilt from actual Settings.
+  Verified: pytest 285, ruff+black clean, 0 v1 compose refs left.
+- **Done (2026-10-11 continue):** pushed the 3 audit commits
+  (`863009d7`…`42bd0e94`) on user continue; CI 38119431811 = success,
+  CodeQL = success — second consecutive green full pipeline.
+- **Done (2026-10-11 drift refresh + fixes):** re-ran every §1 source command —
+  all suites green: pytest 285 passed (6 warnings), ruff+black clean (67 files),
+  coverage **58.89%** ≥ 58 floor (stale `.coverage` artifact had claimed 57.85 —
+  no `--cov` in addopts, so plain `pytest` never refreshes it), vitest 105/105,
+  eslint 0 errors/127 warnings, vite build green (6 entries, 838.26 KiB),
+  alembic offline → 008. Drift fixed: junk **PR #135 closed** (+25,677/−18,283,
+  CONFLICTING, base `ci-cd-pipeline-basics-cf366`, head
+  `secure-github-env-setup-92546`, qwen-chat task bot — re-added deleted
+  `frontend/` and dead v1.8/v2.1 trees) **+ both branches deleted** (same
+  treatment as #85); README/STATUS/AGENTS.md counts 272→**273** files,
+  103→**107** commits, 58.21→**58.89%**. The two failing "Code scanning AI
+  findings on PR #135" runs were dynamic workflows on the junk branch, not repo
+  CI. Still open (cannot fix without user inputs): deploy secrets T-004, domain
+  vars T-016, vuln epics T-008/T-009.
+- **Done (2026-10-11 scripts/ restore):** at ~23:26 all 14 tracked `scripts/*.sh`
+  vanished from the worktree and an **empty nested `git init`** appeared at
+  `scripts/.git` (branch `master`, 0 commits, no remotes). Restored all files
+  with `git restore scripts/` (byte-identical to HEAD, modes intact), removed
+  the nested `.git`; `git status` clean afterward. Nothing lost — the nested
+  repo held zero commits. Likely the same qwen-chat task bot that opened junk
+  PR #135 (see T-019).
 
 ## 4. Open threads
 
 | ID | Thread | Next action |
 |----|--------|-------------|
-| T-003 | Alembic 001–008 **never applied to live PostgreSQL** — blocked: docker daemon down, start needs interactive sudo | `sudo systemctl start docker` → `docker compose up -d postgres redis` → `alembic upgrade head` |
-| T-011 | **CI deploy jobs need `STAGING_KNOWN_HOSTS` + `PRODUCTION_KNOWN_HOSTS` secrets** (new in D-012) or they fail closed | Populate with `ssh-keyscan -H <host>` once, then pin. See docs/GITHUB_SECRETS.md |
-| T-012 | **Container builds unverified** — no runtime on this host, so `docker build` for backend/frontend and the frontend `npm ci` image path are untested | First CI run on the pushed commit will exercise them; watch the `docker-*` jobs |
-| T-013 | Codespaces unusable: `api.github.com` TLS handshake timeout (0/3); `gh` unauthenticated | SHAs were resolved by scraping `/releases/tag/<version>` HTML instead |
-| T-004 | GitHub secrets pending: `DOCKER_USER`, `DOCKER_PAT_BACKEND/FRONTEND`; Docker Hub images empty; `gh` unauthenticated | `gh auth login` → STATUS_CHECKLIST.md → docs/GITHUB_SECRETS.md |
+| T-003 | ~~never applied to live PG~~ **resolved in CI 2026-10-11** — run 38116547621 applied `alembic upgrade head` 001→008 on a real postgres:15 service. Still not applied to a *persistent* local DB | Optional: native PG18 cluster for local persistent DB; CI covers every push |
+| T-011 | **CI deploy jobs need `STAGING_KNOWN_HOSTS` + `PRODUCTION_KNOWN_HOSTS` secrets** (D-012) or they fail closed | Populate with `ssh-keyscan -H <host>` once, then pin. See docs/GITHUB_SECRETS.md §1 |
+| T-012 | **Container builds now verified in CI** — run 38116547621 built both backend and frontend images green. Still never built *on this host* (proot class, D-013/D-018) | none for CI; local builds impossible by design |
+| T-013 | ~~gh unauthenticated~~ **resolved 2026-10-11** — `gh auth status` clean as `nyeinpyaesone-ui`. Codespaces TLS timeout never retested | none (closed except optional Codespaces retest) |
+| T-004 | **partially resolved 2026-10-11 (09:18Z):** `DOCKER_PAT_BACKEND` + `DOCKER_PAT_FRONTEND` now set → image push + Trivy activate on the **next main push** (verify on that run's jobs). Still missing: `SSH_PRIVATE_KEY`, `STAGING_KNOWN_HOSTS`, `PRODUCTION_KNOWN_HOSTS` → deploy jobs still fail closed | `gh secret set` per docs/GITHUB_SECRETS.md §1 (values only the user has); then re-check `can_push` + deploy jobs on the next CI run |
 | T-005 | Production server not provisioned (`.env.production`, services) | docs/END_USER_INSTALL.md |
-| T-007 | ~~Commits not pushed~~ **resolved this session** — `git push origin main` succeeded; `main` in sync with `origin/main` | none (closed) |
-| T-008 | GitHub reports 106 Dependabot vulnerabilities (9 critical) on default branch | `groups:` now batches them; close stale PRs for the 9 deleted branches |
-| T-009 | Frontend 2 moderate prod vulns remain — need breaking majors (react 19 / router 7 / tailwind 4) | batch upgrade epic after B1 |
+| T-007 | ~~Commits not pushed~~ **resolved 2026-10-11** — 10 commits pushed (`bb7295f2`…`59156a96`), CI green | none (closed) |
+| T-008 | GitHub Dependabot banner (refreshed 2026-10-12): **10 vulnerabilities — 3 critical, 1 high, 6 moderate** (was 96/10/50; the drop is real). Plus 5 Trivy code-scanning alerts from the first successful SARIF upload | T-009 epic; decide whether to gate CI on Trivy `exit-code` |
+| T-009 | Frontend moderate prod vulns remain — need breaking majors (react 19 / router 7 / tailwind 4, vite 7/8 in PRs) | batch upgrade epic after B1 |
 | T-010 | `backend/.env` created (random SECRET_KEY, gitignored) — local dev only; Docker/CI use their own env | none (informational) |
+| T-014 | **"Compact the whole repo, make it easy to reuse for client UI/UX"** — requested late in a prior session, no scope agreed | Needs an agreed target: which of the 12 modules to keep, and whether "reusable" means a theming layer, a template scaffold, or stripping the dead Legacy v1.8/v2.1 trees |
+| T-015 | ~~Doc-drift batch~~ **resolved 2026-10-11** — README counts + infra row (ES/S3 → Ollama/Docker/GHA), STATUS_CHECKLIST 259/64→272/103, 56 `docker-compose ` v1 CLI refs → v2 across 10 docs, AGENTS.md 16→20 routers, profile 001–006→001–008 / strict-TS→eslint / 80%→58% claims, GITHUB_SECRETS §3 rewritten to actual `Settings` wiring (SMTP reserved-unwired, SENTRY/OPENAI/AWS not read) | Re-open if new drift appears; keep AGENTS.md + profiles in the same sweep |
+| T-016 | `STAGING_DOMAIN` / `PRODUCTION_DOMAIN` repository variables **unset** — deploy jobs' GitHub-Deployment target_url renders empty | `gh variable set STAGING_DOMAIN --body …` once real hostnames exist |
+| T-017 | ~~junk PR #135 open~~ **resolved 2026-10-11** — closed on user approval, head `secure-github-env-setup-92546` + base `ci-cd-pipeline-basics-cf366` deleted. Same class as #85 (qwen-chat task bot, +25.7k/−18.3k, re-added deleted `frontend/`) | Re-open if another task-bot PR appears; treat >20k-line CONFLICTING diffs as junk by default |
+| T-018 | ~~README/STATUS doc counts stale~~ **resolved 2026-10-11, made permanent 2026-10-12** — counts bumped to 273/107/58.89%, then drifting current-HEAD counts removed from README/STATUS entirely (kept only the immutable v1.0.0 tag facts + a `git ls-files` pointer) | Nothing — recurrence structurally prevented |
+| T-019 | **qwen-chat task bot may be operating on this host** — same actor opened junk PR #135 (~14:52Z) and likely left an empty `git init` in `scripts/` that wiped 14 tracked scripts (~23:26). Files restored; **guard added 2026-10-12**: `make guard` → `scripts/repo-guard.sh` fails on nested `.git`, missing tracked files, or empty `scripts/*.sh` | Identify what automation/token that task uses (PR body says "task 0c24ebdf-…"); consider disabling it. Run `make guard` after any long background job or before commits |
 
 ## 5. Verification ledger
 
 | Check | Result | When |
 |-------|--------|------|
-| `pytest` (backend) | ✅ 285 passed, 6 warnings | 2026-10-08 |
-| backend `ruff check` + `black --check` | ✅ clean (67 files) | 2026-10-08 |
-| coverage (`coverage report`) | ✅ 58.21% (floor 58 from pyproject) | 2026-10-08 |
-| `backend/frontend-react` vitest | ✅ 105/105 (incl. single-client gate) | 2026-10-08 |
-| `backend/frontend-react` build | ✅ vite + PWA sw (6 entries, 838 KiB) | 2026-10-08 |
-| `backend/frontend-react` lint (eslint 10) | ✅ 0 errors / 127 warnings; CI enforces | 2026-10-08 |
+| `pytest` (backend) | ✅ 285 passed, 6 warnings (re-verified 2026-10-11) | 2026-10-11 |
+| backend `ruff check` + `black --check` | ✅ clean (67 files) | 2026-10-11 |
+| coverage (`coverage report`) | ✅ **58.89%** ≥ 58 floor (stale `.coverage` artifact claimed 57.85 — no `--cov` in addopts; `coverage run -m pytest` is the real measure) | 2026-10-11 |
+| `backend/frontend-react` vitest | ✅ 105/105 (incl. single-client gate) | 2026-10-11 |
+| `backend/frontend-react` build | ✅ vite + PWA sw (6 entries, 838.26 KiB) | 2026-10-11 |
+| `backend/frontend-react` lint (eslint 10) | ✅ 0 errors / 127 warnings; CI enforces | 2026-10-11 |
 | all 5 workflows: YAML parse + pin audit | ✅ 0 unpinned, concurrency + timeout everywhere | 2026-10-08 |
 | `docker compose config` | ✅ valid (no `version:` warning) | 2026-10-08 |
 | `npm ci` from lockfile (throwaway copy) | ✅ exit 0, 761 packages resolved | 2026-10-08 |
 | `requirements.txt` pin audit | ✅ 24/24 exact (`==`); bcrypt now `==4.3.0` | 2026-10-08 |
-| `alembic upgrade head --sql` (offline) | ✅ 47 DDL stmts to 008 | 2026-10-08 |
-| `alembic upgrade head` vs live DB | ⬜ not run — no container runtime (D-013) | — |
+| `alembic upgrade head --sql` (offline) | ✅ 47 DDL stmts to 008 (re-verified 2026-10-11) | 2026-10-11 |
+| ~~`alembic upgrade head` vs live DB~~ locally | ⬜ still impossible here (no container runtime, D-013) | — |
 | `docker build` backend + frontend | ⬜ not run — no container runtime (D-013) | — |
-| Live CI run on GitHub | ⬜ not run — commits pushed only after this session | — |
+| **CI run 38119698967 (main, `4eab0b09`)** | ✅ **success** — full pipeline on current HEAD | 2026-10-11 |
 | Codespaces as a fallback runtime | ⬜ unavailable — `api.github.com` TLS timeout | — |
+| `.env.example` vs `config.py` field audit | ✅ 30 keys, 0 unread, 0 missing (script-checked) | 2026-10-08 |
+| prod fail-closed matrix (placeholder/short key, example DB) | ✅ all three refuse; real key + real DB boots | 2026-10-08 |
+| `.env.production.template` vs compose interpolations | ✅ 8/8 vars present | 2026-10-08 |
+| `install.sh` + `setup-production.sh` shell syntax | ✅ `bash -n` clean | 2026-10-08 |
+| 4 workflows: strict YAML (dup-key loader) + pin audit | ✅ 0 dup keys, 0 unpinned, all parse (snyk file gone) | 2026-10-11 |
+| `install.sh --preflight` smoke on this host | ✅ runtime-class proot-termux, native components ok, exit 0 | 2026-10-11 |
+| new `.gitignore` rules vs tracked files | ✅ `git check-ignore` no matches; status clean | 2026-10-11 |
+| session diff vs origin/main: secret scan | ✅ 0 secret-like strings (8 commits) | 2026-10-11 |
+| GitHub environments `staging`/`production` | ✅ created; policies branch `main` / tag `v*`; orphan `Docker` deleted | 2026-10-11 |
+| `gh auth status` | ✅ authenticated `nyeinpyaesone-ui` | 2026-10-11 |
+| **CI run 38116547621 (main, `59156a96`)** | ✅ **success** — gitleaks, quality, tests, frontend build, both Docker images built | 2026-10-11 |
+| **CI run 38119431811 + CodeQL (main, `42bd0e94`)** | ✅ both success — integration audit + drift sweep push re-verified everything | 2026-10-11 |
+| CodeQL run 38116547575 | ✅ success (dup-key fix proven; python/js/actions analyzes green) | 2026-10-11 |
+| `alembic upgrade head` vs live DB | ✅ in CI — 001→008 applied to postgres:15 (8 "Running upgrade" lines) | 2026-10-11 |
+| CI pytest / vitest | ✅ 285 passed / 105 passed (with `backend/static/` absent → makedirs fix `59156a96`) | 2026-10-11 |
+| Trivy + deploy jobs | ⏳ skipped in CI — `can_push=false` until `DOCKER_PAT_*`/SSH secrets exist (T-004) | 2026-10-11 |
+| `docker build` backend + frontend on **this host** | ⬜ impossible — proot class (D-013/D-018); CI builds are the verification | — |
+| pytest local re-run after static-dir fix | ✅ 285 passed with `static/` removed (CI-faithful), ruff+black clean on `main.py` | 2026-10-11 |
+| frontend lint/build **local re-run** | ✅ 105/105 vitest, 0 errors/127 warnings, vite build green (6 entries, 838.26 KiB) | 2026-10-11 |
 
 > Rule: mark ⬜/⏳ honestly. Never upgrade a claim to ✅ without tool output.
 
