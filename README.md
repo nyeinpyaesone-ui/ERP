@@ -8,7 +8,7 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-ready-blue.svg)](https://kubernetes.io/)
 
-> Enterprise-grade AI-powered ERP system with 12 modules (274 files at tag `v1.0.0`; 259 files at current `HEAD`), and full CI/CD pipeline.
+> Enterprise-grade AI-powered ERP system with 12 modules and a full CI/CD pipeline.
 
 ## 🏗️ Platform Overview
 
@@ -27,7 +27,7 @@
 | Legacy v2.1 | v2.1 | 31 | ✅ |
 | Legacy v1.8 | v1.8 | 29 | ✅ |
 
-**Tag `v1.0.0`: 274 tracked files, 3 commits; current `HEAD` (`main`): 259 files, 64 commits — production-ready**
+**Tag `v1.0.0`: 274 tracked files, 3 commits — production-ready** (current tree size: `git ls-files | wc -l`)
 
 > Note: the module-file column above sums to 279; `274` is the total tracked-file count at tag `v1.0.0`, not the column sum.
 
@@ -38,12 +38,17 @@
 - Node.js 20+
 - Python 3.11+
 
+> **Termux / proot-distro (Android arm64)?** Docker cannot run there — use
+> the native mode (venv + native PostgreSQL/Redis) described in
+> [docs/END_USER_INSTALL.md](docs/END_USER_INSTALL.md#termux--proot-distro-android-arm64).
+> The backend's full test suite is verified to pass natively on aarch64.
+
 ### One-Command Setup
 ```bash
 git clone https://github.com/nyeinpyaesone-ui/ERP.git
 cd ERP
 ./scripts/setup.sh        # Install dependencies
-docker-compose up -d      # Start services
+docker compose up -d      # Start services
 ```
 
 ### Development
@@ -81,7 +86,7 @@ cd mobile && npx expo start
 │  CRM │ HR │ Inventory │ Finance │ Manufacturing │ POS  │
 ├─────────────────────────────────────────────────────────┤
 │                   Data & Infrastructure                  │
-│  PostgreSQL │ Redis │ Elasticsearch │ S3/MinIO │ K8s   │
+│  PostgreSQL │ Redis │ Ollama │ Docker │ GitHub Actions │
 └─────────────────────────────────────────────────────────┘
 ```
 

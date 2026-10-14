@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -234,7 +234,7 @@ def update_employee(
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(emp, key, value)
-    emp.updated_at = datetime.utcnow()
+    emp.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(emp)
     return emp

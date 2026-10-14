@@ -1,4 +1,4 @@
-.PHONY: help install dev build test clean docker-up docker-down push status lint
+.PHONY: help install dev build test clean docker-up docker-down push status lint guard
 
 help:
 	@echo "ERP SOLUTION — Available Commands"
@@ -14,8 +14,8 @@ help:
 	@echo "  make push         Push to GitHub"
 	@echo "  make status       Show repository status"
 
-# Portable npm: prefer system npx, fall back to bundled npm10 (npx absent from PATH here)
-NPM = node /tmp/opencode/npm10/package/bin/npm-cli.js
+# Portable npm: prefer npm on PATH (10.9.2 here), fall back to the volatile npm10 bootstrap
+NPM ?= $(shell command -v npm >/dev/null 2>&1 && echo npm || echo node /tmp/opencode/npm10/package/bin/npm-cli.js)
 
 install:
 	cd backend && python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt
@@ -36,8 +36,12 @@ test:
 	cd backend/frontend-react && $(NPM) test
 
 lint:
-	cd backend && ruff check . && black --check . && mypy app/ --ignore-missing-imports || true
-	cd backend/frontend-react && npm run lint || true && npx tsc --noEmit || true
+	cd backend && . venv/bin/activate && ruff check . && black --check .
+	cd backend && . venv/bin/activate && mypy app/ --ignore-missing-imports || true
+	cd backend/frontend-react && $(NPM) run lint
+
+guard:
+	./scripts/repo-guard.sh
 
 clean:
 	find . -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true

@@ -8,9 +8,8 @@ import {
 } from 'lucide-react';
 import { LineChartComponent, BarChartComponent, AreaChartComponent, Sparkline } from '../components/Charts.jsx';
 import { SkeletonStats } from '../components/Skeleton.jsx';
-import axios from 'axios';
+import api from '../api/axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const statCards = [
   { label: 'Contacts', icon: Users, color: 'bg-blue-500', path: '/crm', key: 'total_contacts', trend: 'contacts_trend' },
@@ -25,7 +24,6 @@ export default function Dashboard() {
   const [revenueData, setRevenueData] = useState([]);
   const [pipelineData, setPipelineData] = useState([]);
   const [activityData, setActivityData] = useState([]);
-  const token = localStorage.getItem('token');
 
   useEffect(() => {
     fetchDashboard();
@@ -34,13 +32,13 @@ export default function Dashboard() {
   const fetchDashboard = async () => {
     try {
       const [analytics, crm, hr, inventory, finance, projects, trends] = await Promise.all([
-        axios.get(`${API_URL}/api/v1/analytics/dashboard`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: {} })),
-        axios.get(`${API_URL}/api/v1/crm/dashboard`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: {} })),
-        axios.get(`${API_URL}/api/v1/hr/dashboard`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: {} })),
-        axios.get(`${API_URL}/api/v1/inventory/dashboard`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: {} })),
-        axios.get(`${API_URL}/api/v1/finance/dashboard`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: {} })),
-        axios.get(`${API_URL}/api/v1/projects/dashboard`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: {} })),
-        axios.get(`${API_URL}/api/v1/analytics/monthly-trends`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: {} })),
+        api.get(`/analytics/dashboard`).catch(() => ({ data: {} })),
+        api.get(`/crm/dashboard`).catch(() => ({ data: {} })),
+        api.get(`/hr/dashboard`).catch(() => ({ data: {} })),
+        api.get(`/inventory/dashboard`).catch(() => ({ data: {} })),
+        api.get(`/finance/dashboard`).catch(() => ({ data: {} })),
+        api.get(`/projects/dashboard`).catch(() => ({ data: {} })),
+        api.get(`/analytics/monthly-trends`).catch(() => ({ data: {} })),
       ]);
 
       setStats({

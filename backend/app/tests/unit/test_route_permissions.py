@@ -8,7 +8,19 @@ from fastapi.testclient import TestClient
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import Permission, Role
-from app.routers import auth, crm, documents, finance, hr, inventory
+from app.routers import (
+    ai,
+    analytics,
+    auth,
+    crm,
+    documents,
+    finance,
+    hr,
+    integrations,
+    inventory,
+    projects,
+    reports,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -24,6 +36,8 @@ ROUTES = [
     (hr, "/employees", "employees"),
     (inventory, "/products", "products"),
     (inventory, "/movements", "inventory"),
+    (projects, "/projects", "projects"),
+    (projects, "/projects/1/tasks", "tasks"),
 ]
 
 
@@ -80,6 +94,23 @@ def test_list_routes_enforce_specific_read_permission(
         (finance, "get", "/dashboard", "reports:read"),
         (hr, "get", "/dashboard", "reports:read"),
         (inventory, "get", "/dashboard", "reports:read"),
+        # Catalogue-unified routers (A3): any-authenticated access is banned.
+        (projects, "post", "/projects", "projects:create"),
+        (projects, "post", "/tasks", "tasks:create"),
+        (projects, "put", "/projects/1", "projects:update"),
+        (projects, "get", "/dashboard", "reports:read"),
+        (reports, "get", "/revenue", "reports:read"),
+        (reports, "get", "/chart/revenue", "reports:read"),
+        (analytics, "get", "/dashboard", "analytics:read"),
+        (analytics, "get", "/monthly-trends", "analytics:read"),
+        (ai, "post", "/chat", "ai:create"),
+        (ai, "get", "/insights", "ai:read"),
+        (ai, "get", "/forecast/revenue", "ai:read"),
+        (integrations, "post", "/integrations", "integrations:create"),
+        (integrations, "post", "/webhooks", "webhooks:create"),
+        (integrations, "get", "/webhooks", "webhooks:read"),
+        (integrations, "post", "/webhooks/1/test", "webhooks:test"),
+        (integrations, "get", "/webhooks/1/deliveries", "webhooks:read"),
     ],
 )
 def test_changed_write_and_report_routes_deny_unprivileged_users(

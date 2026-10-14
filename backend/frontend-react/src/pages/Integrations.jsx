@@ -1,23 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Plug, Webhook, Plus, Trash2, Send, CheckCircle, Slack, MessageCircle, Zap } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function Integrations() {
   const [integrations, setIntegrations] = useState([]);
   const [webhooks, setWebhooks] = useState([]);
   const [activeTab, setActiveTab] = useState('integrations');
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/v1/integrations/integrations`, axiosConfig).then(r => setIntegrations(r.data));
-    axios.get(`${API_URL}/api/v1/integrations/webhooks`, axiosConfig).then(r => setWebhooks(r.data));
+    api.get(`/integrations/integrations`).then(r => setIntegrations(r.data));
+    api.get(`/integrations/webhooks`).then(r => setWebhooks(r.data));
   }, []);
 
   const testWebhook = async (id) => {
     try {
-      const res = await axios.post(`${API_URL}/api/v1/integrations/webhooks/${id}/test`, {}, axiosConfig);
+      const res = await api.post(`/integrations/webhooks/${id}/test`, {});
       alert(`Webhook test: ${res.data.status}`);
     } catch (e) { alert('Test failed'); }
   };

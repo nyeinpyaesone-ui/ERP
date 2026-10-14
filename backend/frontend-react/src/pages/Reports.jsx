@@ -1,20 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, BarChart3, Download, TrendingUp, PieChart, Activity } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function Reports() {
   const [revenue, setRevenue] = useState(null);
   const [pipeline, setPipeline] = useState(null);
   const [inventory, setInventory] = useState(null);
   const [activeReport, setActiveReport] = useState('revenue');
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => {
-    if (activeReport === 'revenue') axios.get(`${API_URL}/api/v1/reports/revenue`, axiosConfig).then(r => setRevenue(r.data));
-    if (activeReport === 'pipeline') axios.get(`${API_URL}/api/v1/reports/pipeline`, axiosConfig).then(r => setPipeline(r.data));
-    if (activeReport === 'inventory') axios.get(`${API_URL}/api/v1/reports/inventory`, axiosConfig).then(r => setInventory(r.data));
+    if (activeReport === 'revenue') api.get(`/reports/revenue`).then(r => setRevenue(r.data));
+    if (activeReport === 'pipeline') api.get(`/reports/pipeline`).then(r => setPipeline(r.data));
+    if (activeReport === 'inventory') api.get(`/reports/inventory`).then(r => setInventory(r.data));
   }, [activeReport]);
 
   const reports = [
