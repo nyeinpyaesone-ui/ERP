@@ -39,10 +39,10 @@ cp backend/.env.example backend/.env
 # Edit: DATABASE_URL, REDIS_URL, SECRET_KEY
 
 # 3. Start production stack
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # 4. Run migrations
-docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
 
 # 5. Verify (nginx is the only published port in the prod stack)
 curl http://localhost/api/v1/health
@@ -166,7 +166,7 @@ resources:
 - [ ] Enable 2FA for all admin accounts
 - [ ] Set up WAF (Cloudflare/AWS WAF)
 - [ ] Regular security audits
-- [ ] Dependency scanning (Snyk/Dependabot)
+- [ ] Dependency scanning (Trivy in CI / Dependabot)
 - [ ] Secrets rotation (monthly)
 - [ ] Network segmentation (VPC)
 - [ ] Backup encryption
@@ -180,9 +180,9 @@ resources:
 **Database connection failed**
 ```bash
 # Check PostgreSQL is running
-docker-compose ps
+docker compose ps
 # Check logs
-docker-compose logs postgres
+docker compose logs postgres
 # Verify credentials
 cat backend/.env | grep DATABASE_URL
 ```
