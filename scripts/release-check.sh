@@ -72,16 +72,32 @@ check_version "mobile"                  "$(ver_pkgjson mobile)"
 
 ###############################################################################
 # Gate 3 — Tag placement & prefix convention
+#   * On a tagged commit: strict exact-match check.
+#   * On the release branch tip (post-tag tooling commits): resolve the most
+#     recent reachable tag and require that ONLY chore/docs/tooling changes
+#     sit between it and HEAD (no source drift after tagging).
 ###############################################################################
 gate_start "3/9 release-tag"
 TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || true)
+TAG_MODE="on-HEAD"
+if [ -z "$TAG" ]; then
+    TAG=$(git describe --tags 2>/dev/null || true)   # nearest reachable tag
+    TAG_MODE="behind-HEAD"
+fi
 PREFIX="${GATE_PREFIX:-v}"
 if [ -z "$TAG" ]; then
-    fail "HEAD is not tagged (expected ${PREFIX}<version>)" "release-tag"
+    fail "no reachable tag on HEAD (expected ${PREFIX}<version>)" "release-tag"
 elif [[ "$TAG" != ${PREFIX}[0-9]* ]]; then
     fail "tag '$TAG' violates prefix convention '${PREFIX}N.N.N'" "release-tag"
 elif [ -n "$EXPECTED_VERSION" ] && [ "${TAG#$PREFIX}" != "$EXPECTED_VERSION" ]; then
     fail "tag '$TAG' disagrees with package version $EXPECTED_VERSION" "release-tag"
+elif [ "$TAG_MODE" = "behind-HEAD" ]; then
+    DRIFT=$(git diff --name-only "$TAG"..HEAD | grep -vE '^(scripts/|docs/|README|CHANGELOG|\.github/)' || true)
+    if [ -z "$DRIFT" ]; then
+        pass "tag $TAG (release); only tooling/docs commits since tag — no source drift"
+    else
+        fail "source files changed after tag $TAG: $(echo "$DRIFT" | head -3 | tr '\n' ' ')" "release-tag"
+    fi
 else
     pass "tag $TAG on HEAD, matches ${PREFIX}-prefix + version $EXPECTED_VERSION"
 fi
