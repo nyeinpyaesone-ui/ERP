@@ -33,7 +33,7 @@ bcrypt==4.3.0
 # ── Integrations / clients ───────────────────────────────────────────────────
 httpx==0.28.1
 redis==8.1.0
-stripe==8.0.0
+stripe==16.0.0
 
 # Used by app/routers/reports.py:/chart/revenue (lazy import, graceful
 # fallback when absent).
