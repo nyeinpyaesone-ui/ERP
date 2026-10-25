@@ -5,17 +5,19 @@ Uses Redis sorted sets for O(log N) performance.
 import time
 import redis.asyncio as redis
 
+from app.config import settings
+
 class SlidingWindowLimiter:
     """Production-grade rate limiter with sliding window algorithm."""
-    
+
     PREFIX = "rate:"
 
-    def __init__(self, host: str = "redis", port: int = 6379):
-        self.redis = redis.Redis(
-            host=host,
-            port=port,
+    def __init__(self, url: str | None = None):
+        # Single source of truth: settings.REDIS_URL (works in local dev and Docker)
+        self.redis = redis.from_url(
+            url or settings.REDIS_URL,
             socket_connect_timeout=1,
-            socket_keepalive=True
+            socket_keepalive=True,
         )
 
     async def is_allowed(self, identifier: str, limit: int, window: int = 60) -> bool:
