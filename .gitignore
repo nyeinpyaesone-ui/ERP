@@ -81,3 +81,6 @@ ssl/
 !.env.example
 !.env.production.template
 !backend/.env.example
+
+# Jev-Intercept runtime events
+.opencode/intercept/

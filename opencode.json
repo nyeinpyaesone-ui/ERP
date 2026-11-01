@@ -21,7 +21,10 @@
     { "action": "websearch", "resource": "*", "effect": "allow" },
     { "action": "shell", "resource": "*", "effect": "allow" },
     { "action": "shell", "resource": "git push *", "effect": "ask" },
-    { "action": "shell", "resource": "rm -rf *", "effect": "ask" }
+    { "action": "shell", "resource": "rm -rf *", "effect": "ask" },
+    { "action": "shell", "resource": ".opencode/skills/jev-intercept/scripts/run_backend_intercept.sh", "effect": "allow" },
+    { "action": "shell", "resource": ".opencode/skills/jev-dynamic-detect/scripts/jev-detect.sh", "effect": "allow" },
+    { "action": "shell", "resource": ".opencode/skills/jev-intercept/scripts/jev-intercept.sh", "effect": "allow" }
   ],
   "mcp": {
     "servers": {

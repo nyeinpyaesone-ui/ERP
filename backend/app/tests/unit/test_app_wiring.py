@@ -39,7 +39,13 @@ def test_liveness_registered_at_root_and_versioned_path(application, path: str) 
 
 
 @pytest.mark.parametrize(
-    "path", ["/api/v1/permissions/roles", "/api/v1/search/", "/api/v1/llm/models"]
+    "path",
+    [
+        "/api/v1/permissions/roles",
+        "/api/v1/search/",
+        "/api/v1/llm/models",
+        "/api/v1/jev/intercept/status",
+    ],
 )
 def test_router_prefix_is_applied_once(application, path: str) -> None:
     with TestClient(application) as client:

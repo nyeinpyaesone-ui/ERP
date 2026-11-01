@@ -1,6 +1,6 @@
 ---
 name: ERP Backend
-description: FastAPI backend micro-details for /home/admin/ERP/backend - app factory, 20 router mounts, auth/RBAC, permissions catalogue, migrations, and the exact test/lint/coverage battery with expected results and known pitfalls
+description: FastAPI backend micro-details for /home/admin/ERP/backend - app factory, 21 router mounts, auth/RBAC, permissions catalogue, migrations, and the exact test/lint/coverage battery with expected results and known pitfalls
 ---
 
 # ERP Backend (FastAPI, sync SQLAlchemy)

@@ -7,12 +7,12 @@ This file owns **repo facts**. `AGENTS PROFILE/MEMORY.md` (auto-loaded via `open
 
 ```
 backend/                       # the only backend (FastAPI)
-  app/main.py                  # create_app() factory + ROUTER_MOUNTS — the single router registry (20 mounts)
+  app/main.py                  # create_app() factory + ROUTER_MOUNTS — the single router registry (21 mounts)
   app/models.py                # ALL 39 SQLAlchemy models (sync Session). Never split without updating alembic/env.py
   app/config.py                # Pydantic Settings; reads ./.env
   app/permissions_catalogue.py # single source of truth: resources, actions, role grants
   app/services/permissions.py  # has_permission / get_user_permissions live ONLY here
-  app/routers/ (20) · app/services/ · app/tests/ · alembic/versions/ (001→008)
+  app/routers/ (21) · app/services/ · app/tests/ · alembic/versions/ (001→008)
   pytest.ini                   # the ACTIVE pytest config — see Testing
   frontend-react/              # canonical frontend (see below)
   docker-compose.yml           # nested and UNUSED — the root compose file is the real one

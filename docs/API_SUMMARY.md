@@ -1,6 +1,6 @@
 # API Documentation Summary
 
-> Generated from live OpenAPI (`GET /openapi.json`). **98 paths** total.
+> Generated from live OpenAPI (`GET /openapi.json`). **102 paths** total.
 > Source of truth: `backend/app/main.py` router registration + `TestClient(app).get('/openapi.json')`.
 > All API routes are versioned under `/api/v1`. There is no unversioned `/auth/*` tree.
 
@@ -27,7 +27,7 @@
 
 | Router module (`app/routers/`) | Prefix | Tag | Paths |
 |---|---|---|---|
-| `auth` | `/api/v1/auth` | Authentication | 5 |
+| `auth` | `/api/v1/auth` | Authentication | 7 |
 | `crm` | `/api/v1/crm` | CRM | 8 |
 | `hr` | `/api/v1/hr` | HR | 4 |
 | `inventory` | `/api/v1/inventory` | Inventory | 4 |
@@ -45,6 +45,7 @@
 | `search` | `/api/v1/search` | Search | 7 |
 | `permissions` | `/api/v1/permissions` | Permissions | 11 |
 | `llm` | `/api/v1/llm` | LLM | 13 |
+| `jev_intercept` | `/api/v1/jev` | Jev-Intercept | 2 |
 | `health` | `/api/v1` | Health | 2 (`GET /api/v1/health`, `GET /api/v1/ready`) |
 | `health_root` | `` (root) | Health | 2 (`GET /health`, `GET /ready`) |
 
@@ -64,12 +65,14 @@ Root `GET /` returns service info (`name`, `version`, `status`, `features`).
 
 ## Endpoints by group (live paths)
 
-### Auth — `/api/v1/auth` (5 paths)
+### Auth — `/api/v1/auth` (7 paths)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/v1/auth/login` | Login (OAuth2 password flow, returns JWT) |
 | POST | `/api/v1/auth/register` | User registration |
 | GET | `/api/v1/auth/me` | Current user |
+| POST | `/api/v1/auth/logout` | Revoke the current token |
+| POST | `/api/v1/auth/refresh` | Rotate a refresh token |
 | GET | `/api/v1/auth/users` | List users |
 | PUT | `/api/v1/auth/users/{user_id}` | Update user |
 
@@ -233,6 +236,12 @@ const ws = new WebSocket('wss://api.yourdomain.com/api/v1/ws/...');
 | DELETE | `/api/v1/llm/templates/{template_id}` | Delete template |
 | GET | `/api/v1/llm/analytics/usage` | LLM usage analytics |
 | GET | `/api/v1/llm/analytics/conversations` | Conversation analytics |
+
+### Jev-Intercept — `/api/v1/jev` (2 paths)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/jev/intercept` | Append one interception event (permission `jev_intercept:create`) |
+| GET | `/api/v1/jev/intercept/status` | Interception enabled flag, event file path and count (permission `jev_intercept:read`) |
 
 ### Health — `/api/v1` + root (4 paths)
 | Method | Endpoint | Description |
