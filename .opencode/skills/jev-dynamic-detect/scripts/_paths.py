@@ -23,7 +23,7 @@ def skill_roots() -> list[Path]:
         roots.append(Path(override).expanduser())
     roots.append(REPO_ROOT / ".opencode" / "skills")
     # A checkout usually lives under its owner's home (e.g.
-    # A checkout usually lives under its owner's home (e.g. /home/<user>/projects/ERP),\n    # so that home's skill root is a candidate too.
+    # /home/admin/projects/ERP), so that home's skill root is a candidate too.
     if len(REPO_ROOT.parents) > 1:
         roots.append(REPO_ROOT.parents[1] / ".opencode" / "skills")
     roots.extend(
