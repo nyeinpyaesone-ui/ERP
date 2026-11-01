@@ -4,7 +4,7 @@ Durable cross-session state. Companion to [`AGENTS.md`](../AGENTS.md)
 (AGENTS.md = **how the repo works**; this file = **what is true right now**).
 Append-only ledger; never store secrets (env var *names* only).
 
-**Last verified:** 2026-10-15 (session: T-009 majors to audit 0, gitleaks PR-scan fix, image hygiene — see §3)
+**Last verified:** 2026-11-01 (session: Jev-Intercept repo-native — 295 passed, 58.96%, guard OK)
 
 ---
 
