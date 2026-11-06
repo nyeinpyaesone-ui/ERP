@@ -1,7 +1,7 @@
 # node:20 is EOL (April 2026) and its runtime advisories are what Trivy
 # flags in the image; node 24 matches the version local dev and CI build
 # with (v24.21.0), so the image stops drifting from the test environment.
-FROM node:24-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 # Copy the lockfile alongside the manifest so `npm ci` installs exactly the
