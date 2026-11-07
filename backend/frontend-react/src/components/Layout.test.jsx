@@ -1,6 +1,6 @@
 import React from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { expect, it, vi } from 'vitest'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from './Layout'
@@ -20,6 +20,23 @@ it('renders route content passed by the application router', () => {
   )
   expect(screen.getByRole('main')).toContainElement(
     screen.getByRole('heading', { name: 'CRM route content' }),
+  )
+})
+
+it('renders nested route content through Outlet when children are not supplied', () => {
+  useAuth.mockReturnValue({ user: { name: 'Alex' }, logout: vi.fn() })
+  render(
+    <MemoryRouter initialEntries={['/crm']}>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/crm" element={<h1>Nested CRM route content</h1>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  )
+
+  expect(screen.getByRole('main')).toContainElement(
+    screen.getByRole('heading', { name: 'Nested CRM route content' }),
   )
 })
 
