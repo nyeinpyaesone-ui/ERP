@@ -163,6 +163,12 @@ the matching token file with \`--backend-token-file\` or
 \`--frontend-token-file\`; do not paste PAT values in chat, shell history, or
 repository files.
 
+The optional \`OPENCODE_API_KEY\` is not required for Docker publishing or
+deployment. When the OpenCode automation integration is intentionally enabled,
+supply \`--opencode-key-file /secure/path/opencode-key.txt\`; the setup script
+adds it only when the repository secret is absent and never overwrites an
+existing key.
+
 Validate repository configuration without writing by omitting \`--apply\`.
 The script requires the real host/domain values and verified known-host files.
 It also requires \`gh\` authenticated to the target repository and \`jq\`
