@@ -401,6 +401,8 @@ jobs:
           password: ${{ secrets.DOCKER_PAT_BACKEND }}
 
       - name: Run Trivy on backend
+        id: trivy-backend
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
         with:
           image-ref: ${{ needs.docker-backend.outputs.image_sha_ref }}
@@ -416,6 +418,8 @@ jobs:
           password: ${{ secrets.DOCKER_PAT_FRONTEND }}
 
       - name: Run Trivy on frontend
+        id: trivy-frontend
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
         with:
           image-ref: ${{ needs.docker-frontend.outputs.image_sha_ref }}
@@ -425,18 +429,30 @@ jobs:
           output: trivy-frontend.sarif
 
       - name: Upload Trivy backend results
-        if: always()
+        if: always() && hashFiles('trivy-backend.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend
 
       - name: Upload Trivy frontend results
-        if: always()
+        if: always() && hashFiles('trivy-frontend.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: trivy-frontend.sarif
           category: trivy-frontend
+
+      - name: Enforce image vulnerability gate
+        if: always()
+        env:
+          BACKEND_SCAN: ${{ steps.trivy-backend.outcome }}
+          FRONTEND_SCAN: ${{ steps.trivy-frontend.outcome }}
+        run: |
+          set -euo pipefail
+          if [ "${BACKEND_SCAN}" != "success" ] || [ "${FRONTEND_SCAN}" != "success" ]; then
+            echo "::error::Both image scans must complete successfully with no HIGH or CRITICAL findings."
+            exit 1
+          fi
 
   deploy-staging:
     name: Deploy to Staging
