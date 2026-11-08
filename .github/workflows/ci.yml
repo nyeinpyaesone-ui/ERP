@@ -79,7 +79,11 @@ jobs:
           PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
         run: |
           set -euo pipefail
-          user="${DOCKER_USER_VAR:-powerrangeranikg}"
+          user="${DOCKER_USER_VAR:-local}"
+          if [ -n "${DOCKER_USER_VAR}" ] && [[ ! "${DOCKER_USER_VAR}" =~ ^[a-z0-9][a-z0-9_-]{0,127}$ ]]; then
+            echo "::error::DOCKER_USER must be a valid lowercase Docker Hub namespace."
+            exit 1
+          fi
           echo "docker_user=${user}" >> "$GITHUB_OUTPUT"
 
           can_push=false
