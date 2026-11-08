@@ -66,7 +66,7 @@ the staging-specific env file. Existing Secrets are not overwritten unless
 Verify only the Secret metadata (not its data) and render both overlays:
 
 ```bash
-kubectl --context <production-context> -n erp_solution get secret erp-solution-secrets
+kubectl --context <production-context> -n erp-solution get secret erp-solution-secrets
 kubectl --context <staging-context> -n erp-solution-staging get secret staging-erp-solution-secrets
 kubectl kustomize infra/k8s/overlays/staging
 kubectl kustomize infra/k8s/overlays/production
