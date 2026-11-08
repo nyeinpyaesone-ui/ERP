@@ -4,6 +4,7 @@ kind: Kustomization
 namespace: erp-solution-dev
 resources:
   - ../../base
+  - namespace.yaml
 
 namePrefix: dev-
 nameSuffix: -dev
