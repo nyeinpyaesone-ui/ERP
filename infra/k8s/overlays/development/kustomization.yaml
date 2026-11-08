@@ -13,11 +13,11 @@ commonLabels:
   environment: development
 
 replicas:
-  - name: erp_solution-api
+  - name: erp-solution-api
     count: 1
-  - name: erp_solution-web
+  - name: erp-solution-web
     count: 1
-  - name: erp_solution-worker
+  - name: erp-solution-worker
     count: 1
 
 patches:
