@@ -532,6 +532,18 @@ jobs:
           username: ${{ needs.config.outputs.docker_user }}
           password: ${{ secrets.DOCKER_PAT_BACKEND }}
 
+      # Human-readable diagnostics are retained in the job log and artifact.
+      # This pass is informational; the SARIF pass below owns the blocking gate.
+      - name: Report backend HIGH/CRITICAL findings
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
+        with:
+          image-ref: ${{ needs.docker-backend.outputs.image_sha_ref }}
+          exit-code: '0'
+          severity: CRITICAL,HIGH
+          format: table
+          output: trivy-backend.txt
+
       - name: Run Trivy on backend
         id: trivy-backend
         continue-on-error: true
@@ -549,6 +561,16 @@ jobs:
         with:
           username: ${{ needs.config.outputs.docker_user }}
           password: ${{ secrets.DOCKER_PAT_FRONTEND }}
+
+      - name: Report frontend HIGH/CRITICAL findings
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
+        with:
+          image-ref: ${{ needs.docker-frontend.outputs.image_sha_ref }}
+          exit-code: '0'
+          severity: CRITICAL,HIGH
+          format: table
+          output: trivy-frontend.txt
 
       - name: Run Trivy on frontend
         id: trivy-frontend
@@ -574,6 +596,21 @@ jobs:
         with:
           sarif_file: trivy-frontend.sarif
           category: trivy-frontend
+
+      # Keep machine-readable and human-readable reports for PR and non-PR runs,
+      # including runs where Trivy reports findings and the enforcement gate fails.
+      - name: Archive Trivy reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: trivy-image-reports-${{ github.run_id }}
+          path: |
+            trivy-backend.sarif
+            trivy-frontend.sarif
+            trivy-backend.txt
+            trivy-frontend.txt
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Enforce image vulnerability gate
         if: always()
