@@ -33,7 +33,9 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/pr-map-reduce-orchestrator.yml"
+      - ".github/workflows/ci.yml"
       - "scripts/pr-orchestrator/**"
+      - ".opencode/agents/**"
       - ".opencode/skills/pr-map-reduce/**"
       - "docs/PR_MAP_REDUCE_ORCHESTRATION.md"
 
