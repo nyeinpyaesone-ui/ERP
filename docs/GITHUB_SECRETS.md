@@ -34,7 +34,9 @@ Generate a token at <https://hub.docker.com/settings/access/tokens>.
 | `PRODUCTION_HOST` | `deploy-production` | Production hostname or IP |
 | `PRODUCTION_KNOWN_HOSTS` | `deploy-production` | **Required.** Pinned host keys |
 
-Environment isolation — staging requires only staging SSH credentials; production requires only production SSH credentials. Use separate deploy keys and scope them to their respective GitHub Environments where practical.
+Environment isolation — use separate staging and production SSH keys. **These secrets must currently be repository-level Actions secrets** because the `config` job detects their presence before either deploy job starts; environment-scoped secrets are not visible to that detector. The deploy jobs still use the `staging` and `production` GitHub Environments for branch/tag policies and any configured approval rules.
+
+Remote registry access — the deploy workflow pulls both Docker Hub images on the target host over SSH. Provision a read-only Docker Hub credential on each host (`docker login` for the configured namespace) and verify it can pull both `erp-solution-backend` and `erp-solution-frontend`. CI push tokens are not sent to the servers.
 
 Host-key note — the workflows previously ran `ssh-keyscan` at deploy time.
 `ssh-keyscan` performs **no authentication**: whatever answers the TCP
@@ -78,8 +80,7 @@ Variables are not secret — they are safe to read in logs and to use in
 | `STAGING_DOMAIN` | `deploy-staging` | Staging hostname for deployment links |
 | `PRODUCTION_DOMAIN` | `deploy-production` | Production hostname for deployment links |
 
-If `DOCKER_USER` is unset, `docker/metadata-action` receives an empty `images`
-value and the `docker-*` jobs fail at the push step.
+If `DOCKER_USER` or either Docker Hub push token is unset, images are built and validated but are not published; the deploy jobs are skipped. Staging deploys the immutable `sha-*` tag from that build by default. Production deploys the immutable Git release tag (`v*`).
 
 ## 3. Optional — runtime only, not referenced by CI
 
@@ -105,9 +106,17 @@ Frontend: the browser bundle reads `VITE_API_URL` at build time
 ```bash
 gh auth login
 
-gh secret set DOCKER_PAT_BACKEND < token.txt
-gh secret set STAGING_KNOWN_HOSTS < /tmp/staging_known_hosts
-gh variable set DOCKER_USER --body "powerrangeranikg"
+gh secret set DOCKER_PAT_BACKEND < /secure/path/docker-backend-push-token.txt
+gh secret set DOCKER_PAT_FRONTEND < /secure/path/docker-frontend-push-token.txt
+gh secret set STAGING_SSH_PRIVATE_KEY < /secure/path/staging_deploy_key
+ gh secret set PRODUCTION_SSH_PRIVATE_KEY < /secure/path/production_deploy_key
+gh secret set STAGING_KNOWN_HOSTS < /secure/path/staging_known_hosts
+ gh secret set PRODUCTION_KNOWN_HOSTS < /secure/path/production_known_hosts
+ gh secret set STAGING_HOST --body "<staging-host>"
+ gh secret set STAGING_USER --body "<staging-user>"
+ gh secret set PRODUCTION_HOST --body "<production-host>"
+ gh secret set PRODUCTION_USER --body "<production-user>"
+gh variable set DOCKER_USER --body "<docker-hub-namespace>"
 ```
 
 ## 5. Verification
