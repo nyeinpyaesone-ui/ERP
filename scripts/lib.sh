@@ -274,12 +274,12 @@ erp_env_value() {
 
 erp_detect_docker_user() {
     if [ -n "${DOCKER_USER:-}" ]; then
-        printf '%s\\n' "${DOCKER_USER}"
+        printf '%s\n' "${DOCKER_USER}"
         return 0
     fi
     local value=""
     if value="$(erp_env_value DOCKER_USER 2>/dev/null)" && [ -n "${value}" ]; then
-        printf '%s\\n' "${value}"
+        printf '%s\n' "${value}"
         return 0
     fi
     erp_error "DOCKER_USER is required. Set it in ${ERP_ENV_FILE:-.env.production} or export it before running deployment commands."
