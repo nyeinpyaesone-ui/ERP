@@ -34,7 +34,7 @@ Generate a token at <https://hub.docker.com/settings/access/tokens>.
 | `PRODUCTION_HOST` | `deploy-production` | Production hostname or IP |
 | `PRODUCTION_KNOWN_HOSTS` | `deploy-production` | **Required.** Pinned host keys |
 
-Environment isolation — use separate staging and production SSH keys. **These secrets must currently be repository-level Actions secrets** because the `config` job detects their presence before either deploy job starts; environment-scoped secrets are not visible to that detector. The deploy jobs still use the `staging` and `production` GitHub Environments for branch/tag policies and any configured approval rules.
+Environment isolation — use separate staging and production SSH keys. **These secrets must currently be repository-level Actions secrets** because the `config` job detects their presence before either deploy job starts; environment-scoped secrets are not visible to that detector. The deploy jobs still use the `staging` and `production` GitHub Environments for branch/tag policies and any configured approval rules. Neither a main push nor a release-tag push deploys automatically: operators must manually dispatch `CI` with `deploy_staging=true` on `main` or `deploy_production=true` on a `v*` tag.
 
 Remote registry access — the deploy workflow pulls both Docker Hub images on the target host over SSH. Provision a read-only Docker Hub credential on each host (`docker login` for the configured namespace) and verify it can pull both `erp-solution-backend` and `erp-solution-frontend`. CI push tokens are not sent to the servers.
 
