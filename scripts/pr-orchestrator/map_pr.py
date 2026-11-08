@@ -6,11 +6,12 @@ import argparse
 import json
 import os
 import sys
+import time
 from collections.abc import Iterable
 from typing import Any
 from urllib.parse import urlencode
 
-from client import api_get, api_paginate, repo_api_path, write_json
+from client import api_get, api_paginate, api_paginate_field, repo_api_path, write_json
 
 ALLOWED_CHECK_CONCLUSIONS = {"success", "skipped", "neutral"}
 RISK_ORDER = {
@@ -27,7 +28,7 @@ def latest_check_runs(check_runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keep the newest observation for each check name and GitHub App."""
     latest: dict[tuple[str, int | None], dict[str, Any]] = {}
     for check in check_runs:
-        app_id = check.get("app", {}).get("id")
+        app_id = (check.get("app") or {}).get("id")
         key = (str(check.get("name", "unnamed")), app_id)
         timestamp = check.get("completed_at") or check.get("started_at") or ""
         previous = latest.get(key)
@@ -165,8 +166,14 @@ def evaluate_pr(
         if incomplete:
             reasons.append("checks_not_green:" + ",".join(sorted(set(incomplete))))
 
-    if combined_status.get("state") != "success":
-        reasons.append(f"commit_status_{combined_status.get('state') or 'missing'}")
+    # GitHub's classic commit-status API is independent of Actions check-runs.
+    # A pending combined status with zero contexts is not a failure when the
+    # check-runs API above contains completed successful checks.
+    classic_statuses = combined_status.get("statuses") or []
+    if classic_statuses and combined_status.get("state") != "success":
+        reasons.append(
+            f"commit_status_{combined_status.get('state') or 'missing'}"
+        )
 
     latest_reviews = _latest_reviews_by_user(reviews)
     requested_changes = [
@@ -212,9 +219,15 @@ def build_pr_report(
 ) -> dict[str, Any]:
     token_query = urlencode({"per_page": 100})
     pr = api_get(repo_api_path(f"/pulls/{number}"))
+    for _ in range(5):
+        if pr.get("mergeable") is not None:
+            break
+        time.sleep(2)
+        pr = api_get(repo_api_path(f"/pulls/{number}"))
     head_sha = pr.get("head", {}).get("sha", "")
-    checks = api_paginate(
-        repo_api_path(f"/commits/{head_sha}/check-runs") + f"?{token_query}"
+    checks = api_paginate_field(
+        repo_api_path(f"/commits/{head_sha}/check-runs") + f"?{token_query}",
+        "check_runs",
     )
     combined_status = api_get(
         repo_api_path(f"/commits/{head_sha}/status")
