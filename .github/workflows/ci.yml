@@ -9,15 +9,25 @@ on:
   # Manual re-run for recovery or a rollback without pushing a new commit.
   workflow_dispatch:
     inputs:
+      deploy_staging:
+        description: "Approve a staging deployment of the selected main-branch commit"
+        required: false
+        default: false
+        type: boolean
+      deploy_production:
+        description: "Approve a production deployment of the selected v* release tag"
+        required: false
+        default: false
+        type: boolean
       rollback:
-        description: "Version to roll back to on the staging environment (blank = normal deploy)"
+        description: "Staging rollback target (sha-* or v*); requires deploy_staging=true"
         required: false
         type: string
 
-# Overlapping pushes must not race each other through the blue-green deploy.
-# Superseded runs on a branch are cancelled; deploy-relevant refs are serialized.
+# PR runs are isolated by ref and may be superseded. All non-PR runs share
+# one lock so different release tags cannot race the same blue-green hosts.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || 'deployments' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -60,7 +70,8 @@ jobs:
     outputs:
       docker_user: ${{ steps.detect.outputs.docker_user }}
       can_push: ${{ steps.detect.outputs.can_push }}
-      can_deploy: ${{ steps.detect.outputs.can_deploy }}
+      can_deploy_staging: ${{ steps.detect.outputs.can_deploy_staging }}
+      can_deploy_production: ${{ steps.detect.outputs.can_deploy_production }}
     steps:
       - name: Detect available configuration
         id: detect
@@ -68,7 +79,8 @@ jobs:
           DOCKER_USER_VAR: ${{ vars.DOCKER_USER }}
           PAT_BACKEND: ${{ secrets.DOCKER_PAT_BACKEND }}
           PAT_FRONTEND: ${{ secrets.DOCKER_PAT_FRONTEND }}
-          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          PRODUCTION_SSH_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
           STAGING_KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
           PRODUCTION_KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
           STAGING_HOST: ${{ secrets.STAGING_HOST }}
@@ -77,8 +89,17 @@ jobs:
           PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
         run: |
           set -euo pipefail
-          user="${DOCKER_USER_VAR:-powerrangeranikg}"
+          user="${DOCKER_USER_VAR:-local}"
+          if [ -n "${DOCKER_USER_VAR}" ] && [[ ! "${DOCKER_USER_VAR}" =~ ^[a-z0-9][a-z0-9_-]{0,127}$ ]]; then
+            echo "::error::DOCKER_USER must be a valid lowercase Docker Hub namespace."
+            exit 1
+          fi
           echo "docker_user=${user}" >> "$GITHUB_OUTPUT"
+
+          if [ -n "${STAGING_HOST}" ] && [ "${STAGING_HOST}" = "${PRODUCTION_HOST}" ]; then
+            echo "::error::Staging and production must use separate hosts; the Compose stack uses fixed container names."
+            exit 1
+          fi
 
           can_push=false
           if [ -n "${DOCKER_USER_VAR}" ] && [ -n "${PAT_BACKEND}" ] && [ -n "${PAT_FRONTEND}" ]; then
@@ -86,14 +107,21 @@ jobs:
           fi
           echo "can_push=${can_push}" >> "$GITHUB_OUTPUT"
 
-          can_deploy=false
+          can_deploy_staging=false
           if [ "${can_push}" = true ] \
-             && [ -n "${SSH_KEY}" ] \
-             && [ -n "${STAGING_KNOWN_HOSTS}" ] && [ -n "${STAGING_HOST}" ] && [ -n "${STAGING_USER}" ] \
-             && [ -n "${PRODUCTION_KNOWN_HOSTS}" ] && [ -n "${PRODUCTION_HOST}" ] && [ -n "${PRODUCTION_USER}" ]; then
-            can_deploy=true
+             && [ -n "${STAGING_SSH_KEY}" ] \
+             && [ -n "${STAGING_KNOWN_HOSTS}" ] && [ -n "${STAGING_HOST}" ] && [ -n "${STAGING_USER}" ]; then
+            can_deploy_staging=true
           fi
-          echo "can_deploy=${can_deploy}" >> "$GITHUB_OUTPUT"
+          echo "can_deploy_staging=${can_deploy_staging}" >> "$GITHUB_OUTPUT"
+
+          can_deploy_production=false
+          if [ "${can_push}" = true ] \
+             && [ -n "${PRODUCTION_SSH_KEY}" ] \
+             && [ -n "${PRODUCTION_KNOWN_HOSTS}" ] && [ -n "${PRODUCTION_HOST}" ] && [ -n "${PRODUCTION_USER}" ]; then
+            can_deploy_production=true
+          fi
+          echo "can_deploy_production=${can_deploy_production}" >> "$GITHUB_OUTPUT"
 
           {
             echo "### Deploy configuration"
@@ -102,15 +130,18 @@ jobs:
             echo "|---|---|"
             echo "| Image namespace | \`${user}\` |"
             echo "| Push images to Docker Hub | \`${can_push}\` |"
-            echo "| Deploy over SSH | \`${can_deploy}\` |"
+            echo "| Staging deploy | \`${can_deploy_staging}\` |"
+            echo "| Production deploy | \`${can_deploy_production}\` |"
             echo ""
             if [ "${can_push}" = false ]; then
-              echo "DOCKER_PAT_BACKEND / DOCKER_PAT_FRONTEND are unset, so images are"
+              echo "DOCKER_USER and/or Docker Hub push tokens are unset, so images are"
               echo "built and validated but not pushed. See docs/GITHUB_SECRETS.md."
             fi
-            if [ "${can_deploy}" = false ]; then
-              echo "Deploy jobs are skipped until the SSH and known-hosts secrets exist."
-              echo "They fail closed by design rather than deploy with unverified hosts."
+            if [ "${can_deploy_staging}" = false ]; then
+              echo "Staging deploy is skipped until its image-push and staging SSH configuration exists."
+            fi
+            if [ "${can_deploy_production}" = false ]; then
+              echo "Production deploy is skipped until its image-push and production SSH configuration exists."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -146,6 +177,13 @@ jobs:
         continue-on-error: true
         run: |
           cd backend && mypy app/ --ignore-missing-imports
+
+      - name: Validate deployment scripts and Compose configuration
+        run: |
+          set -euo pipefail
+          bash -n scripts/lib.sh
+          bash -n scripts/deploy-blue-green.sh
+          docker compose --env-file .env.production.template -f docker-compose.prod.yml config --quiet
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -256,6 +294,8 @@ jobs:
     if: github.event_name != 'pull_request'
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
+      image_sha_tag: ${{ steps.immutable.outputs.image_tag }}
+      image_sha_ref: ${{ steps.immutable.outputs.image_ref }}
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -270,6 +310,20 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
             type=sha
+
+      - name: Resolve immutable image reference
+        id: immutable
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          image_ref="$(printf '%s\n' "$IMAGE_TAGS" | grep -E "/erp-solution-backend:sha-[[:xdigit:]]+$" | tail -n1)"
+          if [ -z "$image_ref" ]; then
+            echo "::error::Docker metadata did not produce an immutable backend SHA tag."
+            exit 1
+          fi
+          echo "image_ref=$image_ref" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${image_ref##*:}" >> "$GITHUB_OUTPUT"
 
       # Skipped rather than attempted when the PAT is absent: a login step with
       # an empty password is what failed here and took the workflow offline.
@@ -302,6 +356,8 @@ jobs:
     # Validate the image on PRs too; config keeps push disabled when secrets are unavailable.
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
+      image_sha_tag: ${{ steps.immutable.outputs.image_tag }}
+      image_sha_ref: ${{ steps.immutable.outputs.image_ref }}
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -316,6 +372,20 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
             type=sha
+
+      - name: Resolve immutable image reference
+        id: immutable
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          image_ref="$(printf '%s\n' "$IMAGE_TAGS" | grep -E "/erp-solution-frontend:sha-[[:xdigit:]]+$" | tail -n1)"
+          if [ -z "$image_ref" ]; then
+            echo "::error::Docker metadata did not produce an immutable frontend SHA tag."
+            exit 1
+          fi
+          echo "image_ref=$image_ref" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${image_ref##*:}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Docker Hub
         if: needs.config.outputs.can_push == 'true'
@@ -344,64 +414,81 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-latest
     needs: [docker-backend, docker-frontend, config]
-    # Trivy resolves image-ref against the registry, so it only runs once the
-    # images are actually published.
+    # Trivy scans published images; the deploy jobs require this job to pass.
     if: github.event_name != 'pull_request' && needs.config.outputs.can_push == 'true'
     timeout-minutes: 20
-    # image-ref comes from the build jobs' own metadata-action output. The
-    # previous hardcoded `sha-${{ github.sha }}` used the full 40-char commit
-    # while metadata-action's `type=sha` pushes a 7-char short SHA, so these
-    # scans referenced a tag that was never published. metadata-action's
-    # `tags` output lists one ref per line, but trivy accepts a single ref —
-    # the multi-line value fails with "could not parse reference". Every
-    # listed tag is pushed by the build jobs, so scan the first of each.
+    # Scan immutable SHA tags. HIGH/CRITICAL findings fail this job; SARIF
+    # upload still runs so findings remain visible in GitHub code scanning.
     steps:
-      - name: Resolve single image refs
-        id: refs
-        env:
-          BACKEND_TAGS: ${{ needs.docker-backend.outputs.image_tag }}
-          FRONTEND_TAGS: ${{ needs.docker-frontend.outputs.image_tag }}
-        run: |
-          echo "backend=${BACKEND_TAGS%%$'\n'*}" >> "$GITHUB_OUTPUT"
-          echo "frontend=${FRONTEND_TAGS%%$'\n'*}" >> "$GITHUB_OUTPUT"
+      - name: Log in to Docker Hub for backend scan
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ needs.config.outputs.docker_user }}
+          password: ${{ secrets.DOCKER_PAT_BACKEND }}
 
       - name: Run Trivy on backend
+        id: trivy-backend
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
         with:
-          image-ref: ${{ steps.refs.outputs.backend }}
+          image-ref: ${{ needs.docker-backend.outputs.image_sha_ref }}
+          exit-code: '1'
+          severity: CRITICAL,HIGH
           format: sarif
           output: trivy-backend.sarif
 
+      - name: Log in to Docker Hub for frontend scan
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ needs.config.outputs.docker_user }}
+          password: ${{ secrets.DOCKER_PAT_FRONTEND }}
+
       - name: Run Trivy on frontend
+        id: trivy-frontend
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
         with:
-          image-ref: ${{ steps.refs.outputs.frontend }}
+          image-ref: ${{ needs.docker-frontend.outputs.image_sha_ref }}
+          exit-code: '1'
+          severity: CRITICAL,HIGH
           format: sarif
           output: trivy-frontend.sarif
 
       - name: Upload Trivy backend results
+        if: always() && hashFiles('trivy-backend.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend
 
       - name: Upload Trivy frontend results
+        if: always() && hashFiles('trivy-frontend.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: trivy-frontend.sarif
           category: trivy-frontend
 
+      - name: Enforce image vulnerability gate
+        if: always()
+        env:
+          BACKEND_SCAN: ${{ steps.trivy-backend.outcome }}
+          FRONTEND_SCAN: ${{ steps.trivy-frontend.outcome }}
+        run: |
+          set -euo pipefail
+          if [ "${BACKEND_SCAN}" != "success" ] || [ "${FRONTEND_SCAN}" != "success" ]; then
+            echo "::error::Both image scans must complete successfully with no HIGH or CRITICAL findings."
+            exit 1
+          fi
+
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: [docker-backend, docker-frontend, security, config]
-    # can_deploy covers the SSH key, both hosts and both pinned known_hosts sets.
-    # Absent any of them the job is skipped rather than failed, so the pipeline
-    # stays green on a repository that has not been provisioned for deploys yet.
     if: >-
-      github.ref == 'refs/heads/main'
-      && github.event_name == 'push'
-      && needs.config.outputs.can_deploy == 'true'
+      github.event_name == 'workflow_dispatch'
+      && github.ref == 'refs/heads/main'
+      && inputs.deploy_staging == true
+      && needs.config.outputs.can_deploy_staging == 'true'
     environment: staging
     timeout-minutes: 30
     steps:
@@ -430,53 +517,82 @@ jobs:
       - name: Setup SSH
         uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
 
-      # Pinned host keys from the STAGING_KNOWN_HOSTS secret. ssh-keyscan is
-      # unauthenticated and MITM-able, so it is no longer used. Populate the
-      # secret with: ssh-keyscan -H <staging-host>  (see docs/GITHUB_SECRETS.md)
       - name: Write pinned SSH known hosts
         env:
           KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
           if [ -z "${KNOWN_HOSTS}" ]; then
-            echo "::error::STAGING_KNOWN_HOSTS secret is empty — refusing to deploy without host verification."
+            echo "::error::STAGING_KNOWN_HOSTS is empty; refusing unverified SSH."
             exit 1
           fi
-          printf '%s\n' "${KNOWN_HOSTS}" >> ~/.ssh/known_hosts
+          printf '%s\n' "${KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
-      # With `rollback` set, hand off to the script's --rollback path for that
-      # version instead of deploying latest.
-      - name: Deploy with Blue-Green
+      - name: Validate deployment version
         env:
-          DOCKER_USER: ${{ vars.DOCKER_USER }}
-          ROLLBACK: ${{ inputs.rollback }}
+          ROLLBACK_INPUT: ${{ inputs.rollback }}
         run: |
           set -euo pipefail
-          VERSION="latest"
-          ACTION="deploy"
-          if [ -n "${ROLLBACK}" ]; then
-            VERSION="${ROLLBACK}"
-            ACTION="rollback"
-            docker pull "${DOCKER_USER}/erp-solution-backend:${VERSION}"
-            docker pull "${DOCKER_USER}/erp-solution-frontend:${VERSION}"
-          else
-            docker pull "${DOCKER_USER}/erp-solution-backend:latest"
-            docker pull "${DOCKER_USER}/erp-solution-frontend:latest"
+          if [ -n "${ROLLBACK_INPUT}" ] && [[ ! "${ROLLBACK_INPUT}" =~ ^(sha-[[:xdigit:]]{7,40}|v[0-9A-Za-z][0-9A-Za-z._-]{0,127})$ ]]; then
+            echo "::error::Rollback tag must be a versioned v* release or a sha-* image tag."
+            exit 1
           fi
-          ssh "${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}" << EOF
-            set -euo pipefail
-            cd /opt/erp-solution
-            docker pull ${DOCKER_USER}/erp-solution-backend:${VERSION}
-            docker pull ${DOCKER_USER}/erp-solution-frontend:${VERSION}
-            if [ "${ACTION}" = "rollback" ]; then
-              ./scripts/deploy-blue-green.sh staging ${VERSION} --rollback
-            else
-              ./scripts/deploy-blue-green.sh staging ${VERSION}
-            fi
-          EOF
 
+      - name: Deploy or roll back with Blue-Green
+        env:
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+          STAGING_USER: ${{ secrets.STAGING_USER }}
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          ROLLBACK_INPUT: ${{ inputs.rollback }}
+          IMAGE_SHA_TAG: ${{ needs.docker-backend.outputs.image_sha_tag }}
+          FRONTEND_SHA_TAG: ${{ needs.docker-frontend.outputs.image_sha_tag }}
+        run: |
+          set -euo pipefail
+          VERSION="${ROLLBACK_INPUT:-${IMAGE_SHA_TAG}}"
+          if [ -z "${VERSION}" ] || { [ -z "${ROLLBACK_INPUT}" ] && [ "${IMAGE_SHA_TAG}" != "${FRONTEND_SHA_TAG}" ]; }; then
+            echo "::error::Backend and frontend immutable image tags are missing or do not match."
+            exit 1
+          fi
+          ACTION="deploy"
+          if [ -n "${ROLLBACK_INPUT}" ]; then ACTION="rollback"; fi
+          TARGET="${STAGING_USER}@${STAGING_HOST}"
+          DEPLOY_TMP="/tmp/erp-deploy-${GITHUB_RUN_ID}"
+
+          # Ship the exact deployment script and Compose/nginx config from this commit.
+          tar -czf - scripts/deploy-blue-green.sh scripts/lib.sh docker-compose.prod.yml nginx.conf nginx/upstream-blue.conf nginx/upstream-green.conf |
+            ssh "${TARGET}" "mkdir -p '${DEPLOY_TMP}' && tar -xzf - -C '${DEPLOY_TMP}'"
+
+          ssh "${TARGET}" bash -s -- "${DOCKER_USER}" "${VERSION}" "${ACTION}" "${GITHUB_RUN_ID}" <<'REMOTE'
+          set -euo pipefail
+          DOCKER_USER="$1"
+          VERSION="$2"
+          ACTION="$3"
+          DEPLOY_TMP="/tmp/erp-deploy-$4"
+          export DOCKER_USER VERSION
+          cd /opt/erp-solution
+          install -D -m 0755 "$DEPLOY_TMP/scripts/deploy-blue-green.sh" scripts/deploy-blue-green.sh
+          install -D -m 0644 "$DEPLOY_TMP/scripts/lib.sh" scripts/lib.sh
+          install -D -m 0644 "$DEPLOY_TMP/docker-compose.prod.yml" docker-compose.prod.yml
+          test -f nginx.conf || { echo "nginx.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx.conf" > nginx.conf
+          chmod 0644 nginx.conf
+          test -f nginx/upstream-blue.conf || { echo "nginx/upstream-blue.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx/upstream-blue.conf" > nginx/upstream-blue.conf
+          chmod 0644 nginx/upstream-blue.conf
+          test -f nginx/upstream-green.conf || { echo "nginx/upstream-green.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx/upstream-green.conf" > nginx/upstream-green.conf
+          chmod 0644 nginx/upstream-green.conf
+          rm -rf "$DEPLOY_TMP"
+          if [ "$ACTION" = "rollback" ]; then
+            ./scripts/deploy-blue-green.sh staging "$VERSION" --rollback
+          else
+            ./scripts/deploy-blue-green.sh staging "$VERSION"
+          fi
+          REMOTE
       - name: Set deployment status to success
         if: success()
         uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
@@ -501,14 +617,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: [docker-backend, docker-frontend, security, config]
     if: >-
-      startsWith(github.ref, 'refs/tags/v')
-      && needs.config.outputs.can_deploy == 'true'
+      github.event_name == 'workflow_dispatch'
+      && startsWith(github.ref, 'refs/tags/v')
+      && inputs.deploy_production == true
+      && needs.config.outputs.can_deploy_production == 'true'
     environment: production
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Create GitHub Deployment
         id: deployment
         uses: chrnorm/deployment-action@fe2fba14b486343ce6893cff73b80e153063917a # releases/v1
@@ -519,7 +636,6 @@ jobs:
           description: Deploy ${{ github.ref_name }} to production
           ref: ${{ github.sha }}
           auto_inactive: true
-
       - name: Set deployment status to in_progress
         uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
         with:
@@ -527,38 +643,68 @@ jobs:
           target_url: https://${{ vars.PRODUCTION_DOMAIN }}
           state: in_progress
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-
+      - name: Validate release tag
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${RELEASE_VERSION}" =~ ^v[0-9A-Za-z][0-9A-Za-z._-]{0,127}$ ]]; then
+            echo "::error::Release tag is not a valid immutable deployment tag."
+            exit 1
+          fi
       - name: Setup SSH
         uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      # Pinned host keys from the PRODUCTION_KNOWN_HOSTS secret; see the
-      # staging job for rationale. Populate with: ssh-keyscan -H <prod-host>
+          ssh-private-key: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
       - name: Write pinned SSH known hosts
         env:
           KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
           if [ -z "${KNOWN_HOSTS}" ]; then
-            echo "::error::PRODUCTION_KNOWN_HOSTS secret is empty — refusing to deploy without host verification."
+            echo "::error::PRODUCTION_KNOWN_HOSTS is empty; refusing unverified SSH."
             exit 1
           fi
-          printf '%s\n' "${KNOWN_HOSTS}" >> ~/.ssh/known_hosts
-
-      - name: Deploy with Blue-Green
-        run: |
-          ssh ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOF'
-            set -e
-            cd /opt/erp-solution
-            VERSION=${{ github.ref_name }}
-            docker pull ${{ vars.DOCKER_USER }}/erp-solution-backend:${VERSION}
-            docker pull ${{ vars.DOCKER_USER }}/erp-solution-frontend:${VERSION}
-            ./scripts/deploy-blue-green.sh production ${VERSION}
-          EOF
+          printf '%s\n' "${KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Deploy release with Blue-Green
         env:
           DOCKER_USER: ${{ vars.DOCKER_USER }}
+          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          TARGET="${PRODUCTION_USER}@${PRODUCTION_HOST}"
+          DEPLOY_TMP="/tmp/erp-deploy-${GITHUB_RUN_ID}"
 
+          # Ship the exact deployment script and Compose/nginx config from this tag.
+          tar -czf - scripts/deploy-blue-green.sh scripts/lib.sh docker-compose.prod.yml nginx.conf nginx/upstream-blue.conf nginx/upstream-green.conf |
+            ssh "${TARGET}" "mkdir -p '${DEPLOY_TMP}' && tar -xzf - -C '${DEPLOY_TMP}'"
+
+          ssh "${TARGET}" bash -s -- "${DOCKER_USER}" "${RELEASE_VERSION}" "${GITHUB_RUN_ID}" <<'REMOTE'
+          set -euo pipefail
+          DOCKER_USER="$1"
+          VERSION="$2"
+          DEPLOY_TMP="/tmp/erp-deploy-$3"
+          export DOCKER_USER VERSION
+          cd /opt/erp-solution
+          install -D -m 0755 "$DEPLOY_TMP/scripts/deploy-blue-green.sh" scripts/deploy-blue-green.sh
+          install -D -m 0644 "$DEPLOY_TMP/scripts/lib.sh" scripts/lib.sh
+          install -D -m 0644 "$DEPLOY_TMP/docker-compose.prod.yml" docker-compose.prod.yml
+          test -f nginx.conf || { echo "nginx.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx.conf" > nginx.conf
+          chmod 0644 nginx.conf
+          test -f nginx/upstream-blue.conf || { echo "nginx/upstream-blue.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx/upstream-blue.conf" > nginx/upstream-blue.conf
+          chmod 0644 nginx/upstream-blue.conf
+          test -f nginx/upstream-green.conf || { echo "nginx/upstream-green.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx/upstream-green.conf" > nginx/upstream-green.conf
+          chmod 0644 nginx/upstream-green.conf
+          rm -rf "$DEPLOY_TMP"
+          ./scripts/deploy-blue-green.sh production "$VERSION"
+          REMOTE
       - name: Set deployment status to success
         if: success()
         uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
@@ -567,7 +713,6 @@ jobs:
           target_url: https://${{ vars.PRODUCTION_DOMAIN }}
           state: success
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-
       - name: Set deployment status to failure
         if: failure()
         uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
