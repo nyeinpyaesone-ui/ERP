@@ -553,8 +553,12 @@ jobs:
           test -f nginx.conf || { echo "nginx.conf missing on target host"; exit 1; }
           cat "$DEPLOY_TMP/nginx.conf" > nginx.conf
           chmod 0644 nginx.conf
-          install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-blue.conf" nginx/upstream-blue.conf
-          install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-green.conf" nginx/upstream-green.conf
+          test -f nginx/upstream-blue.conf || { echo "nginx/upstream-blue.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx/upstream-blue.conf" > nginx/upstream-blue.conf
+          chmod 0644 nginx/upstream-blue.conf
+          test -f nginx/upstream-green.conf || { echo "nginx/upstream-green.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx/upstream-green.conf" > nginx/upstream-green.conf
+          chmod 0644 nginx/upstream-green.conf
           rm -rf "$DEPLOY_TMP"
           docker pull "${DOCKER_USER}/erp-solution-backend:${VERSION}"
           docker pull "${DOCKER_USER}/erp-solution-frontend:${VERSION}"
@@ -665,8 +669,12 @@ jobs:
           test -f nginx.conf || { echo "nginx.conf missing on target host"; exit 1; }
           cat "$DEPLOY_TMP/nginx.conf" > nginx.conf
           chmod 0644 nginx.conf
-          install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-blue.conf" nginx/upstream-blue.conf
-          install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-green.conf" nginx/upstream-green.conf
+          test -f nginx/upstream-blue.conf || { echo "nginx/upstream-blue.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx/upstream-blue.conf" > nginx/upstream-blue.conf
+          chmod 0644 nginx/upstream-blue.conf
+          test -f nginx/upstream-green.conf || { echo "nginx/upstream-green.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx/upstream-green.conf" > nginx/upstream-green.conf
+          chmod 0644 nginx/upstream-green.conf
           rm -rf "$DEPLOY_TMP"
           docker pull "${DOCKER_USER}/erp-solution-backend:${VERSION}"
           docker pull "${DOCKER_USER}/erp-solution-frontend:${VERSION}"
