@@ -14,7 +14,6 @@ from urllib.parse import urlencode
 from client import (
     GitHubAPIError,
     api_get,
-    api_paginate,
     api_post,
     api_put,
     repo_api_path,
