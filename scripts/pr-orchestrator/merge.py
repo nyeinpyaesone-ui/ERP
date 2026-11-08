@@ -97,7 +97,7 @@ def wait_for_main_ci(
             and item.get("head_branch") == "main"
         ]
         if matches:
-            run = sorted(matches, key=lambda item: item.get("created_at", ""))[-1]
+            run = max(matches, key=lambda item: item.get("created_at", ""))
             run = api_get(repo_api_path(f"/actions/runs/{run['id']}"))
             if run.get("status") == "completed":
                 conclusion = run.get("conclusion") or "unknown"
@@ -183,7 +183,14 @@ def execute(plan: list[dict[str, Any]], timeout_minutes: int, deploy_staging: bo
             report = build_pr_report(
                 number, expected_head, main_sha, repository
             )
-        except Exception as error:
+        except (
+            GitHubAPIError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as error:
             skipped.append(
                 {
                     "number": number,
@@ -305,15 +312,14 @@ def main() -> int:
                         f"- Staging: **{result['staging']['success']}** — "
                         f"{result['staging']['detail']}\n"
                     )
-                for item in result["merged"]:
-                    file.write(
-                        f"- Merged PR #{item['number']} — "
-                        f"main CI: {item['ci']}\n"
-                    )
-                for item in result["skipped"]:
-                    file.write(
-                        f"- Skipped PR #{item['number']} — {item['reason']}\n"
-                    )
+                file.writelines(
+                    f"- Merged PR #{item['number']} — main CI: {item['ci']}\n"
+                    for item in result["merged"]
+                )
+                file.writelines(
+                    f"- Skipped PR #{item['number']} — {item['reason']}\n"
+                    for item in result["skipped"]
+                )
         print(json.dumps(result, indent=2))
 
         if not result["all_selected_merged"]:
@@ -321,7 +327,14 @@ def main() -> int:
         if result["staging"] and not result["staging"]["success"]:
             return 1
         return 0
-    except Exception as error:
+    except (
+        GitHubAPIError,
+        KeyError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as error:
         print(
             f"Merge executor failed closed: {type(error).__name__}: {error}",
             file=sys.stderr,
