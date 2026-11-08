@@ -16,7 +16,7 @@ NGINX_UPSTREAM_DIR_HOST="${ERP_NGINX_DIR}"
 NGINX_UPSTREAM_DIR_CONTAINER="/etc/nginx/conf.d"
 SSL_DIR="${ERP_SSL_DIR}"
 # State files live beside the env file, so an install outside /opt/erp-solution
-# keeps its own blue/green bookkeeping instead of reading another tree's.
+# keeps its own active-color/version bookkeeping instead of reading another tree's.
 ACTIVE_COLOR_FILE="${ERP_DIR}/.active_color"
 ACTIVE_VERSION_FILE="${ERP_DIR}/.active_version"
 
