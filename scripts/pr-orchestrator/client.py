@@ -104,7 +104,7 @@ def api_paginate(path_or_url: str, token: str | None = None) -> list[Any]:
     while current_url:
         page, headers, _ = api_request("GET", current_url, token=token)
         if not isinstance(page, list):
-            raise RuntimeError(f"Expected a paginated list from {current_url}")
+            raise TypeError(f"Expected a paginated list from {current_url}")
         results.extend(page)
         link_header = next(
             (value for key, value in headers.items() if key.lower() == "link"), ""
@@ -128,7 +128,7 @@ def api_paginate_field(
     while current_url:
         page, headers, _ = api_request("GET", current_url, token=token)
         if not isinstance(page, dict) or not isinstance(page.get(field), list):
-            raise RuntimeError(
+            raise TypeError(
                 f"Expected list field {field!r} from {current_url}"
             )
         results.extend(page[field])
