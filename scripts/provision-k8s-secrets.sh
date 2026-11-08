@@ -104,7 +104,10 @@ if ! kubectl --context "$context" get namespace "$namespace" >/dev/null 2>&1; th
   fi
 fi
 
-existing="$(kubectl --context "$context" --namespace "$namespace" get secret "$secret_name" --ignore-not-found -o name)"
+existing=""
+if [ "$namespace_exists" = true ]; then
+  existing="$(kubectl --context "$context" --namespace "$namespace" get secret "$secret_name" --ignore-not-found -o name)"
+fi
 if [ -n "$existing" ] && [ "$apply" = true ] && [ "$replace_existing" != true ]; then
   echo "Secret already exists. Review ownership before updating; pass --replace-existing to allow an update." >&2
   exit 1
