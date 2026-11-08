@@ -20,6 +20,21 @@ The orchestrator is a control plane. It must preserve repository correctness, br
 5. **Verify**: after every merge, wait for the CI workflow on the exact merge commit SHA. Stop the batch at the first failed or missing main-branch CI run.
 6. **Deploy**: staging is a separate, explicit dispatch after the entire selected batch merges and passes main CI. Production requires the repository's versioned release path and is never triggered by this skill.
 
+## OpenCode agent topology
+
+Project-scoped agents are defined in .opencode/agents:
+
+- pr-orchestrator: primary coordinator; can delegate only to the listed specialist agents.
+- pr-scope-mapper: ownership, scope, cross-PR dependency and risk mapping.
+- pr-backend-reviewer: API, persistence, migration and runtime correctness.
+- pr-frontend-reviewer: canonical React/Vite, PWA and UI contract compatibility.
+- pr-security-reviewer: security and software supply-chain review.
+- pr-platform-reviewer: CI/CD, images, deployment and rollback.
+- pr-test-reviewer: exact-head test and CI evidence.
+- pr-docs-reviewer: operational documentation and source-of-truth drift.
+
+The specialist subagents are read-only and cannot launch nested subagents. The primary coordinator can invoke them in parallel. They return independent findings; the deterministic GitHub Actions map/reduce workflow remains the only merge executor.
+
 ## Zero-shot task contract
 
 Every worker receives the same immutable envelope:
