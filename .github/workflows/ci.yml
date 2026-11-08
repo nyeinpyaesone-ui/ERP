@@ -451,7 +451,7 @@ jobs:
       # With `rollback` set, hand off to the script's --rollback path for that
       # version instead of deploying latest.
       - name: Validate rollback version
-        if: inputs.rollback != ''
+        if: github.event_name == 'workflow_dispatch' && inputs.rollback != ''
         env:
           ROLLBACK: ${{ inputs.rollback }}
         run: |

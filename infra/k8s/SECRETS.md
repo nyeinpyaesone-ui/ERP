@@ -86,16 +86,20 @@ given production credentials unnecessarily.
 
 ## Historical credential exposure
 
-Removing the manifest from the current tree does not remove its values from
-earlier Git commits. Treat any value that was ever deployed as exposed:
-rotate it in the owning system, update the Kubernetes Secret out-of-band, and
-verify consumers have picked up the replacement. Gitleaks scans full history,
-so its historical finding remains a release/security gate until the exposure
-is remediated. Do not suppress the finding with a broad allowlist.
+The two Gitleaks findings in commit
+`74235a961c917cc3de6e23a8c0480eedb24fd6c9` were verified as
+`REPLACE_WITH_32_BYTE_KEY` template placeholders, not live credentials.
+The root `.gitleaks.toml` allowlist is deliberately constrained to that
+single commit, file path, and exact placeholder value. It does not suppress
+other findings or future secrets.
 
-History rewriting is deliberately excluded from this PR. Coordinate it
-separately because it changes commit identities and requires collaborators to
-resynchronize their clones.
+The deleted manifest's other values were also `REPLACE_WITH_*` templates.
+No credential rotation is indicated by these specific findings. If an
+operator ever replaced a template with a real credential and committed that
+value, rotate it in the owning system and update Kubernetes out-of-band.
+
+History rewriting is not needed for these verified placeholders and is
+deliberately excluded from this PR.
 
 ## Operational requirements
 
