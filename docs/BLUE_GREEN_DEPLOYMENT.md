@@ -35,6 +35,8 @@ This guide covers zero-downtime production deployments using the `deploy-blue-gr
 ## Prerequisites
 
 - ✅ Initial installation complete (`install.sh` run successfully)
+- ✅ Separate `/opt/erp-solution/.env.staging` and `.env.production` files populated with environment-specific credentials (mode `0600`)
+- ✅ Staging and production use separate hosts; the Compose stack has fixed container names
 - ✅ Blue environment running and healthy
 - ✅ Docker images built/pushed for new version (or using `latest`)
 - ✅ Access to production server via SSH
@@ -54,7 +56,7 @@ cd /opt/erp-solution  # or wherever repo is cloned
 
 | Step | Action | Duration | Failure Behavior |
 |------|--------|----------|------------------|
-| 1 | Load `/opt/erp-solution/.env.production` | <1s | Exit if missing |
+| 1 | Load `.env.staging` or `.env.production` for the target environment | <1s | Exit if missing; never fall back across environments |
 | 2 | Validate environment | <1s | Exit on invalid config |
 | 3 | Pull images for **inactive** color | 30-120s | Retry/pull error → exit |
 | 4 | Start inactive backend + frontend | 10-30s | Container start error → exit |
