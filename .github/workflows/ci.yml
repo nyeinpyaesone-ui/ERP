@@ -204,6 +204,7 @@ jobs:
         run: |
           set -euo pipefail
           for script in \
+            install.sh \
             scripts/lib.sh \
             scripts/deploy-blue-green.sh \
             scripts/configure-environment.sh \
