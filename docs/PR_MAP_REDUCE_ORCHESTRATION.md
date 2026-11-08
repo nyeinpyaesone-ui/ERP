@@ -65,7 +65,7 @@ The default batch size is five. The plan artifact includes selected, blocked, an
 
 Merge mode is allowed only for a workflow dispatch on `refs/heads/main`. Before each merge, the executor refreshes the PR, the current main SHA, reviews, checks, statuses, and changed files. It submits the request through GitHub CLI auto-merge with the expected head SHA as a compare-and-swap guard. This lets GitHub place changes into a required merge queue; the workflow never uses the administrator bypass flag. It waits for GitHub to confirm the PR is merged before checking the exact merge SHA.
 
-After GitHub confirms a merge, the executor waits for the repository's `CI` workflow for that exact merge SHA with `event=push` and `branch=main`. A failed, missing, canceled, or timed-out run stops the batch. Later PRs are not merged until the preceding main CI barrier succeeds.
+GitHub merge queues require the repository `CI` workflow to subscribe to `merge_group: checks_requested`. That CI path builds temporary backend/frontend images locally, runs the HIGH/CRITICAL Trivy gate, and never publishes those images. After GitHub confirms a merge, the executor waits for the repository's `CI` workflow for that exact merge SHA with `event=push` and `branch=main`. A failed, missing, canceled, or timed-out run stops the batch. Later PRs are not merged until the preceding main CI barrier succeeds.
 
 Staging is dispatched through the existing `ci.yml` workflow only after the entire selected batch has merged and passed main CI. The existing staging environment rules and reviewer gates still apply. Production release remains a separate version-tagged release process and is never auto-triggered here.
 
