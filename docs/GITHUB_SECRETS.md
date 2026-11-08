@@ -188,9 +188,10 @@ Run the runtime generator once on each dedicated server. Use the exact
 hostname/domain that is served by that environment; the generated backend CORS
 origin defaults to `https://app.<domain>`.
 
-Staging host:
+Staging host (prepare the protected install directory first):
 
 ```bash
+install -d -m 0750 /opt/erp-solution
 bash scripts/configure-environment.sh \\
   --environment staging \\
   --domain <staging-domain> \\
