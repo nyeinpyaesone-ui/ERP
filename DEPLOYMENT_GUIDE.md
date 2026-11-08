@@ -79,32 +79,39 @@ back to a personal Docker Hub namespace.
 
 ## Initial Server Setup
 
-Run once on new servers:
+Provision staging and production on **separate hosts**. The current Compose
+stack uses fixed container names and must not share one host between these
+environments.
+
+### Production host
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/yourorg/erp-solution.git /opt/erp-solution
+git clone git@github.com:nyeinpyaesone-ui/ERP.git /opt/erp-solution
 cd /opt/erp-solution
-
-# 2. Create environment file
-cp .env.example .env.production
-# Edit .env.production with all required values
-
-# 3. Create SSL directory
-mkdir -p /opt/erp-solution/ssl /opt/erp-solution/logs/nginx /opt/erp-solution/backups
-
-# 4. Run initial SSL setup (first time only)
-./scripts/setup-ssl.sh api.yourdomain.com admin@yourdomain.com
-
-# 5. Start production stack
-docker compose -f docker-compose.prod.yml up -d
-
-# 6. Verify deployment
-# /health and /ready are served by the API, so they carry the /api/v1 prefix
-# once they pass through nginx
-curl https://api.yourdomain.com/api/v1/health
-curl https://api.yourdomain.com/api/v1/ready
+sudo ./install.sh erp.example.com ops@example.com
 ```
+
+The installer generates unique DB, Redis and application secrets, prompts for
+the Docker Hub namespace, and writes /opt/erp-solution/.env.production with
+mode 0600. Use the real production domain and contact email. Configure a
+read-only Docker Hub credential on the host using its credential helper.
+
+### Staging host
+
+```bash
+git clone git@github.com:nyeinpyaesone-ui/ERP.git /opt/erp-solution
+cd /opt/erp-solution
+install -m 0600 .env.staging.template /opt/erp-solution/.env.staging
+```
+
+Replace every CHANGE_ME value with unique staging-only values, set the real
+staging CORS origin and the configured Docker Hub namespace, then confirm
+permissions remain 0600. Configure a separate read-only Docker Hub credential.
+Never copy production secrets into staging.
+
+The GitHub Actions bootstrapper configures repository variables/secrets and
+Environment ref policies; it does not create host files or deploy. See
+docs/GITHUB_SECRETS.md before the first deployment.
 
 ## Deployment Commands
 
@@ -137,20 +144,25 @@ There is no `deploy-*`, `rollback` or `logs-*` target — deployment runs from
 
 ### Using GitHub Actions
 
-There is no standalone deploy workflow. `.github/workflows/` holds `ci.yml`
-(gates + blue-green deploy jobs, skipped until the SSH/Docker secrets exist),
-`codeql.yml` and `release.yml` — deploys run from `ci.yml` when configured,
-otherwise deployment is manual via `./scripts/deploy-blue-green.sh`.
+The CI workflow builds and tests on pushes; pushes do not deploy automatically.
+Staging requires a manual CI dispatch on main with deploy_staging=true.
+Production requires a manual CI dispatch on a v* tag with
+deploy_production=true. The Release workflow publishes a GitHub Release after
+the tag's CI run succeeds and both immutable Docker images are verified.
+
+Run bash scripts/configure-github-actions.sh to provision repository
+variables/secrets and GitHub Environment ref policies. Actual host runtime env
+files and read-only Docker Hub pull credentials are configured separately.
 
 ## Blue-Green Deployment Details
 
 ### How It Works
 
-1. **Two Environments**: Blue (active) and Green (staging)
+1. **Two Colors per Host**: Blue (active) and Green (inactive); staging and production are separate hosts
 2. **Shared Database**: Both environments use the same PostgreSQL/Redis
 3. **Traffic Switch**: Nginx upstream file is updated in place, validated, and reloaded; the previous file is retained for rollback
 4. **Health Verification**: Comprehensive checks before switch
-5. **Instant Rollback**: Swap symlink back if issues detected
+5. **Rollback**: Restore the exact previous Nginx upstream file if validation or post-switch checks fail
 
 ### Container Naming
 
@@ -379,8 +391,10 @@ echo "blue" > /opt/erp-solution/.active_color
 - [ ] Redis password set
 - [ ] JWT secret 32+ characters
 - [ ] CORS origins restricted to known domains
-- [ ] SSH keys for deployment are dedicated (not personal)
-- [ ] GitHub Environments configured for production approval
+- [ ] Separate non-root SSH deploy users and distinct keys for staging/production
+- [ ] Pinned known_hosts verified out-of-band
+- [ ] GitHub Environments restricted to main and v* refs
+- [ ] Production required reviewer configured when independent approval is required
 - [ ] Dependabot alerts enabled and monitored
 
 ## Performance Tuning
