@@ -532,23 +532,37 @@ jobs:
           fi
           ACTION="deploy"
           if [ -n "${ROLLBACK_INPUT}" ]; then ACTION="rollback"; fi
+          TARGET="${STAGING_USER}@${STAGING_HOST}"
+          DEPLOY_TMP="/tmp/erp-deploy-${GITHUB_RUN_ID}"
 
-          ssh "${STAGING_USER}@${STAGING_HOST}" bash -s -- "${DOCKER_USER}" "${VERSION}" "${ACTION}" <<'REMOTE'
+          # Ship the exact deployment script and Compose/nginx config from this commit.
+          tar -czf - scripts/deploy-blue-green.sh scripts/lib.sh docker-compose.prod.yml nginx.conf nginx/upstream-blue.conf nginx/upstream-green.conf nginx/ssl.conf |
+            ssh "${TARGET}" "mkdir -p '${DEPLOY_TMP}' && tar -xzf - -C '${DEPLOY_TMP}'"
+
+          ssh "${TARGET}" bash -s -- "${DOCKER_USER}" "${VERSION}" "${ACTION}" "${GITHUB_RUN_ID}" <<'REMOTE'
           set -euo pipefail
           DOCKER_USER="$1"
           VERSION="$2"
           ACTION="$3"
+          DEPLOY_TMP="/tmp/erp-deploy-$4"
           export DOCKER_USER VERSION
           cd /opt/erp-solution
+          install -D -m 0755 "$DEPLOY_TMP/scripts/deploy-blue-green.sh" scripts/deploy-blue-green.sh
+          install -D -m 0644 "$DEPLOY_TMP/scripts/lib.sh" scripts/lib.sh
+          install -D -m 0644 "$DEPLOY_TMP/docker-compose.prod.yml" docker-compose.prod.yml
+          install -D -m 0644 "$DEPLOY_TMP/nginx.conf" nginx.conf
+          install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-blue.conf" nginx/upstream-blue.conf
+          install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-green.conf" nginx/upstream-green.conf
+          install -D -m 0644 "$DEPLOY_TMP/nginx/ssl.conf" nginx/ssl.conf
+          rm -rf "$DEPLOY_TMP"
           docker pull "${DOCKER_USER}/erp-solution-backend:${VERSION}"
           docker pull "${DOCKER_USER}/erp-solution-frontend:${VERSION}"
-          if [ "${ACTION}" = "rollback" ]; then
-            ./scripts/deploy-blue-green.sh staging "${VERSION}" --rollback
+          if [ "$ACTION" = "rollback" ]; then
+            ./scripts/deploy-blue-green.sh staging "$VERSION" --rollback
           else
-            ./scripts/deploy-blue-green.sh staging "${VERSION}"
+            ./scripts/deploy-blue-green.sh staging "$VERSION"
           fi
           REMOTE
-
       - name: Set deployment status to success
         if: success()
         uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
@@ -630,15 +644,31 @@ jobs:
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          ssh "${PRODUCTION_USER}@${PRODUCTION_HOST}" bash -s -- "${DOCKER_USER}" "${RELEASE_VERSION}" <<'REMOTE'
+          TARGET="${PRODUCTION_USER}@${PRODUCTION_HOST}"
+          DEPLOY_TMP="/tmp/erp-deploy-${GITHUB_RUN_ID}"
+
+          # Ship the exact deployment script and Compose/nginx config from this tag.
+          tar -czf - scripts/deploy-blue-green.sh scripts/lib.sh docker-compose.prod.yml nginx.conf nginx/upstream-blue.conf nginx/upstream-green.conf nginx/ssl.conf |
+            ssh "${TARGET}" "mkdir -p '${DEPLOY_TMP}' && tar -xzf - -C '${DEPLOY_TMP}'"
+
+          ssh "${TARGET}" bash -s -- "${DOCKER_USER}" "${RELEASE_VERSION}" "${GITHUB_RUN_ID}" <<'REMOTE'
           set -euo pipefail
           DOCKER_USER="$1"
           VERSION="$2"
+          DEPLOY_TMP="/tmp/erp-deploy-$3"
           export DOCKER_USER VERSION
           cd /opt/erp-solution
+          install -D -m 0755 "$DEPLOY_TMP/scripts/deploy-blue-green.sh" scripts/deploy-blue-green.sh
+          install -D -m 0644 "$DEPLOY_TMP/scripts/lib.sh" scripts/lib.sh
+          install -D -m 0644 "$DEPLOY_TMP/docker-compose.prod.yml" docker-compose.prod.yml
+          install -D -m 0644 "$DEPLOY_TMP/nginx.conf" nginx.conf
+          install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-blue.conf" nginx/upstream-blue.conf
+          install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-green.conf" nginx/upstream-green.conf
+          install -D -m 0644 "$DEPLOY_TMP/nginx/ssl.conf" nginx/ssl.conf
+          rm -rf "$DEPLOY_TMP"
           docker pull "${DOCKER_USER}/erp-solution-backend:${VERSION}"
           docker pull "${DOCKER_USER}/erp-solution-frontend:${VERSION}"
-          ./scripts/deploy-blue-green.sh production "${VERSION}"
+          ./scripts/deploy-blue-green.sh production "$VERSION"
           REMOTE
       - name: Set deployment status to success
         if: success()
