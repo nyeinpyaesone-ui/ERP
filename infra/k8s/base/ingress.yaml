@@ -1,8 +1,8 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: erp_solution-ingress
-  namespace: erp_solution
+  name: erp-solution-ingress
+  namespace: erp-solution
   labels:
     app.kubernetes.io/name: erp_solution-ingress
     app.kubernetes.io/part-of: erp_solution
@@ -28,7 +28,7 @@ spec:
     - admin.erp-domain.com
     - store.erp-domain.com
     - erp-domain.com
-    secretName: erp_solution-tls
+    secretName: erp-solution-tls
   rules:
   - host: api.erp-domain.com
     http:
@@ -37,7 +37,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: erp_solution-api
+            name: erp-solution-api
             port:
               number: 3000
   - host: admin.erp-domain.com
@@ -47,7 +47,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: erp_solution-web
+            name: erp-solution-web
             port:
               number: 80
   - host: store.erp-domain.com
@@ -57,7 +57,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: erp_solution-web
+            name: erp-solution-web
             port:
               number: 80
   - host: erp-domain.com
@@ -67,7 +67,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: erp_solution-web
+            name: erp-solution-web
             port:
               number: 80
 
