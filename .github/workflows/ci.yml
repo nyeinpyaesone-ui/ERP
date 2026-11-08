@@ -60,7 +60,8 @@ jobs:
     outputs:
       docker_user: ${{ steps.detect.outputs.docker_user }}
       can_push: ${{ steps.detect.outputs.can_push }}
-      can_deploy: ${{ steps.detect.outputs.can_deploy }}
+      can_deploy_staging: ${{ steps.detect.outputs.can_deploy_staging }}
+      can_deploy_production: ${{ steps.detect.outputs.can_deploy_production }}
     steps:
       - name: Detect available configuration
         id: detect
@@ -68,7 +69,8 @@ jobs:
           DOCKER_USER_VAR: ${{ vars.DOCKER_USER }}
           PAT_BACKEND: ${{ secrets.DOCKER_PAT_BACKEND }}
           PAT_FRONTEND: ${{ secrets.DOCKER_PAT_FRONTEND }}
-          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          PRODUCTION_SSH_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
           STAGING_KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
           PRODUCTION_KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
           STAGING_HOST: ${{ secrets.STAGING_HOST }}
@@ -86,14 +88,21 @@ jobs:
           fi
           echo "can_push=${can_push}" >> "$GITHUB_OUTPUT"
 
-          can_deploy=false
+          can_deploy_staging=false
           if [ "${can_push}" = true ] \
-             && [ -n "${SSH_KEY}" ] \
-             && [ -n "${STAGING_KNOWN_HOSTS}" ] && [ -n "${STAGING_HOST}" ] && [ -n "${STAGING_USER}" ] \
-             && [ -n "${PRODUCTION_KNOWN_HOSTS}" ] && [ -n "${PRODUCTION_HOST}" ] && [ -n "${PRODUCTION_USER}" ]; then
-            can_deploy=true
+             && [ -n "${STAGING_SSH_KEY}" ] \
+             && [ -n "${STAGING_KNOWN_HOSTS}" ] && [ -n "${STAGING_HOST}" ] && [ -n "${STAGING_USER}" ]; then
+            can_deploy_staging=true
           fi
-          echo "can_deploy=${can_deploy}" >> "$GITHUB_OUTPUT"
+          echo "can_deploy_staging=${can_deploy_staging}" >> "$GITHUB_OUTPUT"
+
+          can_deploy_production=false
+          if [ "${can_push}" = true ] \
+             && [ -n "${PRODUCTION_SSH_KEY}" ] \
+             && [ -n "${PRODUCTION_KNOWN_HOSTS}" ] && [ -n "${PRODUCTION_HOST}" ] && [ -n "${PRODUCTION_USER}" ]; then
+            can_deploy_production=true
+          fi
+          echo "can_deploy_production=${can_deploy_production}" >> "$GITHUB_OUTPUT"
 
           {
             echo "### Deploy configuration"
@@ -102,15 +111,18 @@ jobs:
             echo "|---|---|"
             echo "| Image namespace | \`${user}\` |"
             echo "| Push images to Docker Hub | \`${can_push}\` |"
-            echo "| Deploy over SSH | \`${can_deploy}\` |"
+            echo "| Staging deploy | \`${can_deploy_staging}\` |"
+            echo "| Production deploy | \`${can_deploy_production}\` |"
             echo ""
             if [ "${can_push}" = false ]; then
               echo "DOCKER_PAT_BACKEND / DOCKER_PAT_FRONTEND are unset, so images are"
               echo "built and validated but not pushed. See docs/GITHUB_SECRETS.md."
             fi
-            if [ "${can_deploy}" = false ]; then
-              echo "Deploy jobs are skipped until the SSH and known-hosts secrets exist."
-              echo "They fail closed by design rather than deploy with unverified hosts."
+            if [ "${can_deploy_staging}" = false ]; then
+              echo "Staging deploy is skipped until its image-push and staging SSH configuration exists."
+            fi
+            if [ "${can_deploy_production}" = false ]; then
+              echo "Production deploy is skipped until its image-push and production SSH configuration exists."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -395,7 +407,7 @@ jobs:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: [docker-backend, docker-frontend, security, config]
-    # can_deploy covers the SSH key, both hosts and both pinned known_hosts sets.
+    # Staging deploy is gated only by staging-specific SSH and host configuration.
     # Absent any of them the job is skipped rather than failed, so the pipeline
     # stays green on a repository that has not been provisioned for deploys yet.
     # Pushes deploy the current main build; manual dispatches may deploy or
@@ -403,7 +415,7 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main'
       && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      && needs.config.outputs.can_deploy == 'true'
+      && needs.config.outputs.can_deploy_staging == 'true'
     environment: staging
     timeout-minutes: 30
     steps:
@@ -432,7 +444,7 @@ jobs:
       - name: Setup SSH
         uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
 
       # Pinned host keys from the STAGING_KNOWN_HOSTS secret. ssh-keyscan is
       # unauthenticated and MITM-able, so it is no longer used. Populate the
@@ -515,7 +527,7 @@ jobs:
     needs: [docker-backend, docker-frontend, security, config]
     if: >-
       startsWith(github.ref, 'refs/tags/v')
-      && needs.config.outputs.can_deploy == 'true'
+      && needs.config.outputs.can_deploy_production == 'true'
     environment: production
     timeout-minutes: 30
     steps:
@@ -544,7 +556,7 @@ jobs:
       - name: Setup SSH
         uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
 
       # Pinned host keys from the PRODUCTION_KNOWN_HOSTS secret; see the
       # staging job for rationale. Populate with: ssh-keyscan -H <prod-host>
