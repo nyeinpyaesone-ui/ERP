@@ -85,13 +85,26 @@ jobs:
           PRODUCTION_KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
           STAGING_HOST: ${{ secrets.STAGING_HOST }}
           STAGING_USER: ${{ secrets.STAGING_USER }}
+          STAGING_DOMAIN_VAR: ${{ vars.STAGING_DOMAIN }}
           PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
           PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          PRODUCTION_DOMAIN_VAR: ${{ vars.PRODUCTION_DOMAIN }} ${{ secrets.PRODUCTION_USER }}
         run: |
           set -euo pipefail
           user="${DOCKER_USER_VAR:-local}"
           if [ -n "${DOCKER_USER_VAR}" ] && [[ ! "${DOCKER_USER_VAR}" =~ ^[a-z0-9][a-z0-9_-]{0,127}$ ]]; then
             echo "::error::DOCKER_USER must be a valid lowercase Docker Hub namespace."
+            exit 1
+          fi
+          valid_domain() {
+            [[ "$1" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]
+          }
+          if [ -n "${STAGING_DOMAIN_VAR}" ] && ! valid_domain "${STAGING_DOMAIN_VAR}"; then
+            echo "::error::STAGING_DOMAIN must be a lowercase FQDN without scheme, port, or path."
+            exit 1
+          fi
+          if [ -n "${PRODUCTION_DOMAIN_VAR}" ] && ! valid_domain "${PRODUCTION_DOMAIN_VAR}"; then
+            echo "::error::PRODUCTION_DOMAIN must be a lowercase FQDN without scheme, port, or path."
             exit 1
           fi
           echo "docker_user=${user}" >> "$GITHUB_OUTPUT"
@@ -110,7 +123,8 @@ jobs:
           can_deploy_staging=false
           if [ "${can_push}" = true ] \
              && [ -n "${STAGING_SSH_KEY}" ] \
-             && [ -n "${STAGING_KNOWN_HOSTS}" ] && [ -n "${STAGING_HOST}" ] && [ -n "${STAGING_USER}" ]; then
+             && [ -n "${STAGING_KNOWN_HOSTS}" ] && [ -n "${STAGING_HOST}" ] && [ -n "${STAGING_USER}" ] \\
+             && [ -n "${STAGING_DOMAIN_VAR}" ] && valid_domain "${STAGING_DOMAIN_VAR}"; then
             can_deploy_staging=true
           fi
           echo "can_deploy_staging=${can_deploy_staging}" >> "$GITHUB_OUTPUT"
@@ -118,7 +132,8 @@ jobs:
           can_deploy_production=false
           if [ "${can_push}" = true ] \
              && [ -n "${PRODUCTION_SSH_KEY}" ] \
-             && [ -n "${PRODUCTION_KNOWN_HOSTS}" ] && [ -n "${PRODUCTION_HOST}" ] && [ -n "${PRODUCTION_USER}" ]; then
+             && [ -n "${PRODUCTION_KNOWN_HOSTS}" ] && [ -n "${PRODUCTION_HOST}" ] && [ -n "${PRODUCTION_USER}" ] \\
+             && [ -n "${PRODUCTION_DOMAIN_VAR}" ] && valid_domain "${PRODUCTION_DOMAIN_VAR}"; then
             can_deploy_production=true
           fi
           echo "can_deploy_production=${can_deploy_production}" >> "$GITHUB_OUTPUT"
@@ -138,10 +153,10 @@ jobs:
               echo "built and validated but not pushed. See docs/GITHUB_SECRETS.md."
             fi
             if [ "${can_deploy_staging}" = false ]; then
-              echo "Staging deploy is skipped until its image-push and staging SSH configuration exists."
+              echo "Staging deploy is skipped until image push, staging SSH, pinned host keys, and STAGING_DOMAIN are configured."
             fi
             if [ "${can_deploy_production}" = false ]; then
-              echo "Production deploy is skipped until its image-push and production SSH configuration exists."
+              echo "Production deploy is skipped until image push, production SSH, pinned host keys, and PRODUCTION_DOMAIN are configured."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
