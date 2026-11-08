@@ -26,6 +26,8 @@ ACTIVE_VERSION_FILE="${ERP_DIR}/.active_version"
 DEPLOY_TARGET_ENVIRONMENT="${1:-production}"
 DEPLOY_TARGET_VERSION="${2:-latest}"
 ROLLBACK="${3:-false}"
+# CI supplies the selected registry namespace; preserve it over .env imports.
+DEPLOY_DOCKER_USER="${DOCKER_USER:-}"
 
 mkdir -p "${ERP_DIR}/logs"
 LOG_FILE="${ERP_DIR}/logs/deploy-$(date +%Y%m%d-%H%M%S).log"
@@ -268,6 +270,10 @@ load_env() {
         # Parsed rather than sourced: an env file is data, and a value holding
         # a space or a $ must not be able to run code as a side effect.
         erp_load_env "${ERP_ENV_FILE}"
+        if [ -n "${DEPLOY_DOCKER_USER}" ]; then
+            DOCKER_USER="${DEPLOY_DOCKER_USER}"
+            export DOCKER_USER
+        fi
         export ERP_ENV_FILE
     else
         error "No environment file found under ${ERP_DIR} (expected .env.production)."
