@@ -51,9 +51,14 @@ def gh_merge_or_enqueue(
     except subprocess.TimeoutExpired:
         return False, "GitHub CLI merge request timed out"
     if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout or "unknown GitHub CLI error").strip()
+        detail = (
+            completed.stderr or completed.stdout or "unknown GitHub CLI error"
+        ).strip()
         return False, f"GitHub refused merge/queue request: {detail[-1200:]}"
-    return True, (completed.stdout or "GitHub accepted merge/auto-merge request").strip()
+    return (
+        True,
+        (completed.stdout or "GitHub accepted merge/auto-merge request").strip(),
+    )
 
 
 def wait_for_pr_merge(
@@ -68,9 +73,17 @@ def wait_for_pr_merge(
             merge_sha = str(pr.get("merge_commit_sha") or "")
             if merge_sha:
                 return True, merge_sha, "GitHub confirmed the PR merge"
-            return False, "", "GitHub reports merged but did not return merge_commit_sha"
+            return (
+                False,
+                "",
+                "GitHub reports merged but did not return merge_commit_sha",
+            )
         if pr.get("state") != "open":
-            return False, "", f"PR left the open state without a confirmed merge ({pr.get('state')})"
+            return (
+                False,
+                "",
+                f"PR left the open state without a confirmed merge ({pr.get('state')})",
+            )
         auto_merge = pr.get("auto_merge")
         last_state = (
             "GitHub auto-merge enabled; waiting for required checks/reviews"
@@ -110,9 +123,7 @@ def wait_for_main_ci(
 
 
 def dispatch_and_wait_for_staging(timeout_seconds: int) -> tuple[bool, str]:
-    query = urlencode(
-        {"branch": "main", "event": "workflow_dispatch", "per_page": 100}
-    )
+    query = urlencode({"branch": "main", "event": "workflow_dispatch", "per_page": 100})
     before = api_get(repo_api_path("/actions/runs") + f"?{query}")
     previous_ids = {
         int(item["id"])
@@ -131,14 +142,11 @@ def dispatch_and_wait_for_staging(timeout_seconds: int) -> tuple[bool, str]:
         candidates = [
             item
             for item in response.get("workflow_runs", [])
-            if item.get("name") == "CI"
-            and int(item.get("id", 0)) not in previous_ids
+            if item.get("name") == "CI" and int(item.get("id", 0)) not in previous_ids
         ]
         if candidates:
             workflow_run = max(candidates, key=lambda item: int(item["id"]))
-            workflow_run = api_get(
-                repo_api_path(f"/actions/runs/{workflow_run['id']}")
-            )
+            workflow_run = api_get(repo_api_path(f"/actions/runs/{workflow_run['id']}"))
             if workflow_run.get("status") == "completed":
                 run_id = workflow_run["id"]
                 jobs_response = api_get(
@@ -146,11 +154,7 @@ def dispatch_and_wait_for_staging(timeout_seconds: int) -> tuple[bool, str]:
                 )
                 jobs = jobs_response.get("jobs", [])
                 staging = next(
-                    (
-                        job
-                        for job in jobs
-                        if job.get("name") == "Deploy to Staging"
-                    ),
+                    (job for job in jobs if job.get("name") == "Deploy to Staging"),
                     None,
                 )
                 if staging and staging.get("conclusion") == "success":
@@ -166,7 +170,9 @@ def dispatch_and_wait_for_staging(timeout_seconds: int) -> tuple[bool, str]:
     return False, f"staging deployment did not complete before timeout (run={run_id})"
 
 
-def execute(plan: list[dict[str, Any]], timeout_minutes: int, deploy_staging: bool) -> dict[str, Any]:
+def execute(
+    plan: list[dict[str, Any]], timeout_minutes: int, deploy_staging: bool
+) -> dict[str, Any]:
     repository = os.environ["GITHUB_REPOSITORY"]
     timeout_seconds = timeout_minutes * 60
     merged: list[dict[str, Any]] = []
@@ -180,9 +186,7 @@ def execute(plan: list[dict[str, Any]], timeout_minutes: int, deploy_staging: bo
         main_sha = main["commit"]["sha"]
 
         try:
-            report = build_pr_report(
-                number, expected_head, main_sha, repository
-            )
+            report = build_pr_report(number, expected_head, main_sha, repository)
         except (
             GitHubAPIError,
             KeyError,
@@ -218,9 +222,7 @@ def execute(plan: list[dict[str, Any]], timeout_minutes: int, deploy_staging: bo
             )
             break
 
-        merged_ok, merge_sha, merge_detail = wait_for_pr_merge(
-            number, timeout_seconds
-        )
+        merged_ok, merge_sha, merge_detail = wait_for_pr_merge(number, timeout_seconds)
         if not merged_ok:
             skipped.append(
                 {
@@ -228,9 +230,7 @@ def execute(plan: list[dict[str, Any]], timeout_minutes: int, deploy_staging: bo
                     "reason": f"{merge_request_detail}; {merge_detail}",
                 }
             )
-            stopped_reason = (
-                f"PR #{number} was not confirmed merged; stopping batch"
-            )
+            stopped_reason = f"PR #{number} was not confirmed merged; stopping batch"
             break
 
         ci_ok, ci_detail = wait_for_main_ci(merge_sha, timeout_seconds)
@@ -252,7 +252,9 @@ def execute(plan: list[dict[str, Any]], timeout_minutes: int, deploy_staging: bo
             break
 
     staging_result = None
-    all_selected_merged = len(merged) == len(plan) and not skipped and not stopped_reason
+    all_selected_merged = (
+        len(merged) == len(plan) and not skipped and not stopped_reason
+    )
     if deploy_staging:
         if all_selected_merged and merged:
             success, detail = dispatch_and_wait_for_staging(timeout_seconds)
