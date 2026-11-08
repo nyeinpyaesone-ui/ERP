@@ -16,7 +16,7 @@ The orchestrator is a control plane. It must preserve repository correctness, br
 1. **Discover**: snapshot open PR numbers, head SHAs, base SHAs, draft state, and target branch.
 2. **Map**: execute independent PR workers in parallel. Each worker retrieves current PR metadata, changed files, check runs, combined commit status, and submitted reviews.
 3. **Reduce**: join the worker reports, classify risk, detect changed-file overlap, and choose a bounded non-overlapping batch.
-4. **Execute**: serialize merges. Immediately before each merge, repeat the full live preflight and use the expected head SHA as the merge compare-and-swap guard.
+4. **Execute**: serialize merges. Immediately before each merge, repeat the full live preflight and use the expected head SHA as the merge compare-and-swap guard. When the repository uses a merge queue, the existing CI workflow must also execute on `merge_group: checks_requested`.
 5. **Verify**: after every merge, wait for the CI workflow on the exact merge commit SHA. Stop the batch at the first failed or missing main-branch CI run.
 6. **Deploy**: staging is a separate, explicit dispatch after the entire selected batch merges and passes main CI. Production requires the repository's versioned release path and is never triggered by this skill.
 
