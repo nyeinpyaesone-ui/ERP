@@ -14,7 +14,7 @@ Options:
   --domain FQDN        Base domain, e.g. staging.example.com (required)
   --docker-user NAME   Docker Hub namespace (required)
   --version TAG        Initial image tag (default: latest; use an immutable tag for deploys)
-  --dir PATH           Install directory (default: repository root)
+  --dir PATH           Required absolute install directory outside the repository
   --help               Show this help
 
 Creates .env.staging or .env.production with distinct random DB, Redis, and
@@ -27,7 +27,7 @@ environment=""
 domain=""
 docker_user=""
 version="latest"
-target_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+target_dir=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -60,8 +60,21 @@ if [[ ! "$version" =~ ^(latest|sha-[[:xdigit:]]{7,40}|v[0-9A-Za-z][0-9A-Za-z._-]
 fi
 command -v openssl >/dev/null 2>&1 || { echo "openssl is required" >&2; exit 1; }
 
+[ -n "$target_dir" ] || { echo "--dir is required; choose the environment's protected install directory" >&2; exit 2; }
+case "$target_dir" in
+  /*) ;;
+  *) echo "--dir must be an absolute path" >&2; exit 2 ;;
+esac
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "$target_dir"
 target_dir="$(cd "$target_dir" && pwd)"
+case "$target_dir" in
+  "$repo_root"|"$repo_root"/*)
+    echo "Refusing to create runtime credentials inside the Git working tree." >&2
+    exit 2
+    ;;
+esac
 env_file="$target_dir/.env.$environment"
 if [ -e "$env_file" ] || [ -L "$env_file" ]; then
   echo "Refusing to overwrite existing $env_file" >&2
