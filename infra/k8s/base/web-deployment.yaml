@@ -1,8 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: erp_solution-web
-  namespace: erp_solution
+  name: erp-solution-web
+  namespace: erp-solution
   labels:
     app.kubernetes.io/name: erp_solution-web
     app.kubernetes.io/component: web
@@ -63,8 +63,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: erp_solution-web
-  namespace: erp_solution
+  name: erp-solution-web
+  namespace: erp-solution
   labels:
     app.kubernetes.io/name: erp_solution-web
     app.kubernetes.io/component: web
@@ -81,13 +81,13 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: erp_solution-web-hpa
-  namespace: erp_solution
+  name: erp-solution-web-hpa
+  namespace: erp-solution
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: erp_solution-web
+    name: erp-solution-web
   minReplicas: 2
   maxReplicas: 10
   metrics:
