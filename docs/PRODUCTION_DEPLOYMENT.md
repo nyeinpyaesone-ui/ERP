@@ -55,7 +55,7 @@ docker compose --env-file /opt/erp-solution/.env.production -f /opt/erp-solution
 # 5. Run migrations
 docker compose --env-file /opt/erp-solution/.env.production -f /opt/erp-solution/docker-compose.prod.yml exec backend alembic upgrade head
 
-# 5. Verify (nginx is the only published port in the prod stack)
+# 6. Verify (nginx is the only published port in the prod stack)
 curl http://localhost/api/v1/health
 ```
 
