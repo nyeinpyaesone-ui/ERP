@@ -382,6 +382,12 @@ jobs:
     # the multi-line value fails with "could not parse reference". Every
     # listed tag is pushed by the build jobs, so scan the first of each.
     steps:
+      - name: Log in to Docker Hub for backend scan
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ needs.config.outputs.docker_user }}
+          password: ${{ secrets.DOCKER_PAT_BACKEND }}
+
       - name: Run Trivy on backend
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
         with:
@@ -390,6 +396,12 @@ jobs:
           severity: CRITICAL,HIGH
           format: sarif
           output: trivy-backend.sarif
+
+      - name: Log in to Docker Hub for frontend scan
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ needs.config.outputs.docker_user }}
+          password: ${{ secrets.DOCKER_PAT_FRONTEND }}
 
       - name: Run Trivy on frontend
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
