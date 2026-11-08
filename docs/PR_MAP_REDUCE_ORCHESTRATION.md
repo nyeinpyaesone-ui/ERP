@@ -6,6 +6,12 @@ The PR Map-Reduce Orchestrator processes all open pull requests targeting \`main
 
 It does not pretend that a language-model sub-agent has approved code. The accompanying OpenCode skill defines zero-shot specialist review tasks; GitHub Actions performs the deterministic API checks and event orchestration.
 
+## OpenCode specialist agents
+
+The repository includes project-scoped OpenCode agent definitions under .opencode/agents. The primary pr-orchestrator delegates read-only specialist work to the scope, backend, frontend, security, platform, tests, and documentation agents. Their task envelopes include the exact PR head/base SHAs. They return PASS, BLOCK, or NEEDS_EVIDENCE with source evidence; they cannot approve or merge.
+
+The deterministic GitHub Actions workflow is the execution authority for merge eligibility, changed-file overlap, serial merges, and main-CI barriers.
+
 ## Workflow
 
 File: \`.github/workflows/pr-map-reduce-orchestrator.yml\`
