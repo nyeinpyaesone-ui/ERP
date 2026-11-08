@@ -94,20 +94,32 @@ If smoke tests fail **after** traffic switch, the script automatically:
 3. Exits with error
 
 ### Manual Rollback
+
+Redeploy the exact immutable image tag you want to restore:
+
 ```bash
-# Rollback to previous version (stored in .previous_version)
 ./scripts/deploy-blue-green.sh production v1.2.2 --rollback
 ```
 
+The `--rollback` flag requires an explicit tag; `latest` is rejected.
+Both backend and frontend images must exist under the selected tag, and the
+target host must be authenticated to the registry.
+
 **What happens:**
-1. Reads `.previous_version` file (e.g., `v1.2.2`)
-2. Identifies current active color (e.g., `green`)
-3. Switches traffic to inactive color (e.g., `blue`) which runs `v1.2.2`
-4. Stops the failed environment (`green` running `v1.2.3`)
 
-> **Note:** Rollback only works if the previous version's containers still exist (they're stopped, not removed). After a successful deploy, the old environment is stopped but preserved for rollback.
+1. Validate the requested tag.
+2. Pull both backend and frontend images using that same tag.
+3. Start the inactive color with the selected version.
+4. Wait for health checks and run smoke tests.
+5. Switch traffic only after the inactive color is healthy.
+6. Record the active color and version in `.active_color` and
+   `.active_version`.
 
----
+This is a blue-green redeployment of the selected release, not a retag of the
+backend image as the frontend image and not an implicit lookup of a
+`.previous_version` file. If checks fail before traffic switches, the
+current active color remains live. If post-switch smoke tests fail, traffic is
+switched back and the prior active-version record is restored.
 
 ## Smoke Tests Explained
 
