@@ -4,7 +4,6 @@ kind: Kustomization
 namespace: erp-solution
 resources:
   - ../../base
-  - namespace.yaml
 
 commonLabels:
   environment: production
