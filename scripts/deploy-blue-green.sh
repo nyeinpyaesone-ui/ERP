@@ -20,8 +20,8 @@ SSL_DIR="${ERP_SSL_DIR}"
 ACTIVE_COLOR_FILE="${ERP_DIR}/.active_color"
 ACTIVE_VERSION_FILE="${ERP_DIR}/.active_version"
 
-# CLI arguments, captured before load_env runs. .env.production also defines
-# ENVIRONMENT for the backend (dev|test|prod), so exporting it would overwrite
+# CLI arguments, captured before load_env runs. The environment-specific .env
+# file also defines backend ENVIRONMENT (dev|test|prod), so exporting it would overwrite
 # the deploy target and validate_environment would reject "prod".
 DEPLOY_TARGET_ENVIRONMENT="${1:-production}"
 DEPLOY_TARGET_VERSION="${2:-latest}"
