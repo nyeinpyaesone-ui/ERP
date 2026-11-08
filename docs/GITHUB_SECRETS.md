@@ -108,8 +108,11 @@ Frontend: the browser bundle reads `VITE_API_URL` at build time
 The repository has a guarded setup script. It validates values before writing
 and preserves the existing \`DOCKER_PAT_BACKEND\` and \`DOCKER_PAT_FRONTEND\`
 secrets. It creates the \`staging\` and \`production\` GitHub Environments if
-missing and adds only the required deployment-ref policies; existing reviewer,
-wait-timer, and other environment rules are left unchanged.
+missing with custom deployment-ref policies enabled and adds only the required
+branch/tag rules. If an existing environment has custom policies disabled, the
+script stops and asks an administrator to enable them in Settings; it does not
+replace an existing environment definition or change reviewer, wait-timer, or
+other protection settings.
 
 First prepare two host-key files on a trusted operator workstation. Obtain the
 expected SSH host fingerprints from each hosting provider, compare them with
@@ -231,7 +234,7 @@ write access to its matching repository, or a repository name mismatch.
 
 `ci.yml`'s deploy jobs declare `environment: staging` / `environment: production`.
 Both environments must exist, otherwise the jobs fail at the deployment-record
-step. Configured policy (created 2026-10-11):
+step. Required policy:
 
 | Environment | Deployment branch policy | Rationale |
 |-------------|--------------------------|-----------|
@@ -242,9 +245,9 @@ The policies are fail-closed: no other ref can create a deployment. No required 
 requires an explicit manual dispatch boolean for each environment; add GitHub
 Environment reviewers separately when formal approval is required.
 
-The `copilot` environment is auto-created by GitHub Copilot's coding agent —
-leave it alone. Do not create environments named after tools (`Docker` etc.);
-nothing references them.
+The setup script creates only `staging` and `production`. Leave unrelated
+environments alone; do not create environments named after tools (`Docker`,
+etc.) because the workflows do not reference them.
 
 ```bash
 gh api repos/OWNER/ERP/environments --jq '.environments[].name'
