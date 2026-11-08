@@ -10,7 +10,7 @@ This guide covers zero-downtime production deployments using the `deploy-blue-gr
 ┌─────────────────────────────────────────────────────────────────┐
 │                        NGINX (Traffic Router)                   │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │  upstream-active.conf  ──symlink──►  upstream-blue.conf  │   │
+│  │  upstream-active.conf  (bind-mounted active upstream)        │   │
 │  │                          (LIVE TRAFFIC)                   │   │
 │  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
@@ -35,10 +35,11 @@ This guide covers zero-downtime production deployments using the `deploy-blue-gr
 ## Prerequisites
 
 - ✅ Initial installation complete (`install.sh` run successfully)
-- ✅ Separate `/opt/erp-solution/.env.staging` and `.env.production` files populated with environment-specific credentials (mode `0600`)
+- ✅ A dedicated staging host has `/opt/erp-solution/.env.staging`, and a separate production host has `/opt/erp-solution/.env.production` (both mode `0600`)
+- ✅ Both hosts have read-only Docker Hub access configured through a native credential helper
 - ✅ Staging and production use separate hosts; the Compose stack has fixed container names
 - ✅ Blue environment running and healthy
-- ✅ Docker images built/pushed for new version (or using `latest`)
+- ✅ Both images published under the same immutable `sha-*` or `v*` tag
 - ✅ Access to production server via SSH
 
 ---
@@ -62,7 +63,7 @@ cd /opt/erp-solution  # or wherever repo is cloned
 | 4 | Start inactive backend + frontend | 10-30s | Container start error → exit |
 | 5 | Wait for health checks | 30-300s | Timeout → stop inactive, exit |
 | 6 | Run smoke tests (health/ready/root) | 5-15s | Any fail → stop inactive, exit |
-| 7 | **Atomic traffic switch** (nginx symlink + reload) | <5s | Rollback to old, exit |
+| 7 | **Nginx traffic switch** (update bind-mounted `upstream-active.conf`, validate with `nginx -t`, then reload) | <5s | Restore the exact prior config and reload, then exit |
 | 8 | Post-switch smoke tests | 5-10s | Fail → rollback traffic, exit |
 | 9 | Stop old environment | 5-10s | Warning only (old still accessible) |
 
