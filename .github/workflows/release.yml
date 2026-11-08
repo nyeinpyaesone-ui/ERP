@@ -74,8 +74,8 @@ jobs:
               sleep 30
               continue
             fi
-            if printf '%s' "${CI_RUNS}" | jq -e 'any(.[]; .event == "push" and .conclusion == "failure")' >/dev/null; then
-              echo "::error::CI failed for release tag ${TAG}."
+            if printf '%s' "${CI_RUNS}" | jq -e 'any(.[]; .event == "push" and .status == "completed" and .conclusion != "success")' >/dev/null; then
+              echo "::error::CI did not complete successfully for release tag ${TAG}."
               exit 1
             fi
             sleep 30
