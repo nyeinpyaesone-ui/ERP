@@ -123,6 +123,11 @@ ssh-keygen -y -P '' -f "$STAGING_KEY_FILE" >/dev/null 2>&1 ||
   die "Staging key must be a valid unencrypted private key."
 ssh-keygen -y -P '' -f "$PRODUCTION_KEY_FILE" >/dev/null 2>&1 ||
   die "Production key must be a valid unencrypted private key."
+STAGING_PUBLIC_KEY="$(ssh-keygen -y -P '' -f "$STAGING_KEY_FILE")"
+PRODUCTION_PUBLIC_KEY="$(ssh-keygen -y -P '' -f "$PRODUCTION_KEY_FILE")"
+[ "$STAGING_PUBLIC_KEY" != "$PRODUCTION_PUBLIC_KEY" ] ||
+  die "Staging and production must use distinct SSH key pairs."
+unset STAGING_PUBLIC_KEY PRODUCTION_PUBLIC_KEY
 ssh-keygen -F "$STAGING_HOST" -f "$STAGING_KNOWN_HOSTS_FILE" >/dev/null ||
   die "Pinned staging known_hosts file has no matching entry for $STAGING_HOST."
 ssh-keygen -F "$PRODUCTION_HOST" -f "$PRODUCTION_KNOWN_HOSTS_FILE" >/dev/null ||
