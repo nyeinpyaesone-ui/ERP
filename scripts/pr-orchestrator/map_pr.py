@@ -5,13 +5,19 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 import time
 from collections.abc import Iterable
 from typing import Any
 from urllib.parse import urlencode
 
-from client import api_get, api_paginate, api_paginate_field, repo_api_path, write_json
+from client import (
+    GitHubAPIError,
+    api_get,
+    api_paginate,
+    api_paginate_field,
+    repo_api_path,
+    write_json,
+)
 
 ALLOWED_CHECK_CONCLUSIONS = {"success", "skipped", "neutral"}
 RISK_ORDER = {
@@ -263,7 +269,14 @@ def main() -> int:
         report = build_pr_report(
             args.number, args.expected_head, args.expected_base, repository
         )
-    except Exception as error:
+    except (
+        GitHubAPIError,
+        KeyError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as error:
         report = {
             "schema_version": 1,
             "number": args.number,
