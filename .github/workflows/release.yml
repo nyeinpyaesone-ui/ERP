@@ -1,66 +1,98 @@
 name: Release
 
 on:
-  push:
-    tags: ['v*']
+  # Wait for CI on a version tag to finish before publishing a GitHub Release.
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to publish a GitHub Release for"
+        description: "Existing version tag whose verified images should be released"
         required: true
         type: string
 
 permissions:
   contents: write
 
-# Serialize releases: a second tag push while one is publishing would race the
-# `gh release create` for the same tag.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event.workflow_run.head_branch || inputs.tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
   release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.workflow_run.conclusion == 'success'
+      && startsWith(github.event.workflow_run.head_branch, 'v'))
     steps:
-      - name: Checkout
+      - name: Checkout completed CI revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Full history so the previous tag can be found for comparison notes.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
-      # CI already built and pushed the tag images on this same ref
-      # (docker-backend / docker-frontend, `type=ref,event=tag`). This job only
-      # publishes the GitHub Release record — it must not rebuild or redeploy,
-      # so production deploys stay owned by ci.yml's deploy-production job.
-      - name: Determine tag
+      - name: Validate release publishing configuration
         id: tag
+        env:
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+          BACKEND_TOKEN: ${{ secrets.DOCKER_PAT_BACKEND }}
+          FRONTEND_TOKEN: ${{ secrets.DOCKER_PAT_FRONTEND }}
+          MANUAL_TAG: ${{ inputs.tag }}
+          WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          TAG="${{ inputs.tag }}"
-          if [ -z "$TAG" ]; then TAG="${GITHUB_REF#refs/tags/}"; fi
+          set -euo pipefail
+          if [ -z "${DOCKER_USER}" ] || [ -z "${BACKEND_TOKEN}" ] || [ -z "${FRONTEND_TOKEN}" ]; then
+            echo "::error::DOCKER_USER and both image-scoped Docker Hub tokens are required to publish a release."
+            exit 1
+          fi
+
+          if [ -n "${MANUAL_TAG}" ]; then
+            TAG="${MANUAL_TAG}"
+          else
+            TAG="$(git tag --points-at "${WORKFLOW_HEAD_SHA}" | grep -E '^v[0-9A-Za-z][0-9A-Za-z._-]{0,127}$' | sort -V | tail -n1)"
+          fi
+
+          if [[ ! "${TAG}" =~ ^v[0-9A-Za-z][0-9A-Za-z._-]{0,127}$ ]]; then
+            echo "::error::No valid v* release tag is associated with the completed CI revision."
+            exit 1
+          fi
           if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "::error::Tag ${TAG} not found in the repository"
+            echo "::error::Tag ${TAG} not found in the checked-out repository."
             exit 1
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "name=${TAG}" >> "$GITHUB_OUTPUT"
 
-      - name: Verify referenced images exist
+      - name: Log in to Docker Hub for backend verification
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ vars.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PAT_BACKEND }}
+
+      - name: Verify backend image exists
         env:
           TAG: ${{ steps.tag.outputs.tag }}
           DOCKER_USER: ${{ vars.DOCKER_USER }}
         run: |
           set -euo pipefail
-          for image in erp-solution-backend erp-solution-frontend; do
-            ref="${DOCKER_USER}/${image}:${TAG}"
-            echo "Checking ${ref}"
-            if ! docker manifest inspect "$ref" >/dev/null 2>&1; then
-              echo "::error::Image ${ref} not found in the registry — CI image build must succeed before releasing"
-              exit 1
-            fi
-          done
+          docker manifest inspect "${DOCKER_USER}/erp-solution-backend:${TAG}" >/dev/null
+
+      - name: Log in to Docker Hub for frontend verification
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ vars.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PAT_FRONTEND }}
+
+      - name: Verify frontend image exists
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+        run: |
+          set -euo pipefail
+          docker manifest inspect "${DOCKER_USER}/erp-solution-frontend:${TAG}" >/dev/null
 
       - name: Extract release notes from CHANGELOG.md
         id: notes
@@ -70,16 +102,13 @@ jobs:
           set -euo pipefail
           : > release-notes.md
           if [ -f CHANGELOG.md ]; then
-            # Section headings are `## [<version>]` or `## <version>`; stop at
-            # the next level-2 heading. Falls through to a commit list when the
-            # changelog has no entry for this tag yet.
             awk -v tag="${TAG#v}" '
               BEGIN { found = 0 }
               /^## / {
                 if (found) exit
                 line = $0
-                gsub(/^##[[:space:]]*\[?/, "", line)
-                gsub(/\]?[[:space:]]*$/, "", line)
+                gsub(/^##[[:space:]]*\\[?/, "", line)
+                gsub(/\\]?[[:space:]]*$/, "", line)
                 gsub(/^[^0-9]*/, "", line)
                 if (index(line, tag) > 0) { found = 1; print; next }
               }
@@ -97,10 +126,10 @@ jobs:
             {
               echo "## Changes in ${TAG}"
               echo
-              if [ -n "$PREV" ]; then
-                git log --pretty=format:'- %s (%h)' "$PREV..${TAG}"
+              if [ -n "${PREV}" ]; then
+                git log --pretty=format:'- %s (%h)' "${PREV}..${TAG}"
               else
-                git log --pretty=format:'- %s (%h)' --max-count=50 "$TAG"
+                git log --pretty=format:'- %s (%h)' --max-count=50 "${TAG}"
               fi
             } > release-notes.md
             echo >> release-notes.md
@@ -111,16 +140,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
-          NAME: ${{ steps.tag.outputs.name }}
         run: |
           set -euo pipefail
-          gh release create "$TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "ERP SOLUTION $TAG" \
+          gh release create "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "ERP SOLUTION ${TAG}" \
             --notes-file release-notes.md \
             --verify-tag
 
-      - name: Attach image references to the release body
+      - name: Attach verified image references to release body
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
@@ -136,6 +164,6 @@ jobs:
             echo "${DOCKER_USER}/erp-solution-frontend:${TAG}"
             echo '```'
           } >> release-notes.md
-          gh release edit "$TAG" \
-            --repo "$GITHUB_REPOSITORY" \
+          gh release edit "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
             --notes-file release-notes.md
