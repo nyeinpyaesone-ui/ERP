@@ -177,11 +177,27 @@ set_secret_value() {
 }
 ensure_environment() {
   local env_name="$1"
-  local environments
+  local environments details protected
   environments="$(gh api "repos/$repo/environments?per_page=100" --jq '.environments[].name')"
+
   if ! grep -Fxq "$env_name" <<< "$environments"; then
-    gh api --method PUT "repos/$repo/environments/$env_name" --silent >/dev/null
-    echo "Created GitHub Environment: $env_name"
+    gh api --method PUT "repos/$repo/environments/$env_name" \
+      -F 'deployment_branch_policy[protected_branches]=false' \
+      -F 'deployment_branch_policy[custom_branch_policies]=true' \
+      --silent >/dev/null
+    echo "Created GitHub Environment with custom deployment-ref policies: $env_name"
+    return 0
+  fi
+
+  details="$(gh api "repos/$repo/environments/$env_name")"
+  if ! jq -e '.deployment_branch_policy.custom_branch_policies == true' <<< "$details" >/dev/null; then
+    protected="$(jq -r '.deployment_branch_policy.protected_branches // false' <<< "$details")"
+    # Enable custom branch/tag policies without changing the current
+    # protected-branches choice or any reviewer/wait-timer settings.
+    gh api --method PUT "repos/$repo/environments/$env_name" \
+      -F "deployment_branch_policy[protected_branches]=$protected" \
+      -F 'deployment_branch_policy[custom_branch_policies]=true' \
+      --silent >/dev/null
   fi
 }
 ensure_policy() {
