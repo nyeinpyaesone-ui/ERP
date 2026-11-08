@@ -214,38 +214,54 @@ run_smoke_tests() {
 switch_traffic() {
     local new_color="$1"
     local old_color="$2"
-    
+
     info "Switching traffic from ${old_color} to ${new_color}"
-    
+
     local new_upstream_host="${NGINX_UPSTREAM_DIR_HOST}/upstream-${new_color}.conf"
+    local old_upstream_host="${NGINX_UPSTREAM_DIR_HOST}/upstream-${old_color}.conf"
     local active_upstream_host="${NGINX_UPSTREAM_DIR_HOST}/upstream-active.conf"
-    
-    if [ ! -f "${new_upstream_host}" ]; then
-        error "Upstream config not found: ${new_upstream_host}"
+    local temp_upstream_host="${active_upstream_host}.tmp.$$"
+    local restore_upstream_host="${active_upstream_host}.restore.$$"
+
+    if [ ! -f "${new_upstream_host}" ] || [ ! -f "${old_upstream_host}" ]; then
+        error "New or previous upstream config is missing."
         return 1
     fi
-    
-    # Atomic switch - copy on host (not symlink in container since it's ro mount)
-    if cp "${new_upstream_host}" "${active_upstream_host}" 2>&1 | tee -a "${LOG_FILE}"; then
-        info "Upstream config updated on host"
-    else
-        error "Failed to update upstream config on host"
+
+    # Replace the mounted file atomically so nginx never observes a partial copy.
+    if ! cp "${new_upstream_host}" "${temp_upstream_host}" ||
+       ! mv -f "${temp_upstream_host}" "${active_upstream_host}"; then
+        rm -f "${temp_upstream_host}"
+        error "Failed to stage the new nginx upstream config."
         return 1
     fi
-    
-    # Reload nginx
-    if docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"; then
-        success "Traffic switched to ${new_color}"
-    else
-        error "Failed to reload nginx"
+
+    if ! docker exec erp-nginx nginx -t 2>&1 | tee -a "${LOG_FILE}"; then
+        cp "${old_upstream_host}" "${restore_upstream_host}" &&
+            mv -f "${restore_upstream_host}" "${active_upstream_host}" || true
+        error "New nginx upstream config failed validation; previous config restored."
         return 1
     fi
-    
-    # Update active color file on host
+
+    if ! docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"; then
+        if cp "${old_upstream_host}" "${restore_upstream_host}" &&
+           mv -f "${restore_upstream_host}" "${active_upstream_host}"; then
+            if docker exec erp-nginx nginx -t 2>&1 | tee -a "${LOG_FILE}" &&
+               docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"; then
+                warn "Previous nginx upstream restored after reload failure."
+            else
+                error "Could not reload nginx with the previous upstream config."
+            fi
+        else
+            error "Could not restore the previous nginx upstream config."
+        fi
+        return 1
+    fi
+
+    # Update deployment state only after nginx accepts and reloads the config.
     echo "${new_color}" > "${ACTIVE_COLOR_FILE}"
-    
-    # Record the version now serving traffic.
     printf '%s\n' "${VERSION}" > "${ACTIVE_VERSION_FILE}"
+    success "Traffic switched to ${new_color}"
 }
 
 stop_old_environment() {
