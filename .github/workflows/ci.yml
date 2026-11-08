@@ -123,7 +123,7 @@ jobs:
           can_deploy_staging=false
           if [ "${can_push}" = true ] \
              && [ -n "${STAGING_SSH_KEY}" ] \
-             && [ -n "${STAGING_KNOWN_HOSTS}" ] && [ -n "${STAGING_HOST}" ] && [ -n "${STAGING_USER}" ] \\
+             && [ -n "${STAGING_KNOWN_HOSTS}" ] && [ -n "${STAGING_HOST}" ] && [ -n "${STAGING_USER}" ] \
              && [ -n "${STAGING_DOMAIN_VAR}" ] && valid_domain "${STAGING_DOMAIN_VAR}"; then
             can_deploy_staging=true
           fi
@@ -132,7 +132,7 @@ jobs:
           can_deploy_production=false
           if [ "${can_push}" = true ] \
              && [ -n "${PRODUCTION_SSH_KEY}" ] \
-             && [ -n "${PRODUCTION_KNOWN_HOSTS}" ] && [ -n "${PRODUCTION_HOST}" ] && [ -n "${PRODUCTION_USER}" ] \\
+             && [ -n "${PRODUCTION_KNOWN_HOSTS}" ] && [ -n "${PRODUCTION_HOST}" ] && [ -n "${PRODUCTION_USER}" ] \
              && [ -n "${PRODUCTION_DOMAIN_VAR}" ] && valid_domain "${PRODUCTION_DOMAIN_VAR}"; then
             can_deploy_production=true
           fi
