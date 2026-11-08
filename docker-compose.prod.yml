@@ -145,9 +145,12 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      # Mount the directory, not individual files: blue-green switches replace
-      # upstream-active.conf atomically with rename, which file bind mounts do not observe.
-      - ./nginx:/etc/nginx/conf.d:ro
+      # Keep file bind mounts stable; the deploy script updates upstream-active.conf
+      # in place and reloads nginx only after validating the complete file.
+      - ./nginx/upstream-blue.conf:/etc/nginx/conf.d/upstream-blue.conf:ro
+      - ./nginx/upstream-green.conf:/etc/nginx/conf.d/upstream-green.conf:ro
+      - ./nginx/upstream-active.conf:/etc/nginx/conf.d/upstream-active.conf:ro
+      - ./nginx/ssl.conf:/etc/nginx/conf.d/ssl.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
       - ./logs/nginx:/var/log/nginx
     networks:
