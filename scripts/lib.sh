@@ -23,8 +23,6 @@ ERP_COMPOSE_FILE="${ERP_COMPOSE_FILE:-${ERP_DIR}/docker-compose.prod.yml}"
 ERP_NGINX_DIR="${ERP_NGINX_DIR:-${ERP_DIR}/nginx}"
 ERP_SSL_DIR="${ERP_SSL_DIR:-${ERP_DIR}/ssl}"
 
-# Fallback image namespace when neither the environment nor the env file says.
-ERP_DEFAULT_DOCKER_USER="${ERP_DEFAULT_DOCKER_USER:-powerrangeranikg}"
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
     ERP_RED='\033[0;31m'; ERP_GREEN='\033[0;32m'; ERP_YELLOW='\033[1;33m'
@@ -275,13 +273,17 @@ erp_env_value() {
 
 erp_detect_docker_user() {
     if [ -n "${DOCKER_USER:-}" ]; then
-        echo "${DOCKER_USER}"; return 0
+        printf '%s\n' "${DOCKER_USER}"
+        return 0
     fi
     local value
     if value="$(erp_env_value DOCKER_USER)"; then
-        [ -n "${value}" ] && { echo "${value}"; return 0; }
+        if [ -n "${value}" ]; then
+            printf '%s\n' "${value}"
+            return 0
+        fi
     fi
-    echo "${ERP_DEFAULT_DOCKER_USER}"
+    erp_die "DOCKER_USER is required. Set the Docker Hub namespace in the environment file or export DOCKER_USER."
 }
 
 # Release resolution: explicit argument, then VERSION from the environment,
