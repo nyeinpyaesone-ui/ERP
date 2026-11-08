@@ -63,23 +63,20 @@ jobs:
 
           # Tag pushes and CI start independently. Wait for CI on this exact
           # commit; do not publish a release if CI fails or never starts.
-          if [ -n "${MANUAL_TAG}" ]; then
-            ALLOWED_EVENTS='["push","workflow_dispatch"]'
-          else
-            ALLOWED_EVENTS='["push"]'
-          fi
+          # A commit may have both a main-branch push and a release-tag push.
+          # Require the successful CI run whose head branch is this exact tag.
           CI_OK=false
           for attempt in $(seq 1 60); do
-            CI_RUNS="$(gh run list --workflow ci.yml --commit "${TAG_SHA}" --json event,status,conclusion --limit 50)"
-            if printf '%s' "${CI_RUNS}" | jq -e --argjson allowed "${ALLOWED_EVENTS}" 'any(.[]; .event as $event | ($allowed | index($event)) != null and .conclusion == "success")' >/dev/null; then
+            CI_RUNS="$(gh run list --workflow ci.yml --commit "${TAG_SHA}" --json event,headBranch,status,conclusion --limit 50)"
+            if printf '%s' "${CI_RUNS}" | jq -e --arg tag "${TAG}" 'any(.[]; .event == "push" and .headBranch == $tag and .conclusion == "success")' >/dev/null; then
               CI_OK=true
               break
             fi
-            if printf '%s' "${CI_RUNS}" | jq -e --argjson allowed "${ALLOWED_EVENTS}" 'any(.[]; .event as $event | ($allowed | index($event)) != null and (.status == "queued" or .status == "in_progress" or .status == "waiting" or .status == "requested"))' >/dev/null; then
+            if printf '%s' "${CI_RUNS}" | jq -e --arg tag "${TAG}" 'any(.[]; .event == "push" and .headBranch == $tag and (.status == "queued" or .status == "in_progress" or .status == "waiting" or .status == "requested"))' >/dev/null; then
               sleep 30
               continue
             fi
-            if printf '%s' "${CI_RUNS}" | jq -e --argjson allowed "${ALLOWED_EVENTS}" 'any(.[]; .event as $event | ($allowed | index($event)) != null and .status == "completed" and .conclusion != "success")' >/dev/null; then
+            if printf '%s' "${CI_RUNS}" | jq -e --arg tag "${TAG}" 'any(.[]; .event == "push" and .headBranch == $tag and .status == "completed" and .conclusion != "success")' >/dev/null; then
               echo "::error::CI did not complete successfully for release tag ${TAG}."
               exit 1
             fi
