@@ -536,7 +536,7 @@ jobs:
           DEPLOY_TMP="/tmp/erp-deploy-${GITHUB_RUN_ID}"
 
           # Ship the exact deployment script and Compose/nginx config from this commit.
-          tar -czf - scripts/deploy-blue-green.sh scripts/lib.sh docker-compose.prod.yml nginx.conf nginx/upstream-blue.conf nginx/upstream-green.conf nginx/ssl.conf |
+          tar -czf - scripts/deploy-blue-green.sh scripts/lib.sh docker-compose.prod.yml nginx.conf nginx/upstream-blue.conf nginx/upstream-green.conf |
             ssh "${TARGET}" "mkdir -p '${DEPLOY_TMP}' && tar -xzf - -C '${DEPLOY_TMP}'"
 
           ssh "${TARGET}" bash -s -- "${DOCKER_USER}" "${VERSION}" "${ACTION}" "${GITHUB_RUN_ID}" <<'REMOTE'
@@ -555,7 +555,6 @@ jobs:
           chmod 0644 nginx.conf
           install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-blue.conf" nginx/upstream-blue.conf
           install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-green.conf" nginx/upstream-green.conf
-          install -D -m 0644 "$DEPLOY_TMP/nginx/ssl.conf" nginx/ssl.conf
           rm -rf "$DEPLOY_TMP"
           docker pull "${DOCKER_USER}/erp-solution-backend:${VERSION}"
           docker pull "${DOCKER_USER}/erp-solution-frontend:${VERSION}"
@@ -650,7 +649,7 @@ jobs:
           DEPLOY_TMP="/tmp/erp-deploy-${GITHUB_RUN_ID}"
 
           # Ship the exact deployment script and Compose/nginx config from this tag.
-          tar -czf - scripts/deploy-blue-green.sh scripts/lib.sh docker-compose.prod.yml nginx.conf nginx/upstream-blue.conf nginx/upstream-green.conf nginx/ssl.conf |
+          tar -czf - scripts/deploy-blue-green.sh scripts/lib.sh docker-compose.prod.yml nginx.conf nginx/upstream-blue.conf nginx/upstream-green.conf |
             ssh "${TARGET}" "mkdir -p '${DEPLOY_TMP}' && tar -xzf - -C '${DEPLOY_TMP}'"
 
           ssh "${TARGET}" bash -s -- "${DOCKER_USER}" "${RELEASE_VERSION}" "${GITHUB_RUN_ID}" <<'REMOTE'
@@ -668,7 +667,6 @@ jobs:
           chmod 0644 nginx.conf
           install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-blue.conf" nginx/upstream-blue.conf
           install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-green.conf" nginx/upstream-green.conf
-          install -D -m 0644 "$DEPLOY_TMP/nginx/ssl.conf" nginx/ssl.conf
           rm -rf "$DEPLOY_TMP"
           docker pull "${DOCKER_USER}/erp-solution-backend:${VERSION}"
           docker pull "${DOCKER_USER}/erp-solution-frontend:${VERSION}"
