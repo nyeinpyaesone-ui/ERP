@@ -80,7 +80,6 @@ jobs:
       - name: Detect available configuration
         id: detect
         env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
           DOCKER_USER_VAR: ${{ vars.DOCKER_USER }}
           PAT_BACKEND: ${{ secrets.DOCKER_PAT_BACKEND }}
           PAT_FRONTEND: ${{ secrets.DOCKER_PAT_FRONTEND }}
