@@ -221,39 +221,35 @@ switch_traffic() {
     local old_upstream_host="${NGINX_UPSTREAM_DIR_HOST}/upstream-${old_color}.conf"
     local active_upstream_host="${NGINX_UPSTREAM_DIR_HOST}/upstream-active.conf"
     local temp_upstream_host="${active_upstream_host}.tmp.$$"
-    local restore_upstream_host="${active_upstream_host}.restore.$$"
 
-    if [ ! -f "${new_upstream_host}" ] || [ ! -f "${old_upstream_host}" ]; then
-        error "New or previous upstream config is missing."
+    if [ ! -f "${new_upstream_host}" ] || [ ! -f "${old_upstream_host}" ] || [ ! -f "${active_upstream_host}" ]; then
+        error "New, previous, or active upstream config is missing."
         return 1
     fi
 
-    # Replace the mounted file atomically so nginx never observes a partial copy.
+    # Stage first, then update the existing bind-mounted inode in place.
+    # Nginx keeps serving its loaded config until the validated reload below.
     if ! cp "${new_upstream_host}" "${temp_upstream_host}" ||
-       ! mv -f "${temp_upstream_host}" "${active_upstream_host}"; then
+       ! cat "${temp_upstream_host}" > "${active_upstream_host}"; then
         rm -f "${temp_upstream_host}"
-        error "Failed to stage the new nginx upstream config."
+        error "Failed to write the new nginx upstream config."
         return 1
     fi
+    rm -f "${temp_upstream_host}"
 
     if ! docker exec erp-nginx nginx -t 2>&1 | tee -a "${LOG_FILE}"; then
-        cp "${old_upstream_host}" "${restore_upstream_host}" &&
-            mv -f "${restore_upstream_host}" "${active_upstream_host}" || true
+        cat "${old_upstream_host}" > "${active_upstream_host}"
         error "New nginx upstream config failed validation; previous config restored."
         return 1
     fi
 
     if ! docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"; then
-        if cp "${old_upstream_host}" "${restore_upstream_host}" &&
-           mv -f "${restore_upstream_host}" "${active_upstream_host}"; then
-            if docker exec erp-nginx nginx -t 2>&1 | tee -a "${LOG_FILE}" &&
-               docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"; then
-                warn "Previous nginx upstream restored after reload failure."
-            else
-                error "Could not reload nginx with the previous upstream config."
-            fi
+        if cat "${old_upstream_host}" > "${active_upstream_host}" &&
+           docker exec erp-nginx nginx -t 2>&1 | tee -a "${LOG_FILE}" &&
+           docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"; then
+            warn "Previous nginx upstream restored after reload failure."
         else
-            error "Could not restore the previous nginx upstream config."
+            error "Could not restore and reload the previous nginx upstream config."
         fi
         return 1
     fi
