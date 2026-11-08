@@ -9,8 +9,9 @@ Secret; provision it **before** applying an environment overlay.
 
 | Environment | Namespace | Secret name |
 |---|---|---|
-| Production | `erp-solution` | `erp-solution-secrets` |
+| Development | `erp-solution-dev` | not provisioned by this script |
 | Staging | `erp-solution-staging` | `staging-erp-solution-secrets` |
+| Production | `erp-solution` | `erp-solution-secrets` |
 
 The staging overlay applies the `staging-` name prefix and changes the
 namespace. Kustomize also rewrites the workload `secretRef` name, so the
@@ -39,15 +40,6 @@ The Secret is provisioned by `scripts/provision-k8s-secrets.sh`. It defaults
 to validation-only mode, requires an explicit Kubernetes context, refuses
 files inside the repository or with group/other permissions, and never prints
 Secret data.
-
-The environment overlays now use DNS-compatible namespaces and Secret
-names:
-
-| Environment | Namespace | Secret |
-|---|---|---|
-| Development | `erp-solution-dev` | not provisioned by this script |
-| Staging | `erp-solution-staging` | `staging-erp-solution-secrets` |
-| Production | `erp-solution` | `erp-solution-secrets` |
 
 Validate the Secret input and intended context first. With
 `--create-namespace`, the script reports the namespace it would create but
