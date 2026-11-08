@@ -440,3 +440,31 @@ Append-only ledger; never store secrets (env var *names* only).
 3. Any statement older than the last merge to `main` → re-verify before acting.
 4. On forgetting a decision: check §2 first; if absent, it was never a decision.
 5. Session end: append to §3, update §5 with actual results, add drift to §4.
+
+
+---
+
+## 8. Verified deployment configuration update — 2026-11-08
+
+This entry supersedes the older GitHub secret/variable rows in §1 and the
+first-deploy instructions in the 2026-11-01 snapshot. Keep earlier ledger
+entries for historical context; do not treat them as current.
+
+| Fact | Verified value | Evidence |
+|---|---|---|
+| PR #154 | Merged to main at 972f558e79818441fe524eba8d8d58bcdad14eff on 2026-11-08 | GitHub PR metadata |
+| Main CI after PR #154 | Run 42465025608 completed successfully | GitHub Actions run |
+| Docker Hub push tokens | DOCKER_PAT_BACKEND and DOCKER_PAT_FRONTEND were present (masked in runner environment) | Deploy Configuration job 128682408031 |
+| Docker Hub namespace variable | DOCKER_USER was empty in the same runner environment; image publishing therefore remained disabled | Job 128682408031 runner environment |
+| SSH deploy config | Staging and production SSH keys, pinned known_hosts, host and user values were empty in the same run | Job 128682408031 runner environment |
+| Actual deployment | No staging or production deployment occurred; both deploy jobs were skipped | Main CI run 42465025608 |
+| Follow-up | PR #155, branch ops/configuration-bootstrap-and-deploy-hardening, adds an interactive repository config bootstrapper, separate staging env template, explicit Docker namespace validation, and CI checks | PR #155 |
+| Runtime boundary | Compose blue-green is the active CI/CD path. Kubernetes manifests reference different GHCR images and are not wired to CI | infra/k8s/README-Kubernetes.md and CI workflow |
+
+The PR #155 bootstrapper deliberately does not fabricate infrastructure values
+or deploy. It prompts for real staging/production hosts, domains, users,
+dedicated SSH keys, and pinned known_hosts files. Existing Docker Hub token
+secrets are preserved by default and can be explicitly replaced from files.
+Do not mark this setup complete until the bootstrapper is run and its output
+and GitHub settings are verified. Do not merge/deploy based on this ledger
+entry alone; check the latest PR checks and environment state.
