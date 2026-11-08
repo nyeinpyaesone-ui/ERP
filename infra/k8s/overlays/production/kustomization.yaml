@@ -10,11 +10,11 @@ commonLabels:
   environment: production
 
 replicas:
-  - name: erp_solution-api
+  - name: erp-solution-api
     count: 5
-  - name: erp_solution-web
+  - name: erp-solution-web
     count: 3
-  - name: erp_solution-worker
+  - name: erp-solution-worker
     count: 3
 
 patches:
