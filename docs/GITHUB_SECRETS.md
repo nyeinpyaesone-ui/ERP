@@ -117,11 +117,11 @@ gh auth login
 bash scripts/configure-github-actions.sh
 ```
 
-The script asks for the actual domains, hostnames, SSH users, token-file paths,
+The script requires `gh`, `jq`, and `ssh-keygen`, and asks for the actual domains, hostnames, SSH users, token-file paths,
 private-key paths, and pinned `known_hosts` paths. It defaults the Docker Hub
 namespace to `powerrangeranikg` (confirm it at the prompt). It refuses shared
 staging/production hosts and requires unencrypted dedicated SSH keys because
-the current ssh-agent workflow has no passphrase input. Verify host key
+the current ssh-agent workflow has no passphrase input. It also rejects the `root` SSH account; create dedicated deploy users with only the directory and Docker permissions required by the deployment. Verify host key
 fingerprints out-of-band before providing the `known_hosts` files.
 
 For manual or non-interactive setup, the equivalent commands are:
@@ -175,7 +175,7 @@ A failed image push almost always means `DOCKER_USER` or one of the
 
 `ci.yml`'s deploy jobs declare `environment: staging` / `environment: production`.
 Both environments must exist, otherwise the jobs fail at the deployment-record
-step. Configured policy (created 2026-10-11):
+step. The bootstrapper ensures these deployment-ref policies:
 
 | Environment | Deployment branch policy | Rationale |
 |-------------|--------------------------|-----------|
