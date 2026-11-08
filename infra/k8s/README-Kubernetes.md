@@ -29,7 +29,9 @@ There is no tracked `base/secrets.yaml` template. Never create or commit one.
 ## Before any cluster deployment
 
 1. Confirm the intended Kubernetes context and account.
-2. Follow [SECRETS.md](SECRETS.md) to provision Secrets out of band.
+2. Follow [SECRETS.md](SECRETS.md) to create protected environment files.
+   Validate them with `scripts/provision-k8s-secrets.sh` using an explicit
+   `--context`; add `--apply` only after reviewing the target namespace.
 3. Build and publish the exact GHCR images referenced by the manifests.
 4. Validate the manifests and their runtime contract against the actual
    container images. In particular, verify container ports, health endpoints,
