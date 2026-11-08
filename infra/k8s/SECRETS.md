@@ -19,10 +19,12 @@ names with `kubectl kustomize` before applying.
 
 ## Provisioning
 
-Create the environment file outside the repository on a trusted operator
-machine. Restrict its permissions (`chmod 600`) and populate it from the
-approved secret manager. Do not paste values into shell history, tickets, chat,
-CI logs, or Git.
+Use `infra/k8s/secrets.env.template` only as a key-name reference; it contains
+placeholders and must never be applied. Create the real environment file
+outside the repository on a trusted operator machine. Restrict its permissions
+(`chmod 600`) and populate it from the approved secret manager. The provisioner
+rejects `REPLACE_WITH_*` and other placeholder values. Do not paste values into
+shell history, tickets, chat, CI logs, or Git.
 
 Required keys are taken from the current base manifest's explicit
 `secretKeyRef` entries:
