@@ -223,8 +223,10 @@ jobs:
             --domain staging.example.test \
             --docker-user example \
             --version sha-0123456 \
+            --cors-origins "https://staging.example.test,https://admin.example.test" \
             --dir "$temp_env_dir"
           test "$(stat -c '%a' "$temp_env_dir/.env.staging")" = "600"
+          grep -Fxq 'CORS_ORIGINS=https://staging.example.test,https://admin.example.test' "$temp_env_dir/.env.staging"
           docker compose --env-file "$temp_env_dir/.env.staging" -f docker-compose.prod.yml config --quiet
           docker compose --env-file .env.production.template -f docker-compose.prod.yml config --quiet
 
@@ -235,6 +237,13 @@ jobs:
               kubectl kustomize "infra/k8s/overlays/$environment" > "$temp_env_dir/k8s-$environment.yaml"
               test -s "$temp_env_dir/k8s-$environment.yaml"
             done
+            grep -Fq '  namespace: erp-solution-dev' "$temp_env_dir/k8s-development.yaml"
+            grep -Fq '  namespace: erp-solution-staging' "$temp_env_dir/k8s-staging.yaml"
+            grep -Fq '  namespace: erp-solution' "$temp_env_dir/k8s-production.yaml"
+            if grep -Eq '^  (name|namespace): erp_solution' "$temp_env_dir"/k8s-*.yaml; then
+              echo "::error::Kubernetes output contains an invalid underscore-based resource name or namespace."
+              exit 1
+            fi
           elif command -v kustomize >/dev/null 2>&1; then
             for environment in development staging production; do
               kustomize build "infra/k8s/overlays/$environment" > "$temp_env_dir/k8s-$environment.yaml"
