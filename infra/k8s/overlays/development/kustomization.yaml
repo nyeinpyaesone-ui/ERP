@@ -1,8 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: erp_solution-dev
-
+namespace: erp-solution-dev
 resources:
   - ../../base
 
@@ -23,7 +22,7 @@ replicas:
 patches:
   - target:
       kind: ConfigMap
-      name: erp_solution-config
+      name: erp-solution-config
     patch: |-
       - op: replace
         path: /data/APP_ENV
@@ -40,7 +39,7 @@ patches:
 
   - target:
       kind: Ingress
-      name: erp_solution-ingress
+      name: erp-solution-ingress
     patch: |-
       - op: replace
         path: /spec/rules/0/host
@@ -59,11 +58,11 @@ patches:
           - dev-store.erp-domain.com
       - op: replace
         path: /spec/tls/0/secretName
-        value: dev-erp_solution-tls
+        value: dev-erp-solution-tls
 
   - target:
       kind: HorizontalPodAutoscaler
-      name: erp_solution-api-hpa
+      name: erp-solution-api-hpa
     patch: |-
       - op: replace
         path: /spec/minReplicas
