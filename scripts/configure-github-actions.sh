@@ -27,6 +27,7 @@ Optional:
   --key-dir PATH           Default: ~/.ssh/erp-github-actions-<repo>
   --backend-token-file FILE
   --frontend-token-file FILE
+  --opencode-key-file FILE  Optional OpenCode automation secret
 
 Existing Docker PAT secrets are preserved. Supply token files only when a PAT
 secret is absent. Host-key files must contain independently verified host keys.
@@ -49,6 +50,7 @@ staging_key=""
 production_key=""
 backend_token_file=""
 frontend_token_file=""
+opencode_key_file=""
 generate_keys=false
 apply=false
 key_dir=""
@@ -69,6 +71,7 @@ while [ "$#" -gt 0 ]; do
     --production-key) production_key="$2"; shift 2 ;;
     --backend-token-file) backend_token_file="$2"; shift 2 ;;
     --frontend-token-file) frontend_token_file="$2"; shift 2 ;;
+    --opencode-key-file) opencode_key_file="$2"; shift 2 ;;
     --generate-keys) generate_keys=true; shift ;;
     --key-dir) key_dir="$2"; shift 2 ;;
     --apply) apply=true; shift ;;
