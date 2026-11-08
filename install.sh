@@ -182,79 +182,34 @@ generate_env_file() {
         return 0
     fi
     if [ "${ASSUME_YES}" = true ]; then
-        erp_die "No env file found and --yes was given. Create ${ERP_DIR}/.env.production first."
+        erp_die "No environment file found. Run scripts/configure-environment.sh with the required domain and Docker namespace first."
     fi
 
-    erp_step "Generating ${ERP_DIR}/.env.production"
-    local domain="$DOMAIN"
+    erp_step "Configuring production runtime environment"
+    local domain="${DOMAIN}"
     if [ -z "${domain}" ]; then
         prompt_input "Base domain (e.g. erp.example.com)" domain
     fi
-    local api_domain="api.${domain}"
-    local app_domain="app.${domain}"
 
-    local db_password redis_password secret_key
-    db_password="$(erp_random_secret)"
-    redis_password="$(erp_random_secret)"
-    secret_key="$(erp_random_hex 32)"
+    local docker_user="${DOCKER_USER:-}"
+    if [ -z "${docker_user}" ]; then
+        prompt_input "Docker Hub namespace (lowercase)" docker_user
+    fi
+
+    local version
+    version="$(erp_detect_version "${VERSION:-}")"
+    bash "${SCRIPT_DIR}/scripts/configure-environment.sh" \
+        --environment production \
+        --domain "${domain}" \
+        --docker-user "${docker_user}" \
+        --version "${version}" \
+        --dir "${ERP_DIR}"
 
     ERP_ENV_FILE="${ERP_DIR}/.env.production"
-    cat > "${ERP_ENV_FILE}" <<EOF
-# ERP Solution production environment
-# Generated $(date -u '+%Y-%m-%d %H:%M:%S UTC') by install.sh
-# Do not commit. Keys mirror .env.production.template.
-
-# Database (consumed by docker-compose.prod.yml; the app receives DATABASE_URL)
-DB_USER=erp
-DB_PASSWORD=${db_password}
-DB_NAME=erp_solution
-
-# Redis
-REDIS_PASSWORD=${redis_password}
-
-# Security
-SECRET_KEY=${secret_key}
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# CORS
-CORS_ORIGINS=https://${app_domain}
-
-# AI
-OLLAMA_BASE_URL=http://ollama:11434
-OLLAMA_MODEL=llama3.1
-
-# Optional integrations
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-STRIPE_PUBLISHABLE_KEY=
-SMTP_HOST=
-SMTP_PORT=587
-SMTP_USER=
-SMTP_PASSWORD=
-SMTP_FROM=noreply@${domain}
-
-# Settings uses a Literal: only dev|test|prod are accepted, and prod refuses to
-# boot with a placeholder or short SECRET_KEY.
-ENVIRONMENT=prod
-
-UPLOAD_DIR=/app/uploads
-MAX_UPLOAD_SIZE=52428800
-WS_HEARTBEAT_INTERVAL=30
-
-# Image coordinates, read by compose and deploy-blue-green.sh
-DOCKER_USER=$(erp_detect_docker_user)
-VERSION=$(erp_detect_version "${VERSION:-}")
-EOF
-    chmod 600 "${ERP_ENV_FILE}"
-    erp_success "Env file written (mode 600)"
-    erp_warn "Store these now — they are not shown again:"
-    erp_warn "  DB_PASSWORD=${db_password}"
-    erp_warn "  REDIS_PASSWORD=${redis_password}"
-    erp_warn "  SECRET_KEY=${secret_key}"
+    export ERP_ENV_FILE
+    erp_success "Production environment file created with unique generated secrets (mode 0600)."
+    erp_info "Secret values were not printed; retain the file in your host's protected backup/secret-management process."
 }
-
 prepare_nginx_config() {
     erp_step "Preparing nginx configuration"
     local domain="${1:-}"
