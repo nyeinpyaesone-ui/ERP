@@ -51,40 +51,30 @@ kubectl kustomize infra/k8s/overlays/staging
 kubectl kustomize infra/k8s/overlays/production
 ```
 
-## Environment keys
+## Keys explicitly referenced by the Kubernetes manifests
 
-The workload Secret contract currently includes:
+These keys are referenced through `secretKeyRef` in the current base
+manifests:
 
-```text
-DB_USER
-DB_PASSWORD
-DB_URL
-REDIS_PASSWORD
-REDIS_URL
-JWT_SECRET
-JWT_REFRESH_SECRET
-OPENAI_API_KEY
-SENTRY_AUTH_TOKEN
-EXPO_ACCESS_TOKEN
-AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY
-SMTP_USER
-SMTP_PASSWORD
-KBZPAY_API_KEY
-KBZPAY_MERCHANT_ID
-WAVE_API_KEY
-WAVE_MERCHANT_ID
-GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET
-FACEBOOK_APP_ID
-FACEBOOK_APP_SECRET
-ENCRYPTION_KEY
-SIGNING_KEY
-```
+| Secret key | Workload references |
+|---|---|
+| `DB_USER` | PostgreSQL StatefulSet and backup CronJob |
+| `DB_PASSWORD` | PostgreSQL StatefulSet and backup CronJob |
+| `REDIS_PASSWORD` | Redis StatefulSet and backup CronJob |
+| `AWS_ACCESS_KEY_ID` | Backup CronJob |
+| `AWS_SECRET_ACCESS_KEY` | Backup CronJob |
 
-Supply values appropriate to each environment. Verify which integrations are
-enabled in the application configuration; unused integrations should not be
-given production credentials unnecessarily.
+The API and worker Deployments use `envFrom.secretRef`, which exposes every
+key present in the Secret to those containers. The manifest does not define a
+complete application-level environment contract for those images; add further
+keys only after checking the exact image's configuration. The old removed
+template listed many `REPLACE_WITH_*` names that are not direct
+`secretKeyRef` requirements in these manifests.
+
+`S3_BUCKET` is read from the Kubernetes ConfigMap, not this Secret. The
+Kubernetes manifests are a separate deployment path from the current
+GitHub Actions Docker Compose deployment; CI does not build or publish the
+GHCR image names referenced by these manifests.
 
 ## Historical credential exposure
 
