@@ -183,6 +183,7 @@ jobs:
           set -euo pipefail
           bash -n scripts/lib.sh
           bash -n scripts/deploy-blue-green.sh
+          bash -n scripts/configure-github-actions.sh
           DOCKER_USER=ci-validation docker compose --env-file .env.production.template -f docker-compose.prod.yml config --quiet
 
       - name: Set up Node
