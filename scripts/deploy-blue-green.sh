@@ -292,8 +292,12 @@ load_env() {
         fi
         export ERP_ENV_FILE
     else
-        error "No environment file found under ${ERP_DIR} (expected .env.production)."
-        error "Create it with ./install.sh, or copy .env.production.template and fill it in."
+        error "No environment file found under ${ERP_DIR}; expected .env.${DEPLOY_TARGET_ENVIRONMENT}."
+        if [ "${DEPLOY_TARGET_ENVIRONMENT}" = "staging" ]; then
+            error "Create a separate .env.staging from staging-only credentials; production credentials are never used as fallback."
+        else
+            error "Create .env.production with ./install.sh or from .env.production.template."
+        fi
         return 1
     fi
     # The env file's ENVIRONMENT/VERSION describe the application, not this
