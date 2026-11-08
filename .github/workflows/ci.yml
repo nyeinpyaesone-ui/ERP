@@ -322,6 +322,8 @@ jobs:
     # Validate the image on PRs too; config keeps push disabled when secrets are unavailable.
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
+      image_sha_tag: ${{ steps.immutable.outputs.image_tag }}
+      image_sha_ref: ${{ steps.immutable.outputs.image_ref }}
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -374,13 +376,9 @@ jobs:
     # images are actually published.
     if: github.event_name != 'pull_request' && needs.config.outputs.can_push == 'true'
     timeout-minutes: 20
-    # image-ref comes from the build jobs' own metadata-action output. The
-    # previous hardcoded `sha-${{ github.sha }}` used the full 40-char commit
-    # while metadata-action's `type=sha` pushes a 7-char short SHA, so these
-    # scans referenced a tag that was never published. metadata-action's
-    # `tags` output lists one ref per line, but trivy accepts a single ref —
-    # the multi-line value fails with "could not parse reference". Every
-    # listed tag is pushed by the build jobs, so scan the first of each.
+    # Scan the immutable SHA tags produced by each image build. Both scans
+    # fail the job on HIGH or CRITICAL findings; SARIF upload still runs so
+    # findings remain visible in GitHub code scanning.
     steps:
       - name: Log in to Docker Hub for backend scan
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
@@ -413,12 +411,14 @@ jobs:
           output: trivy-frontend.sarif
 
       - name: Upload Trivy backend results
+        if: always()
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend
 
       - name: Upload Trivy frontend results
+        if: always()
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: trivy-frontend.sarif
