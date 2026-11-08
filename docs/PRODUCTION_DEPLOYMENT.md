@@ -80,14 +80,16 @@ The active CI/CD path uses `docker-compose.prod.yml` and
 `scripts/deploy-blue-green.sh`:
 
 - A push to `main` builds and publishes immutable `sha-*` backend and
-  frontend images. When the staging SSH, host-key, and registry configuration
-  is present, CI deploys that exact SHA tag to staging.
+  frontend images. It does **not** deploy automatically. To deploy staging,
+  manually dispatch the `CI` workflow on `main` with `deploy_staging=true`.
 - A `v*` Git tag builds and publishes matching release-tagged images. After
-  the security scan passes and production configuration is present, CI
-  deploys that exact tag to production.
-- A manual CI dispatch on `main` with a rollback tag redeploys that selected
-  immutable tag to staging through the same health-check and traffic-switch
-  process. It does not blindly retag one image as the other.
+  CI and security scans pass, the Release workflow publishes the GitHub
+  Release. It does **not** deploy production automatically. To deploy,
+  manually dispatch `CI` on that `v*` tag with `deploy_production=true`.
+- A staging rollback requires a manual CI dispatch on `main` with
+  `deploy_staging=true` and a rollback tag (`sha-*` or `v*`). It redeploys that
+  selected tag through the same health-check and traffic-switch process; it
+  does not blindly retag one image as the other.
 
 Required repository-level Actions secrets and repository variables are listed
 in `docs/GITHUB_SECRETS.md`. The target hosts must also have read-only Docker
