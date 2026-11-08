@@ -25,7 +25,7 @@ Kubernetes: separate scaffold; not connected to the current CI/CD pipeline.
 | STAGING_KNOWN_HOSTS / PRODUCTION_KNOWN_HOSTS | Missing | Supply out-of-band verified pinned host keys |
 | STAGING_HOST / STAGING_USER | Missing | Supply actual staging target and non-root deploy account |
 | PRODUCTION_HOST / PRODUCTION_USER | Missing | Supply actual production target and non-root deploy account |
-| STAGING_DOMAIN / PRODUCTION_DOMAIN | Not configured in the latest runner snapshot | Supply actual HTTPS hostnames |
+| STAGING_DOMAIN / PRODUCTION_DOMAIN | Not verified by the latest config job (it does not read these variables) | Set and verify through scripts/configure-github-actions.sh |
 | Host runtime env files | Not verified | Create separate .env.staging and .env.production on their respective hosts |
 | Host Docker Hub pull access | Not verified | Configure read-only credentials on each host |
 | Production required reviewer | Not verified | Set explicitly in GitHub Environment if policy requires it |
