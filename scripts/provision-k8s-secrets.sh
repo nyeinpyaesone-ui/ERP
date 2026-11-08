@@ -10,8 +10,8 @@ Usage:
   scripts/provision-k8s-secrets.sh --environment staging|production --context CONTEXT --file /secure/path/secrets.env [--apply] [--replace-existing]
 
 Mappings:
-  production: namespace erp_solution, Secret erp_solution-secrets
-  staging:    namespace erp_solution-staging, Secret staging-erp_solution-secrets
+  production: namespace erp-solution, Secret erp-solution-secrets
+  staging:    namespace erp-solution-staging, Secret staging-erp-solution-secrets
 
 The file must be outside the repository and mode 0600. Required keys:
   DB_USER, DB_PASSWORD, REDIS_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
@@ -40,8 +40,8 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$environment" in
-  production) namespace="erp_solution"; secret_name="erp_solution-secrets" ;;
-  staging) namespace="erp_solution-staging"; secret_name="staging-erp_solution-secrets" ;;
+  production) namespace="erp-solution"; secret_name="erp-solution-secrets" ;;
+  staging) namespace="erp-solution-staging"; secret_name="staging-erp-solution-secrets" ;;
   *) echo "--environment must be staging or production" >&2; exit 2 ;;
 esac
 [ -n "$context" ] || { echo "--context is required; do not rely on the current context" >&2; exit 2; }
