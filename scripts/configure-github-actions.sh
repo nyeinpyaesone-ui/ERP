@@ -148,7 +148,7 @@ for required in DOCKER_PAT_BACKEND DOCKER_PAT_FRONTEND; do
     token_file="$backend_token_file"
     [ "$required" = "DOCKER_PAT_FRONTEND" ] && token_file="$frontend_token_file"
     [ -n "$token_file" ] && [ -s "$token_file" ] || {
-      echo "Missing $required. Supply its value through --${required,,}-file." >&2
+      echo "Missing $required. Supply it with --backend-token-file or --frontend-token-file." >&2
       exit 1
     }
   fi
