@@ -16,17 +16,18 @@ NGINX_UPSTREAM_DIR_HOST="${ERP_NGINX_DIR}"
 NGINX_UPSTREAM_DIR_CONTAINER="/etc/nginx/conf.d"
 SSL_DIR="${ERP_SSL_DIR}"
 # State files live beside the env file, so an install outside /opt/erp-solution
-# keeps its own blue/green bookkeeping instead of reading another tree's.
+# keeps its own active-color/version bookkeeping instead of reading another tree's.
 ACTIVE_COLOR_FILE="${ERP_DIR}/.active_color"
-PREVIOUS_VERSION_FILE="${ERP_DIR}/.previous_version"
-PREVIOUS_IMAGE_FILE="${ERP_DIR}/.previous_image"
+ACTIVE_VERSION_FILE="${ERP_DIR}/.active_version"
 
-# CLI arguments, captured before load_env runs. .env.production also defines
-# ENVIRONMENT for the backend (dev|test|prod), so exporting it would overwrite
+# CLI arguments, captured before load_env runs. The environment-specific .env
+# file also defines backend ENVIRONMENT (dev|test|prod), so exporting it would overwrite
 # the deploy target and validate_environment would reject "prod".
 DEPLOY_TARGET_ENVIRONMENT="${1:-production}"
 DEPLOY_TARGET_VERSION="${2:-latest}"
 ROLLBACK="${3:-false}"
+# CI supplies the selected registry namespace; preserve it over .env imports.
+DEPLOY_DOCKER_USER="${DOCKER_USER:-}"
 
 mkdir -p "${ERP_DIR}/logs"
 LOG_FILE="${ERP_DIR}/logs/deploy-$(date +%Y%m%d-%H%M%S).log"
@@ -213,45 +214,58 @@ run_smoke_tests() {
 switch_traffic() {
     local new_color="$1"
     local old_color="$2"
-    
+
     info "Switching traffic from ${old_color} to ${new_color}"
-    
+
     local new_upstream_host="${NGINX_UPSTREAM_DIR_HOST}/upstream-${new_color}.conf"
+    local old_upstream_host="${NGINX_UPSTREAM_DIR_HOST}/upstream-${old_color}.conf"
     local active_upstream_host="${NGINX_UPSTREAM_DIR_HOST}/upstream-active.conf"
-    
-    if [ ! -f "${new_upstream_host}" ]; then
-        error "Upstream config not found: ${new_upstream_host}"
+    local temp_upstream_host="${active_upstream_host}.tmp.$$"
+    local backup_upstream_host="${active_upstream_host}.backup.$$"
+
+    if [ ! -f "${new_upstream_host}" ] || [ ! -f "${old_upstream_host}" ] || [ ! -f "${active_upstream_host}" ]; then
+        error "New, previous, or active upstream config is missing."
         return 1
     fi
-    
-    # Atomic switch - copy on host (not symlink in container since it's ro mount)
-    if cp "${new_upstream_host}" "${active_upstream_host}" 2>&1 | tee -a "${LOG_FILE}"; then
-        info "Upstream config updated on host"
-    else
-        error "Failed to update upstream config on host"
+
+    # Preserve the exact active file, then update its existing bind-mounted
+    # inode in place. Nginx keeps serving its loaded config until a valid reload.
+    if ! cp "${active_upstream_host}" "${backup_upstream_host}" ||
+       ! cp "${new_upstream_host}" "${temp_upstream_host}" ||
+       ! cat "${temp_upstream_host}" > "${active_upstream_host}"; then
+        if [ -f "${backup_upstream_host}" ]; then
+            cat "${backup_upstream_host}" > "${active_upstream_host}" || true
+        fi
+        rm -f "${temp_upstream_host}" "${backup_upstream_host}"
+        error "Failed to stage the new nginx upstream config."
         return 1
     fi
-    
-    # Reload nginx
-    if docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"; then
-        success "Traffic switched to ${new_color}"
-    else
-        error "Failed to reload nginx"
+    rm -f "${temp_upstream_host}"
+
+    if ! docker exec erp-nginx nginx -t 2>&1 | tee -a "${LOG_FILE}"; then
+        cat "${backup_upstream_host}" > "${active_upstream_host}"
+        rm -f "${backup_upstream_host}"
+        error "New nginx upstream config failed validation; previous config restored."
         return 1
     fi
-    
-    # Update active color file on host
+
+    if ! docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"; then
+        if cat "${backup_upstream_host}" > "${active_upstream_host}" &&
+           docker exec erp-nginx nginx -t 2>&1 | tee -a "${LOG_FILE}" &&
+           docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"; then
+            warn "Previous nginx upstream restored after reload failure."
+        else
+            error "Could not restore and reload the previous nginx upstream config."
+        fi
+        rm -f "${backup_upstream_host}"
+        return 1
+    fi
+
+    rm -f "${backup_upstream_host}"
+    # Update deployment state only after nginx accepts and reloads the config.
     echo "${new_color}" > "${ACTIVE_COLOR_FILE}"
-    
-    # Store the OUTGOING version for rollback (the version we're leaving behind)
-    if [ -f "${PREVIOUS_VERSION_FILE}" ]; then
-        mv "${PREVIOUS_VERSION_FILE}" "${PREVIOUS_VERSION_FILE}.bak"
-    fi
-    echo "${VERSION}" > "${PREVIOUS_VERSION_FILE}"
-    
-    # Also store the image tag for true rollback
-    local new_image="${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION}"
-    echo "${new_image}" > "${PREVIOUS_IMAGE_FILE}"
+    printf '%s\n' "${VERSION}" > "${ACTIVE_VERSION_FILE}"
+    success "Traffic switched to ${new_color}"
 }
 
 stop_old_environment() {
@@ -270,73 +284,24 @@ stop_old_environment() {
     success "Old ${color} environment stopped"
 }
 
-perform_rollback() {
-    info "Performing rollback..."
-    
-    local current_color=$(get_active_color)
-    local previous_color=$(get_inactive_color)
-    local previous_version=""
-    local previous_image=""
-    
-    if [ -f "${PREVIOUS_VERSION_FILE}" ]; then
-        previous_version=$(cat "${PREVIOUS_VERSION_FILE}")
-    else
-        error "No previous version recorded for rollback"
-        return 1
-    fi
-    
-    if [ -f "${PREVIOUS_IMAGE_FILE}" ]; then
-        previous_image=$(cat "${PREVIOUS_IMAGE_FILE}")
-    else
-        previous_image="${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${previous_version}"
-    fi
-    
-    warn "Rolling back from ${current_color} to ${previous_color} (version: ${previous_version})"
-    
-    # Pull the previous image
-    info "Pulling previous image: ${previous_image}"
-    docker pull "${previous_image}" 2>&1 | tee -a "${LOG_FILE}"
-    
-    # Retag as current VERSION for the inactive color
-    docker tag "${previous_image}" "${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION}" 2>&1 | tee -a "${LOG_FILE}"
-    docker tag "${previous_image}" "${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION}" 2>&1 | tee -a "${LOG_FILE}"
-    
-    # START the previous environment (it was stopped after the failed deploy)
-    info "Starting previous environment: ${previous_color}"
-    start_inactive_environment "${previous_color}"
-    
-    # Wait for it to be healthy
-    if ! wait_for_health "${previous_color}"; then
-        error "Previous environment failed health checks after rollback start"
-        return 1
-    fi
-    
-    # Run smoke tests on the rolled-back environment
-    if ! run_smoke_tests "${previous_color}"; then
-        error "Rollback environment failed smoke tests"
-        return 1
-    fi
-    
-    # Switch traffic back to the previous environment
-    switch_traffic "${previous_color}" "$(get_active_color)"
-
-    # Stop the failed environment (captured before the switch above, since
-    # switch_traffic rewrites ACTIVE_COLOR_FILE)
-    stop_old_environment "${current_color}"
-    
-    success "Rollback completed to ${previous_color} (version: ${previous_version})"
-}
-
 load_env() {
     if erp_detect_env_file; then
         info "Loading environment from ${ERP_ENV_FILE}"
         # Parsed rather than sourced: an env file is data, and a value holding
         # a space or a $ must not be able to run code as a side effect.
         erp_load_env "${ERP_ENV_FILE}"
+        if [ -n "${DEPLOY_DOCKER_USER}" ]; then
+            DOCKER_USER="${DEPLOY_DOCKER_USER}"
+            export DOCKER_USER
+        fi
         export ERP_ENV_FILE
     else
-        error "No environment file found under ${ERP_DIR} (expected .env.production)."
-        error "Create it with ./install.sh, or copy .env.production.template and fill it in."
+        error "No environment file found under ${ERP_DIR}; expected .env.${DEPLOY_TARGET_ENVIRONMENT}."
+        if [ "${DEPLOY_TARGET_ENVIRONMENT}" = "staging" ]; then
+            error "Create a separate .env.staging from staging-only credentials; production credentials are never used as fallback."
+        else
+            error "Create .env.production with ./install.sh or from .env.production.template."
+        fi
         return 1
     fi
     # The env file's ENVIRONMENT/VERSION describe the application, not this
@@ -369,13 +334,20 @@ main() {
     validate_environment
     
     if [ "${ROLLBACK}" = "true" ] || [ "${ROLLBACK}" = "--rollback" ]; then
-        perform_rollback
-        exit 0
+        if [[ ! "${VERSION}" =~ ^(sha-[[:xdigit:]]{7,40}|v[0-9A-Za-z][0-9A-Za-z._-]{0,127})$ ]]; then
+            error "Rollback tag must be a versioned v* release or a sha-* image tag; mutable tags are rejected."
+            exit 1
+        fi
+        info "Rollback requested: deploying image tag ${VERSION} through the normal blue-green health-check and traffic-switch flow."
     fi
-    
+
     local active_color=$(get_active_color)
     local inactive_color=$(get_inactive_color)
-    
+    local previous_active_version=""
+    if [ -f "${ACTIVE_VERSION_FILE}" ]; then
+        previous_active_version="$(cat "${ACTIVE_VERSION_FILE}")"
+    fi
+
     info "Active color: ${active_color}"
     info "Inactive color: ${inactive_color}"
     
@@ -414,6 +386,11 @@ main() {
     if ! run_smoke_tests "${inactive_color}"; then
         error "Post-switch smoke tests failed, rolling back..."
         switch_traffic "${active_color}" "${inactive_color}"
+        if [ -n "${previous_active_version}" ]; then
+            printf '%s\n' "${previous_active_version}" > "${ACTIVE_VERSION_FILE}"
+        else
+            rm -f "${ACTIVE_VERSION_FILE}"
+        fi
         stop_old_environment "${inactive_color}"
         exit 1
     fi
