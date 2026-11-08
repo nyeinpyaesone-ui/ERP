@@ -114,6 +114,41 @@ valid_user "$staging_user" && valid_user "$production_user" || { echo "SSH users
 [ "$staging_host" != "$production_host" ] || { echo "Staging and production must use different hosts" >&2; exit 2; }
 [ "$staging_domain" != "$production_domain" ] || { echo "Staging and production must use different domains" >&2; exit 2; }
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+command -v python3 >/dev/null 2>&1 || { echo "python3 is required to validate protected input files" >&2; exit 1; }
+
+validate_secure_file() {
+  local label="$1" file="$2"
+  python3 - "$label" "$file" "$repo_root" <<'PY'
+import os
+import stat
+import sys
+
+label, path, root = sys.argv[1:]
+try:
+    info = os.lstat(path)
+except OSError as exc:
+    print(f"{label}: cannot access input file ({exc})", file=sys.stderr)
+    raise SystemExit(1)
+
+if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+    print(f"{label}: input must be a regular, non-symlink file", file=sys.stderr)
+    raise SystemExit(1)
+
+resolved = os.path.realpath(path)
+root = os.path.realpath(root)
+if os.path.commonpath([root, resolved]) == root:
+    print(f"{label}: sensitive input files must be stored outside the Git working tree", file=sys.stderr)
+    raise SystemExit(1)
+
+if stat.S_IMODE(info.st_mode) & 0o077:
+    print(f"{label}: permissions are too broad; set mode 0600", file=sys.stderr)
+    raise SystemExit(1)
+PY
+}
+
+validate_secure_file "Staging known-hosts" "$staging_known_hosts"
+validate_secure_file "Production known-hosts" "$production_known_hosts"
 [ -s "$staging_known_hosts" ] && [ -s "$production_known_hosts" ] || { echo "Known-hosts files must be non-empty" >&2; exit 2; }
 ssh-keygen -F "$staging_host" -f "$staging_known_hosts" >/dev/null || { echo "Staging known-hosts file does not contain $staging_host" >&2; exit 2; }
 ssh-keygen -F "$production_host" -f "$production_known_hosts" >/dev/null || { echo "Production known-hosts file does not contain $production_host" >&2; exit 2; }
@@ -124,6 +159,10 @@ if [ "$generate_keys" = true ]; then
   slug="${repo//\//-}"
   key_dir="${key_dir:-$HOME/.ssh/erp-github-actions-$slug}"
   mkdir -p "$key_dir"
+  key_dir="$(cd "$key_dir" && pwd)"
+  case "$key_dir" in
+    "$repo_root"|"$repo_root"/*) echo "Refusing to generate private keys inside the Git working tree" >&2; exit 2 ;;
+  esac
   chmod 700 "$key_dir"
   staging_key="$key_dir/staging_ed25519"
   production_key="$key_dir/production_ed25519"
@@ -137,6 +176,8 @@ fi
 need_value --staging-key "$staging_key"
 need_value --production-key "$production_key"
 [ -s "$staging_key" ] && [ -s "$production_key" ] || { echo "Private key files must exist and be non-empty" >&2; exit 2; }
+validate_secure_file "Staging private key" "$staging_key"
+validate_secure_file "Production private key" "$production_key"
 ssh-keygen -y -P "" -f "$staging_key" >/dev/null
 ssh-keygen -y -P "" -f "$production_key" >/dev/null
 
@@ -157,10 +198,12 @@ for required in DOCKER_PAT_BACKEND DOCKER_PAT_FRONTEND; do
   fi
 done
 
-if [ -n "$opencode_key_file" ] && [ ! -s "$opencode_key_file" ]; then
-  echo "--opencode-key-file must reference a non-empty file" >&2
-  exit 2
-fi
+for token_file in "$backend_token_file" "$frontend_token_file" "$opencode_key_file"; do
+  if [ -n "$token_file" ]; then
+    validate_secure_file "Token input file" "$token_file"
+    [ -s "$token_file" ] || { echo "Token input files must be non-empty" >&2; exit 2; }
+  fi
+done
 
 if [ "$apply" != true ]; then
   cat <<SUMMARY
