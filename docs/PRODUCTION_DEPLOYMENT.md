@@ -37,7 +37,10 @@ cd ERP
 # 2. Create the root production env file
 cp .env.production.template .env.production
 chmod 600 .env.production
-# Set unique production DB, Redis, and SECRET_KEY values.
+# Set DOCKER_USER to the actual Docker Hub namespace, then generate unique
+# DB_PASSWORD, REDIS_PASSWORD and SECRET_KEY values with a secret manager or
+# openssl rand. The installer (sudo ./install.sh <domain> <email>) does this
+# interactively and writes the file with mode 0600.
 
 # 3. Start production stack
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d
@@ -91,10 +94,11 @@ The active CI/CD path uses `docker-compose.prod.yml` and
   selected tag through the same health-check and traffic-switch process; it
   does not blindly retag one image as the other.
 
-Required repository-level Actions secrets and repository variables are listed
-in `docs/GITHUB_SECRETS.md`. The target hosts must also have read-only Docker
-Hub credentials configured so they can pull the private images. GitHub
-Environment branch/tag policies apply to the deploy jobs.
+Run `bash scripts/configure-github-actions.sh` from a trusted workstation to
+provision repository-level Actions secrets/variables and the staging/production
+Environment ref policies. Required values are listed in
+`docs/GITHUB_SECRETS.md`. This does not provision the target hosts: each host
+must have its own runtime env file and read-only Docker Hub pull credentials.
 
 For a manual server-side operation:
 
