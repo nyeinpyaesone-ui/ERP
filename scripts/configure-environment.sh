@@ -67,8 +67,8 @@ case "$target_dir" in
 esac
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-mkdir -p "$target_dir"
-target_dir="$(cd "$target_dir" && pwd)"
+[ -d "$target_dir" ] || { echo "Install directory must already exist; create it with the target host's provisioning process first" >&2; exit 2; }
+target_dir="$(cd "$target_dir" && pwd -P)"
 case "$target_dir" in
   "$repo_root"|"$repo_root"/*)
     echo "Refusing to create runtime credentials inside the Git working tree." >&2
