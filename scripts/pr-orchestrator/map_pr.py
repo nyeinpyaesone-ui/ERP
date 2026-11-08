@@ -88,8 +88,7 @@ def classify_risk(paths: Iterable[str]) -> str:
         "go.sum",
     )
     if any(
-        path.endswith(dependency_names)
-        or path.startswith(".github/dependabot")
+        path.endswith(dependency_names) or path.startswith(".github/dependabot")
         for path in files
     ):
         return "dependency"
@@ -177,9 +176,7 @@ def evaluate_pr(
     # check-runs API above contains completed successful checks.
     classic_statuses = combined_status.get("statuses") or []
     if classic_statuses and combined_status.get("state") != "success":
-        reasons.append(
-            f"commit_status_{combined_status.get('state') or 'missing'}"
-        )
+        reasons.append(f"commit_status_{combined_status.get('state') or 'missing'}")
 
     latest_reviews = _latest_reviews_by_user(reviews)
     requested_changes = [
@@ -235,15 +232,11 @@ def build_pr_report(
         repo_api_path(f"/commits/{head_sha}/check-runs") + f"?{token_query}",
         "check_runs",
     )
-    combined_status = api_get(
-        repo_api_path(f"/commits/{head_sha}/status")
-    )
+    combined_status = api_get(repo_api_path(f"/commits/{head_sha}/status"))
     reviews = api_paginate(
         repo_api_path(f"/pulls/{number}/reviews") + f"?{token_query}"
     )
-    files = api_paginate(
-        repo_api_path(f"/pulls/{number}/files") + f"?{token_query}"
-    )
+    files = api_paginate(repo_api_path(f"/pulls/{number}/files") + f"?{token_query}")
     return evaluate_pr(
         pr,
         checks,
