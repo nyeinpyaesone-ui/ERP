@@ -4,7 +4,6 @@ kind: Kustomization
 namespace: erp-solution
 
 resources:
-  - namespace.yaml
   - configmap.yaml
   - rbac.yaml
   - network-policy.yaml
