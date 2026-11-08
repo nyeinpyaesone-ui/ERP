@@ -1,5 +1,5 @@
 # Build stage
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -9,11 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-runtime.txt .
-RUN pip install --no-cache-dir --user -r requirements-runtime.txt \
-    && pip install --no-cache-dir --user --upgrade "setuptools>=78.1.1" wheel
+RUN pip install --no-cache-dir --user -r requirements-runtime.txt
 
 # Runtime stage
-FROM python:3.11-slim AS runtime
+FROM python:3.11-slim-bookworm AS runtime
 
 WORKDIR /app
 
