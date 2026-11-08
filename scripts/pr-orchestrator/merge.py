@@ -84,9 +84,10 @@ def dispatch_and_wait_for_staging(timeout_seconds: int) -> tuple[bool, str]:
             )
             if workflow_run.get("status") == "completed":
                 run_id = workflow_run["id"]
-                jobs = api_paginate(
+                jobs_response = api_get(
                     repo_api_path(f"/actions/runs/{run_id}/jobs?per_page=100")
                 )
+                jobs = jobs_response.get("jobs", [])
                 staging = next(
                     (
                         job
