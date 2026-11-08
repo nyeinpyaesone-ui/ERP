@@ -40,28 +40,44 @@ to validation-only mode, requires an explicit Kubernetes context, refuses
 files inside the repository or with group/other permissions, and never prints
 Secret data.
 
-Validate first:
+The environment overlays now use DNS-compatible namespaces and Secret
+names:
 
-```bash
-bash scripts/provision-k8s-secrets.sh \
-  --environment production \
-  --context <production-context> \
-  --file /secure/path/erp-production.env
-```
+| Environment | Namespace | Secret |
+|---|---|---|
+| Development | `erp-solution-dev` | not provisioned by this script |
+| Staging | `erp-solution-staging` | `staging-erp-solution-secrets` |
+| Production | `erp-solution` | `erp-solution-secrets` |
 
-Apply only after reviewing the context and the Secret target:
+Validate the Secret input and intended context first. With
+`--create-namespace`, the script reports the namespace it would create but
+does not change the cluster in validation mode:
 
 ```bash
 bash scripts/provision-k8s-secrets.sh \
   --environment production \
   --context <production-context> \
   --file /secure/path/erp-production.env \
+  --create-namespace
+```
+
+Apply only after reviewing the context, namespace, and Secret target. The
+explicit `--apply --create-namespace` flags create the namespace if missing
+and then create the Secret. Existing Secret data is not replaced unless
+`--replace-existing` is also supplied:
+
+```bash
+bash scripts/provision-k8s-secrets.sh \
+  --environment production \
+  --context <production-context> \
+  --file /secure/path/erp-production.env \
+  --create-namespace \
   --apply
 ```
 
 For staging, use `--environment staging`, the staging cluster context, and
-the staging-specific env file. Existing Secrets are not overwritten unless
-`--replace-existing` is explicitly added with `--apply`.
+the staging-specific env file. The provisioner has no development mapping;
+do not reuse staging or production Secret values in development.
 
 Verify only the Secret metadata (not its data) and render both overlays:
 
