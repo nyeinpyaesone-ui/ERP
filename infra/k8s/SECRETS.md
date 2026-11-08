@@ -20,33 +20,52 @@ names with `kubectl kustomize` before applying.
 ## Provisioning
 
 Create the environment file outside the repository on a trusted operator
-machine. Restrict its permissions (for example, `chmod 600`) and populate it
-from the approved secret manager. Do not paste values into shell history,
-tickets, chat, CI logs, or Git.
+machine. Restrict its permissions (`chmod 600`) and populate it from the
+approved secret manager. Do not paste values into shell history, tickets, chat,
+CI logs, or Git.
 
-Production:
+Required keys are taken from the current base manifest's explicit
+`secretKeyRef` entries:
+
+- `DB_USER`
+- `DB_PASSWORD`
+- `REDIS_PASSWORD`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+
+The Secret is provisioned by `scripts/provision-k8s-secrets.sh`. It defaults
+to validation-only mode, requires an explicit Kubernetes context, refuses
+files inside the repository or with group/other permissions, and never prints
+Secret data.
+
+Validate first:
 
 ```bash
-kubectl create secret generic erp_solution-secrets \
-  --namespace erp_solution \
-  --from-env-file=/secure/path/erp-production.env \
-  --dry-run=client -o yaml | kubectl apply -f -
+bash scripts/provision-k8s-secrets.sh \
+  --environment production \
+  --context <production-context> \
+  --file /secure/path/erp-production.env
 ```
 
-Staging:
+Apply only after reviewing the context and the Secret target:
 
 ```bash
-kubectl create secret generic staging-erp_solution-secrets \
-  --namespace erp_solution-staging \
-  --from-env-file=/secure/path/erp-staging.env \
-  --dry-run=client -o yaml | kubectl apply -f -
+bash scripts/provision-k8s-secrets.sh \
+  --environment production \
+  --context <production-context> \
+  --file /secure/path/erp-production.env \
+  --apply
 ```
 
-Then validate the Secret exists without printing its data:
+For staging, use `--environment staging`, the staging cluster context, and
+the staging-specific env file. Existing Secrets are not overwritten unless
+`--replace-existing` is explicitly added with `--apply`.
+
+Verify only the Secret metadata (not its data) and render both overlays:
 
 ```bash
-kubectl -n erp_solution get secret erp_solution-secrets
-kubectl -n erp_solution-staging get secret staging-erp_solution-secrets
+kubectl --context <production-context> -n erp_solution get secret erp_solution-secrets
+kubectl --context <staging-context> -n erp_solution-staging get secret staging-erp_solution-secrets
 kubectl kustomize infra/k8s/overlays/staging
 kubectl kustomize infra/k8s/overlays/production
 ```
