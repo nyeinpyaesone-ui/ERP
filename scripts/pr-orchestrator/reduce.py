@@ -104,8 +104,8 @@ def main() -> int:
     parser.add_argument("--output", default="orchestration-plan.json")
     args = parser.parse_args()
 
-    if not 1 <= args.max_merges <= 20:
-        parser.error("--max-merges must be between 1 and 20")
+    if not 1 <= args.max_merges <= 5:
+        parser.error("--max-merges must be between 1 and 5")
 
     expected = [int(value) for value in json.loads(args.expected_prs)]
     reports: list[dict[str, Any]] = []
