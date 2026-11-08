@@ -7,7 +7,7 @@ umask 077
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/provision-k8s-secrets.sh --environment staging|production --context CONTEXT --file /secure/path/secrets.env [--apply] [--replace-existing]
+  scripts/provision-k8s-secrets.sh --environment staging|production --context CONTEXT --file /secure/path/secrets.env [--apply] [--create-namespace] [--replace-existing]
 
 Mappings:
   production: namespace erp-solution, Secret erp-solution-secrets
@@ -27,12 +27,14 @@ context=""
 secret_file=""
 apply=false
 replace_existing=false
+create_namespace=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --environment) environment="$2"; shift 2 ;;
     --context) context="$2"; shift 2 ;;
     --file) secret_file="$2"; shift 2 ;;
     --apply) apply=true; shift ;;
+    --create-namespace) create_namespace=true; shift ;;
     --replace-existing) replace_existing=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -87,7 +89,19 @@ if [ -z "$current_context" ]; then
   echo "No current kubectl context is configured; refusing to continue" >&2
   exit 1
 fi
-kubectl --context "$context" get namespace "$namespace" >/dev/null
+if ! kubectl --context "$context" get namespace "$namespace" >/dev/null 2>&1; then
+  if [ "$create_namespace" != true ] || [ "$apply" != true ]; then
+    echo "Namespace $namespace does not exist. Pass --create-namespace --apply to create it explicitly." >&2
+    exit 1
+  fi
+  kubectl --context "$context" create namespace "$namespace" --dry-run=client -o yaml |
+    kubectl --context "$context" apply -f - >/dev/null
+fi
+
+if [ "$create_namespace" = true ] && [ "$apply" != true ]; then
+  echo "--create-namespace requires --apply because it changes cluster state." >&2
+  exit 2
+fi
 
 existing="$(kubectl --context "$context" --namespace "$namespace" get secret "$secret_name" --ignore-not-found -o name)"
 if [ -n "$existing" ] && [ "$apply" = true ] && [ "$replace_existing" != true ]; then
