@@ -14,6 +14,7 @@ Options:
   --domain FQDN        Base domain, e.g. staging.example.com (required)
   --docker-user NAME   Docker Hub namespace (required)
   --version TAG        Initial image tag (default: latest; use an immutable tag for deploys)
+  --cors-origins LIST  Comma-separated HTTPS origins (default: https://DOMAIN)
   --dir PATH           Required absolute install directory outside the repository
   --help               Show this help
 
@@ -27,6 +28,7 @@ environment=""
 domain=""
 docker_user=""
 version="latest"
+cors_origins=""
 target_dir=""
 
 while [ "$#" -gt 0 ]; do
@@ -35,6 +37,7 @@ while [ "$#" -gt 0 ]; do
     --domain) [ "$#" -ge 2 ] || { echo "Missing value for --domain" >&2; exit 2; }; domain="$2"; shift 2 ;;
     --docker-user) [ "$#" -ge 2 ] || { echo "Missing value for --docker-user" >&2; exit 2; }; docker_user="$2"; shift 2 ;;
     --version) [ "$#" -ge 2 ] || { echo "Missing value for --version" >&2; exit 2; }; version="$2"; shift 2 ;;
+    --cors-origins) [ "$#" -ge 2 ] || { echo "Missing value for --cors-origins" >&2; exit 2; }; cors_origins="$2"; shift 2 ;;
     --dir) [ "$#" -ge 2 ] || { echo "Missing value for --dir" >&2; exit 2; }; target_dir="$2"; shift 2 ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -50,6 +53,15 @@ if [[ ! "$domain" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{
   echo "--domain must be a lowercase FQDN without scheme, path, or port" >&2
   exit 2
 fi
+cors_origins="${cors_origins:-https://$domain}"
+IFS=',' read -r -a cors_origin_list <<< "$cors_origins"
+[ "${#cors_origin_list[@]}" -gt 0 ] || { echo "At least one CORS origin is required" >&2; exit 2; }
+for origin in "${cors_origin_list[@]}"; do
+  [[ "$origin" =~ ^https://([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(:[0-9]{1,5})?$ ]] || {
+    echo "CORS origins must be comma-separated HTTPS origins without paths" >&2
+    exit 2
+  }
+done
 if [[ ! "$docker_user" =~ ^[a-z0-9][a-z0-9_-]{0,127}$ ]]; then
   echo "--docker-user must be a valid lowercase Docker Hub namespace" >&2
   exit 2
@@ -111,7 +123,7 @@ SECRET_KEY=$secret_key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 REFRESH_TOKEN_EXPIRE_DAYS=7
-CORS_ORIGINS=https://app.$domain
+CORS_ORIGINS=$cors_origins
 OLLAMA_BASE_URL=http://ollama:11434
 OLLAMA_MODEL=llama3.1
 UPLOAD_DIR=/app/uploads
