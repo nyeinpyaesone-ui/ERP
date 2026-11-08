@@ -26,7 +26,9 @@ class MergeExecutorTests(unittest.TestCase):
         self.assertEqual(detail, "queued")
         command = run.call_args.args[0]
         self.assertIn("--match-head-commit", command)
-        self.assertEqual(command[command.index("--match-head-commit") + 1], "expected-head-sha")
+        self.assertEqual(
+            command[command.index("--match-head-commit") + 1], "expected-head-sha"
+        )
         self.assertIn("--auto", command)
         self.assertNotIn("--admin", command)
         self.assertEqual(run.call_args.kwargs["env"]["GH_TOKEN"], "test-token")
