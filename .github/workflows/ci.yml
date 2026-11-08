@@ -316,7 +316,9 @@ jobs:
           SECRET_KEY=ci-runtime-smoke-secret-key-32-characters \
           ENVIRONMENT=test \
           PYTHONPATH="$PWD" \
-            /tmp/erp-runtime-smoke/bin/python -c "from app.main import app; assert app is not None; print('Production runtime dependency smoke test passed')"
+            /tmp/erp-runtime-smoke/bin/python -c "from app.main import app; import app.scripts.seed_defaults; assert app is not None; print('Production runtime imports passed')" \
+          && /tmp/erp-runtime-smoke/bin/python -m alembic --version \
+          && /tmp/erp-runtime-smoke/bin/python -m uvicorn --version
 
       - name: Install backend dependencies
         run: |
