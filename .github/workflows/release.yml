@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.event.workflow_run.head_branch || inputs.tag || github.ref }}
+  group: release-${{ github.event.workflow_run.head_sha || inputs.tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -26,8 +26,7 @@ jobs:
     timeout-minutes: 20
     if: >-
       github.event_name == 'workflow_dispatch'
-      || (github.event.workflow_run.conclusion == 'success'
-      && startsWith(github.event.workflow_run.head_branch, 'v'))
+      || github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Checkout completed CI revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -35,29 +34,26 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
-      - name: Validate release publishing configuration
+      - name: Resolve version tag
         id: tag
         env:
-          DOCKER_USER: ${{ vars.DOCKER_USER }}
-          BACKEND_TOKEN: ${{ secrets.DOCKER_PAT_BACKEND }}
-          FRONTEND_TOKEN: ${{ secrets.DOCKER_PAT_FRONTEND }}
           MANUAL_TAG: ${{ inputs.tag }}
           WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          if [ -z "${DOCKER_USER}" ] || [ -z "${BACKEND_TOKEN}" ] || [ -z "${FRONTEND_TOKEN}" ]; then
-            echo "::error::DOCKER_USER and both image-scoped Docker Hub tokens are required to publish a release."
-            exit 1
-          fi
-
           if [ -n "${MANUAL_TAG}" ]; then
             TAG="${MANUAL_TAG}"
           else
-            TAG="$(git tag --points-at "${WORKFLOW_HEAD_SHA}" | grep -E '^v[0-9A-Za-z][0-9A-Za-z._-]{0,127}$' | sort -V | tail -n1)"
+            TAG="$(git tag --points-at "${WORKFLOW_HEAD_SHA}" | grep -E '^v[0-9A-Za-z][0-9A-Za-z._-]{0,127}$' | sort -V | tail -n1 || true)"
           fi
 
+          if [ -z "${TAG}" ]; then
+            echo "No version tag on this successful CI revision; no release is needed."
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [[ ! "${TAG}" =~ ^v[0-9A-Za-z][0-9A-Za-z._-]{0,127}$ ]]; then
-            echo "::error::No valid v* release tag is associated with the completed CI revision."
+            echo "::error::Release tag must use the v* version format."
             exit 1
           fi
           if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
@@ -66,13 +62,28 @@ jobs:
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
+      - name: Validate release publishing configuration
+        if: steps.tag.outputs.tag != ''
+        env:
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+          BACKEND_TOKEN: ${{ secrets.DOCKER_PAT_BACKEND }}
+          FRONTEND_TOKEN: ${{ secrets.DOCKER_PAT_FRONTEND }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DOCKER_USER}" ] || [ -z "${BACKEND_TOKEN}" ] || [ -z "${FRONTEND_TOKEN}" ]; then
+            echo "::error::DOCKER_USER and both image-scoped Docker Hub tokens are required to publish a release."
+            exit 1
+          fi
+
       - name: Log in to Docker Hub for backend verification
+        if: steps.tag.outputs.tag != ''
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ vars.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PAT_BACKEND }}
 
       - name: Verify backend image exists
+        if: steps.tag.outputs.tag != ''
         env:
           TAG: ${{ steps.tag.outputs.tag }}
           DOCKER_USER: ${{ vars.DOCKER_USER }}
@@ -81,12 +92,14 @@ jobs:
           docker manifest inspect "${DOCKER_USER}/erp-solution-backend:${TAG}" >/dev/null
 
       - name: Log in to Docker Hub for frontend verification
+        if: steps.tag.outputs.tag != ''
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ vars.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PAT_FRONTEND }}
 
       - name: Verify frontend image exists
+        if: steps.tag.outputs.tag != ''
         env:
           TAG: ${{ steps.tag.outputs.tag }}
           DOCKER_USER: ${{ vars.DOCKER_USER }}
@@ -95,6 +108,7 @@ jobs:
           docker manifest inspect "${DOCKER_USER}/erp-solution-frontend:${TAG}" >/dev/null
 
       - name: Extract release notes from CHANGELOG.md
+        if: steps.tag.outputs.tag != ''
         id: notes
         env:
           TAG: ${{ steps.tag.outputs.tag }}
@@ -137,6 +151,7 @@ jobs:
           echo "Notes: $(wc -l < release-notes.md) lines"
 
       - name: Publish release
+        if: steps.tag.outputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
@@ -149,6 +164,7 @@ jobs:
             --verify-tag
 
       - name: Attach verified image references to release body
+        if: steps.tag.outputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
