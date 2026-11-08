@@ -157,6 +157,11 @@ for required in DOCKER_PAT_BACKEND DOCKER_PAT_FRONTEND; do
   fi
 done
 
+if [ -n "$opencode_key_file" ] && [ ! -s "$opencode_key_file" ]; then
+  echo "--opencode-key-file must reference a non-empty file" >&2
+  exit 2
+fi
+
 if [ "$apply" != true ]; then
   cat <<SUMMARY
 Validation passed. No GitHub configuration was changed.
@@ -233,6 +238,9 @@ if ! grep -Fxq DOCKER_PAT_BACKEND <<< "$secret_names"; then
 fi
 if ! grep -Fxq DOCKER_PAT_FRONTEND <<< "$secret_names"; then
   set_secret_from_file DOCKER_PAT_FRONTEND "$frontend_token_file"
+fi
+if [ -n "$opencode_key_file" ] && ! grep -Fxq OPENCODE_API_KEY <<< "$secret_names"; then
+  set_secret_from_file OPENCODE_API_KEY "$opencode_key_file"
 fi
 
 echo "GitHub Actions configuration updated. Secret values were not printed."
