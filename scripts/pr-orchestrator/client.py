@@ -115,6 +115,32 @@ def api_paginate(path_or_url: str, token: str | None = None) -> list[Any]:
     return results
 
 
+def api_paginate_field(
+    path_or_url: str, field: str, token: str | None = None
+) -> list[Any]:
+    """Read a paginated list nested inside an object response."""
+    current_url = (
+        path_or_url
+        if path_or_url.startswith("https://")
+        else f"{API_ROOT}{path_or_url}"
+    )
+    results: list[Any] = []
+    next_pattern = re.compile(r'<([^>]+)>;\s*rel="next"')
+    while current_url:
+        page, headers, _ = api_request("GET", current_url, token=token)
+        if not isinstance(page, dict) or not isinstance(page.get(field), list):
+            raise RuntimeError(
+                f"Expected list field {field!r} from {current_url}"
+            )
+        results.extend(page[field])
+        link_header = next(
+            (value for key, value in headers.items() if key.lower() == "link"), ""
+        )
+        match = next_pattern.search(link_header)
+        current_url = match.group(1) if match else ""
+    return results
+
+
 def repo_slug() -> str:
     repository = os.environ.get("GITHUB_REPOSITORY", "").strip()
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
