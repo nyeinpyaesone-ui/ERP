@@ -180,7 +180,10 @@ create_directories() {
 
 generate_env_file() {
     if erp_detect_env_file; then
-        erp_success "Using existing env file: ${ERP_ENV_FILE}"
+        if [ "$(basename "${ERP_ENV_FILE}")" != ".env.production" ]; then
+            erp_die "The production installer only accepts a .env.production file; staging configuration is not permitted."
+        fi
+        erp_success "Using existing production env file: ${ERP_ENV_FILE}"
         return 0
     fi
     if [ "${ASSUME_YES}" = true ]; then
