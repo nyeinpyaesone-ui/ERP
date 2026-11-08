@@ -214,7 +214,7 @@ The host script refuses to store a token in Docker's base64-only
 \`config.json\`, requires a credential helper, and checks both image manifests.
 Use the same namespace and tag that CI published.
 
-## 5. Verification
+## 6. Verification
 
 ```bash
 gh secret list          # names + updated timestamps (values are never shown)
@@ -227,7 +227,7 @@ SSH step also fails closed if a pinned known-hosts value is unexpectedly empty.
 A failed image push usually means a missing/wrong `DOCKER_USER`, a PAT without
 write access to its matching repository, or a repository name mismatch.
 
-## 6. GitHub Environments (Settings → Environments)
+## 7. GitHub Environments (Settings → Environments)
 
 `ci.yml`'s deploy jobs declare `environment: staging` / `environment: production`.
 Both environments must exist, otherwise the jobs fail at the deployment-record
