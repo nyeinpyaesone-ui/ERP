@@ -32,6 +32,7 @@ validate_host() {
 }
 validate_user() {
   [[ "$1" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "Invalid SSH username: $1"
+  [ "$1" != "root" ] || die "Use a dedicated non-root deployment account."
 }
 set_secret_file() {
   local key="$1" file="$2"
@@ -90,6 +91,7 @@ prompt PRODUCTION_USER "Production SSH username"
 validate_user "$PRODUCTION_USER"
 
 [ "$STAGING_HOST" != "$PRODUCTION_HOST" ] || die "Staging and production must be separate hosts for the current fixed-name Compose stack."
+[ "$STAGING_DOMAIN" != "$PRODUCTION_DOMAIN" ] || die "Staging and production deployment domains must be different."
 
 prompt_file BACKEND_TOKEN_FILE "Docker Hub backend push token file"
 prompt_file FRONTEND_TOKEN_FILE "Docker Hub frontend push token file"
