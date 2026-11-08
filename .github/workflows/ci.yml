@@ -305,6 +305,19 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Verify production runtime dependency manifest
+        run: |
+          set -euo pipefail
+          cd backend
+          python -m venv /tmp/erp-runtime-smoke
+          /tmp/erp-runtime-smoke/bin/python -m pip install --disable-pip-version-check -r requirements-runtime.txt
+          DATABASE_URL=postgresql://erp_user:erp_password@localhost:5432/erp_db \
+          REDIS_URL=redis://localhost:6379/0 \
+          SECRET_KEY=ci-runtime-smoke-secret-key-32-characters \
+          ENVIRONMENT=test \
+          PYTHONPATH="$PWD" \
+            /tmp/erp-runtime-smoke/bin/python -c "from app.main import app; assert app is not None; print('Production runtime dependency smoke test passed')"
+
       - name: Install backend dependencies
         run: |
           cd backend
