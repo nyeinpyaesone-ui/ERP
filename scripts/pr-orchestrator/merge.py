@@ -12,7 +12,7 @@ import time
 from typing import Any
 from urllib.parse import urlencode
 
-from client import api_get, api_post, repo_api_path, write_json
+from client import GitHubAPIError, api_get, api_post, repo_api_path, write_json
 from map_pr import build_pr_report
 
 
