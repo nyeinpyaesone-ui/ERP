@@ -34,20 +34,43 @@
 git clone https://github.com/nyeinpyaesone-ui/ERP.git
 cd ERP
 
-# 2. Create the root production env file
-cp .env.production.template .env.production
-chmod 600 .env.production
-# Set unique production DB, Redis, and SECRET_KEY values.
+# 2. Generate a protected production env file (never copy the template as-is)
+bash scripts/configure-environment.sh \
+  --environment production \
+  --domain <production-domain> \
+  --docker-user <docker-hub-namespace> \
+  --version <published-v-tag> \
+  --dir /opt/erp-solution
+# The generated .env.production is mode 0600 and contains unique random secrets.
 
-# 3. Start production stack
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+# 3. Configure read-only Docker Hub access on this host.
+# First install/configure a native Docker credential helper.
+bash scripts/configure-host-registry.sh \
+  --docker-user <docker-hub-namespace> \
+  --image-tag <published-v-tag>
 
-# 4. Run migrations
-docker compose --env-file .env.production -f docker-compose.prod.yml exec backend alembic upgrade head
+# 4. Start production stack
+docker compose --env-file /opt/erp-solution/.env.production -f /opt/erp-solution/docker-compose.prod.yml up -d
+
+# 5. Run migrations
+docker compose --env-file /opt/erp-solution/.env.production -f /opt/erp-solution/docker-compose.prod.yml exec backend alembic upgrade head
 
 # 5. Verify (nginx is the only published port in the prod stack)
 curl http://localhost/api/v1/health
 ```
+
+### Environment isolation
+
+The active blue-green Compose stack uses fixed container names. Staging and
+production must therefore be deployed to **separate Docker hosts**. Generate
+`.env.staging` on the staging host and `.env.production` on the production
+host with `scripts/configure-environment.sh`; do not copy one file between
+hosts. The application setting is `ENVIRONMENT=prod` in both files because
+the backend accepts only `dev|test|prod`. The deploy target controls which
+environment-specific file is selected.
+
+Do not commit real env files. They contain independent PostgreSQL, Redis, and
+application secrets and must remain mode `0600`.
 
 ### Option 2: Kubernetes manifests (separate, not CI-integrated)
 
