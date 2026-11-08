@@ -134,7 +134,7 @@ jobs:
             echo "| Production deploy | \`${can_deploy_production}\` |"
             echo ""
             if [ "${can_push}" = false ]; then
-              echo "DOCKER_PAT_BACKEND / DOCKER_PAT_FRONTEND are unset, so images are"
+              echo "DOCKER_USER and/or Docker Hub push tokens are unset, so images are"
               echo "built and validated but not pushed. See docs/GITHUB_SECRETS.md."
             fi
             if [ "${can_deploy_staging}" = false ]; then
