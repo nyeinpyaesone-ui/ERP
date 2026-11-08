@@ -63,7 +63,7 @@ jobs:
       - name: Lint and format-check orchestration scripts
         run: |
           ruff check scripts/pr-orchestrator
-          black --check scripts/pr-orchestrator
+          black --check --diff scripts/pr-orchestrator
       - name: Run orchestrator unit tests
         env:
           PYTHONPATH: scripts/pr-orchestrator
