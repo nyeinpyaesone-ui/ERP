@@ -330,8 +330,8 @@ main() {
     validate_environment
     
     if [ "${ROLLBACK}" = "true" ] || [ "${ROLLBACK}" = "--rollback" ]; then
-        if [[ "${VERSION}" == "latest" || ! "${VERSION}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
-            error "Rollback requires an explicit immutable image tag; 'latest' is not allowed."
+        if [[ ! "${VERSION}" =~ ^(sha-[[:xdigit:]]{7,40}|v[0-9A-Za-z][0-9A-Za-z._-]{0,127})$ ]]; then
+            error "Rollback tag must be a versioned v* release or a sha-* image tag; mutable tags are rejected."
             exit 1
         fi
         info "Rollback requested: deploying image tag ${VERSION} through the normal blue-green health-check and traffic-switch flow."
