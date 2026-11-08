@@ -398,9 +398,11 @@ jobs:
     # can_deploy covers the SSH key, both hosts and both pinned known_hosts sets.
     # Absent any of them the job is skipped rather than failed, so the pipeline
     # stays green on a repository that has not been provisioned for deploys yet.
+    # Pushes deploy the current main build; manual dispatches may deploy or
+    # roll back a selected immutable image tag from the main branch only.
     if: >-
       github.ref == 'refs/heads/main'
-      && github.event_name == 'push'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && needs.config.outputs.can_deploy == 'true'
     environment: staging
     timeout-minutes: 30
@@ -448,6 +450,17 @@ jobs:
 
       # With `rollback` set, hand off to the script's --rollback path for that
       # version instead of deploying latest.
+      - name: Validate rollback version
+        if: inputs.rollback != ''
+        env:
+          ROLLBACK: ${{ inputs.rollback }}
+        run: |
+          set -euo pipefail
+          if [[ "${ROLLBACK}" == "latest" || ! "${ROLLBACK}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
+            echo "::error::Rollback must be an immutable image tag (not latest) using letters, digits, dots, underscores or hyphens."
+            exit 1
+          fi
+
       - name: Deploy with Blue-Green
         env:
           DOCKER_USER: ${{ vars.DOCKER_USER }}
