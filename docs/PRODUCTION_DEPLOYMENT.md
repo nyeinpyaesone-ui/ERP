@@ -34,7 +34,8 @@
 git clone https://github.com/nyeinpyaesone-ui/ERP.git
 cd ERP
 
-# 2. Generate a protected production env file (never copy the template as-is)
+# 2. Prepare the protected install directory and generate a production env file
+install -d -m 0750 /opt/erp-solution
 bash scripts/configure-environment.sh \
   --environment production \
   --domain <production-domain> \
