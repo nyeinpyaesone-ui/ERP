@@ -38,6 +38,8 @@ Environment isolation — use separate staging and production SSH keys. **These 
 
 Remote registry access — the deploy workflow pulls both Docker Hub images on the target host over SSH. Provision a read-only Docker Hub credential on each host (`docker login` for the configured namespace) and verify it can pull both `erp-solution-backend` and `erp-solution-frontend`. CI push tokens are not sent to the servers.
 
+Target host runtime — each host needs its own `/opt/erp-solution/.env.staging` or `.env.production` file (mode `0600`), created from `.env.production.template` but populated with that environment's independent database, Redis, and application secrets. The deploy script selects `.env.staging` for staging and `.env.production` for production; it fails closed if the matching file is absent. Never use production credentials on staging. The two environments must use separate hosts because the Compose stack has fixed container names. The workflow syncs the deployment script, Compose file, and static nginx config from the exact CI revision, but it does not overwrite env files, TLS material, persistent data, or the runtime `nginx/upstream-active.conf`.
+
 Host-key note — the workflows previously ran `ssh-keyscan` at deploy time.
 `ssh-keyscan` performs **no authentication**: whatever answers the TCP
 connection supplies the key, so a machine that intercepts DNS or port 22 can
