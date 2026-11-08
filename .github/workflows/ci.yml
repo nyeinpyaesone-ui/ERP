@@ -550,7 +550,9 @@ jobs:
           install -D -m 0755 "$DEPLOY_TMP/scripts/deploy-blue-green.sh" scripts/deploy-blue-green.sh
           install -D -m 0644 "$DEPLOY_TMP/scripts/lib.sh" scripts/lib.sh
           install -D -m 0644 "$DEPLOY_TMP/docker-compose.prod.yml" docker-compose.prod.yml
-          install -D -m 0644 "$DEPLOY_TMP/nginx.conf" nginx.conf
+          test -f nginx.conf || { echo "nginx.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx.conf" > nginx.conf
+          chmod 0644 nginx.conf
           install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-blue.conf" nginx/upstream-blue.conf
           install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-green.conf" nginx/upstream-green.conf
           install -D -m 0644 "$DEPLOY_TMP/nginx/ssl.conf" nginx/ssl.conf
@@ -661,7 +663,9 @@ jobs:
           install -D -m 0755 "$DEPLOY_TMP/scripts/deploy-blue-green.sh" scripts/deploy-blue-green.sh
           install -D -m 0644 "$DEPLOY_TMP/scripts/lib.sh" scripts/lib.sh
           install -D -m 0644 "$DEPLOY_TMP/docker-compose.prod.yml" docker-compose.prod.yml
-          install -D -m 0644 "$DEPLOY_TMP/nginx.conf" nginx.conf
+          test -f nginx.conf || { echo "nginx.conf missing on target host"; exit 1; }
+          cat "$DEPLOY_TMP/nginx.conf" > nginx.conf
+          chmod 0644 nginx.conf
           install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-blue.conf" nginx/upstream-blue.conf
           install -D -m 0644 "$DEPLOY_TMP/nginx/upstream-green.conf" nginx/upstream-green.conf
           install -D -m 0644 "$DEPLOY_TMP/nginx/ssl.conf" nginx/ssl.conf
