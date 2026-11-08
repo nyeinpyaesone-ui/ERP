@@ -86,6 +86,11 @@ jobs:
           fi
           echo "docker_user=${user}" >> "$GITHUB_OUTPUT"
 
+          if [ -n "${STAGING_HOST}" ] && [ "${STAGING_HOST}" = "${PRODUCTION_HOST}" ]; then
+            echo "::error::Staging and production must use separate hosts; the Compose stack uses fixed container names."
+            exit 1
+          fi
+
           can_push=false
           if [ -n "${DOCKER_USER_VAR}" ] && [ -n "${PAT_BACKEND}" ] && [ -n "${PAT_FRONTEND}" ]; then
             can_push=true
