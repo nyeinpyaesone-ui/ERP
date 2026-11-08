@@ -186,7 +186,7 @@ public keys on their matching hosts before deploying.
 
 Run the runtime generator once on each dedicated server. Use the exact
 hostname/domain that is served by that environment; the generated backend CORS
-origin defaults to `https://app.<domain>`.
+origin defaults to `https://<domain>` so it matches the exact host in `STAGING_DOMAIN` or `PRODUCTION_DOMAIN`. Pass `--cors-origins` when additional frontend origins must be allowed.
 
 Staging host (prepare the protected install directory first):
 
