@@ -84,9 +84,8 @@ if [ "${#missing[@]}" -gt 0 ]; then
   exit 2
 fi
 
-current_context="$(kubectl config current-context 2>/dev/null || true)"
-if [ -z "$current_context" ]; then
-  echo "No current kubectl context is configured; refusing to continue" >&2
+if ! kubectl config get-contexts -o name | grep -Fxq "$context"; then
+  echo "Kubernetes context '$context' is not present in the current kubeconfig." >&2
   exit 1
 fi
 namespace_exists=true
