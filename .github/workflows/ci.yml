@@ -299,7 +299,7 @@ jobs:
     name: Build Frontend Image
     runs-on: ubuntu-latest
     needs: [frontend-build, config]
-    if: github.event_name != 'pull_request'
+    # Validate the image on PRs too; config keeps push disabled when secrets are unavailable.
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
     timeout-minutes: 30
