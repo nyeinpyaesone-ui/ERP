@@ -25,13 +25,16 @@ Generate a token at <https://hub.docker.com/settings/access/tokens>.
 
 | Secret | Used by | Notes |
 |--------|---------|-------|
-| `SSH_PRIVATE_KEY` | `deploy-staging`, `deploy-production` | Deploy key, not your personal key |
+| `STAGING_SSH_PRIVATE_KEY` | `deploy-staging` | Staging-only deploy key |
+| `PRODUCTION_SSH_PRIVATE_KEY` | `deploy-production` | Production-only deploy key |
 | `STAGING_USER` | `deploy-staging` | SSH user on the staging host |
 | `STAGING_HOST` | `deploy-staging` | Staging hostname or IP |
 | `STAGING_KNOWN_HOSTS` | `deploy-staging` | **Required.** Pinned host keys |
 | `PRODUCTION_USER` | `deploy-production` | SSH user on the production host |
 | `PRODUCTION_HOST` | `deploy-production` | Production hostname or IP |
 | `PRODUCTION_KNOWN_HOSTS` | `deploy-production` | **Required.** Pinned host keys |
+
+Environment isolation — staging requires only staging SSH credentials; production requires only production SSH credentials. Use separate deploy keys and scope them to their respective GitHub Environments where practical.
 
 Host-key note — the workflows previously ran `ssh-keyscan` at deploy time.
 `ssh-keyscan` performs **no authentication**: whatever answers the TCP
