@@ -260,11 +260,11 @@ bash -x ./scripts/deploy-blue-green.sh production v1.2.3 2>&1 | head -50
 |------|---------|
 | `scripts/deploy-blue-green.sh` | Main deployment script |
 | `/opt/erp-solution/.active_color` | Current active color (blue/green) |
-| `/opt/erp-solution/.previous_version` | Last deployed version for rollback |
+| `/opt/erp-solution/.active_version` | Version currently serving traffic |
 | `/opt/erp-solution/logs/deploy-*.log` | Deployment logs |
-| `nginx/upstream-blue.conf` | Blue upstream definition (backend:8000, frontend:3000) |
-| `nginx/upstream-green.conf` | Green upstream definition (erp-green-backend:8000, erp-green-frontend:3000) |
-| `nginx/upstream-active.conf` | Symlink to active upstream |
+| `nginx/upstream-blue.conf` | Blue upstream definition (backend:8000, frontend:80) |
+| `nginx/upstream-green.conf` | Green upstream definition (erp-green-backend:8000, erp-green-frontend:80) |
+| `nginx/upstream-active.conf` | Bind-mounted active upstream configuration file |
 | `docker-compose.prod.yml` | Service definitions (blue + green profiles) |
 
 ---
@@ -274,7 +274,7 @@ bash -x ./scripts/deploy-blue-green.sh production v1.2.3 2>&1 | head -50
 | Decision | Rationale |
 |----------|-----------|
 | Shared PostgreSQL/Redis | Avoids data sync complexity; migrations run once |
-| Nginx symlink switch | Atomic, no connection drops, sub-second |
+| Nginx active-file update | Validate the bind-mounted config, reload, and restore previous content on failure |
 | Health checks in container | Tests actual service, not just port |
 | Smoke tests pre + post switch | Catches config issues before/after traffic |
 | Preserve old env for rollback | Instant rollback without rebuild |
@@ -284,7 +284,7 @@ bash -x ./scripts/deploy-blue-green.sh production v1.2.3 2>&1 | head -50
 ## Best Practices Checklist
 
 - [ ] Tag release in Git (`git tag v1.2.3 && git push origin v1.2.3`)
-- [ ] Verify CI built images for that tag (`powerrangeranikg/erp-solution-backend:v1.2.3`)
+- [ ] Verify CI built both images for that tag (`$DOCKER_USER/erp-solution-backend:v1.2.3`, `$DOCKER_USER/erp-solution-frontend:v1.2.3`)
 - [ ] Run during low-traffic window
 - [ ] Monitor deployment log in real-time
 - [ ] Verify post-deploy: API health, frontend loads, key user flows
