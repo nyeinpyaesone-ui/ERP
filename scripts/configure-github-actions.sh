@@ -44,6 +44,19 @@ set_secret_value() {
   info "Setting repository secret $key"
   printf '%s' "$value" | gh secret set "$key" --repo "$REPO"
 }
+ensure_secret_file() {
+  local key="$1" label="$2" existing answer file=""
+  existing="$(gh secret list --repo "$REPO" --json name --jq '.[].name')"
+  if printf '%s\\n' "$existing" | grep -Fxq "$key"; then
+    read -r -p "$key already exists. Replace it from a local file? [y/N]: " answer
+    if [[ ! "$answer" =~ ^[Yy]$ ]]; then
+      info "Keeping existing $key"
+      return 0
+    fi
+  fi
+  prompt_file file "$label"
+  set_secret_file "$key" "$file"
+}
 set_variable() {
   local key="$1" value="$2"
   info "Setting repository variable $key"
@@ -97,8 +110,8 @@ validate_user "$PRODUCTION_USER"
 [ "$STAGING_HOST" != "$PRODUCTION_HOST" ] || die "Staging and production must be separate hosts for the current fixed-name Compose stack."
 [ "$STAGING_DOMAIN" != "$PRODUCTION_DOMAIN" ] || die "Staging and production deployment domains must be different."
 
-prompt_file BACKEND_TOKEN_FILE "Docker Hub backend push token file"
-prompt_file FRONTEND_TOKEN_FILE "Docker Hub frontend push token file"
+ensure_secret_file DOCKER_PAT_BACKEND "Docker Hub backend push token file"
+ensure_secret_file DOCKER_PAT_FRONTEND "Docker Hub frontend push token file"
 prompt_file STAGING_KEY_FILE "Staging deploy private key"
 prompt_file PRODUCTION_KEY_FILE "Production deploy private key"
 prompt_file STAGING_KNOWN_HOSTS_FILE "Pinned staging known_hosts file"
@@ -120,8 +133,6 @@ ssh-keygen -F "$PRODUCTION_HOST" -f "$PRODUCTION_KNOWN_HOSTS_FILE" >/dev/null ||
 set_variable DOCKER_USER "$DOCKER_USER"
 set_variable STAGING_DOMAIN "$STAGING_DOMAIN"
 set_variable PRODUCTION_DOMAIN "$PRODUCTION_DOMAIN"
-set_secret_file DOCKER_PAT_BACKEND "$BACKEND_TOKEN_FILE"
-set_secret_file DOCKER_PAT_FRONTEND "$FRONTEND_TOKEN_FILE"
 set_secret_file STAGING_SSH_PRIVATE_KEY "$STAGING_KEY_FILE"
 set_secret_file PRODUCTION_SSH_PRIVATE_KEY "$PRODUCTION_KEY_FILE"
 set_secret_file STAGING_KNOWN_HOSTS "$STAGING_KNOWN_HOSTS_FILE"
