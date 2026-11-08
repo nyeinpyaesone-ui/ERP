@@ -7,7 +7,6 @@ import json
 import os
 import sys
 from collections.abc import Iterable
-from datetime import datetime
 from typing import Any
 from urllib.parse import urlencode
 
@@ -22,6 +21,24 @@ RISK_ORDER = {
     "application": 5,
     "infrastructure": 6,
 }
+
+
+def latest_check_runs(check_runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep the newest observation for each check name and GitHub App."""
+    latest: dict[tuple[str, int | None], dict[str, Any]] = {}
+    for check in check_runs:
+        app_id = check.get("app", {}).get("id")
+        key = (str(check.get("name", "unnamed")), app_id)
+        timestamp = check.get("completed_at") or check.get("started_at") or ""
+        previous = latest.get(key)
+        previous_timestamp = (
+            previous.get("completed_at") or previous.get("started_at") or ""
+            if previous
+            else ""
+        )
+        if previous is None or timestamp >= previous_timestamp:
+            latest[key] = check
+    return list(latest.values())
 
 
 def classify_risk(paths: Iterable[str]) -> str:
@@ -135,12 +152,13 @@ def evaluate_pr(
     if not changed_files:
         reasons.append("changed_files_unavailable_or_empty")
 
-    if not check_runs:
+    effective_checks = latest_check_runs(check_runs)
+    if not effective_checks:
         reasons.append("check_runs_missing")
     else:
         incomplete = [
             run.get("name", "unnamed")
-            for run in check_runs
+            for run in effective_checks
             if run.get("status") != "completed"
             or run.get("conclusion") not in ALLOWED_CHECK_CONCLUSIONS
         ]
