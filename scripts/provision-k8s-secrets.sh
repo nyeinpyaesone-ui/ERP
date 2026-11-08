@@ -63,8 +63,15 @@ if [[ ! "$mode" =~ ^[0-7]{3,4}$ ]] || (( (8#$mode & 077) != 0 )); then
 fi
 
 has_value() {
-  local key="$1"
-  awk -F= -v wanted="$key" '$1 == wanted && index($0, "=") > 0 && length(substr($0, index($0, "=") + 1)) > 0 { found=1 } END { exit !found }' "$secret_file"
+  local key="$1" value
+  value="$(awk -F= -v wanted="$key" '$1 == wanted { sub(/^[^=]*=/, ""); print; exit }' "$secret_file")"
+  [ -n "$value" ] || return 1
+  case "$value" in
+    REPLACE_WITH_*|CHANGE_ME*|<*|your-*|example-*)
+      return 1
+      ;;
+  esac
+  return 0
 }
 missing=()
 for key in DB_USER DB_PASSWORD REDIS_PASSWORD AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
