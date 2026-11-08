@@ -483,9 +483,14 @@ jobs:
           STAGING_HOST: ${{ secrets.STAGING_HOST }}
           ROLLBACK_INPUT: ${{ inputs.rollback }}
           IMAGE_SHA_TAG: ${{ needs.docker-backend.outputs.image_sha_tag }}
+          FRONTEND_SHA_TAG: ${{ needs.docker-frontend.outputs.image_sha_tag }}
         run: |
           set -euo pipefail
           VERSION="${ROLLBACK_INPUT:-${IMAGE_SHA_TAG}}"
+          if [ -z "${VERSION}" ] || [ "${IMAGE_SHA_TAG}" != "${FRONTEND_SHA_TAG}" ] && [ -z "${ROLLBACK_INPUT}" ]; then
+            echo "::error::Backend and frontend immutable image tags do not match."
+            exit 1
+          fi
           ACTION="deploy"
           if [ -n "${ROLLBACK_INPUT}" ]; then ACTION="rollback"; fi
 
@@ -494,6 +499,7 @@ jobs:
           DOCKER_USER="$1"
           VERSION="$2"
           ACTION="$3"
+          export DOCKER_USER VERSION
           cd /opt/erp-solution
 
           # Registry credentials must be provisioned on the target host.
@@ -598,6 +604,7 @@ jobs:
           set -euo pipefail
           DOCKER_USER="$1"
           VERSION="$2"
+          export DOCKER_USER VERSION
           cd /opt/erp-solution
 
           # Registry credentials must be provisioned on the target host.
