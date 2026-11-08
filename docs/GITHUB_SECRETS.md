@@ -109,13 +109,13 @@ gh auth login
 gh secret set DOCKER_PAT_BACKEND < /secure/path/docker-backend-push-token.txt
 gh secret set DOCKER_PAT_FRONTEND < /secure/path/docker-frontend-push-token.txt
 gh secret set STAGING_SSH_PRIVATE_KEY < /secure/path/staging_deploy_key
- gh secret set PRODUCTION_SSH_PRIVATE_KEY < /secure/path/production_deploy_key
+gh secret set PRODUCTION_SSH_PRIVATE_KEY < /secure/path/production_deploy_key
 gh secret set STAGING_KNOWN_HOSTS < /secure/path/staging_known_hosts
- gh secret set PRODUCTION_KNOWN_HOSTS < /secure/path/production_known_hosts
- gh secret set STAGING_HOST --body "<staging-host>"
- gh secret set STAGING_USER --body "<staging-user>"
- gh secret set PRODUCTION_HOST --body "<production-host>"
- gh secret set PRODUCTION_USER --body "<production-user>"
+gh secret set PRODUCTION_KNOWN_HOSTS < /secure/path/production_known_hosts
+gh secret set STAGING_HOST --body "<staging-host>"
+gh secret set STAGING_USER --body "<staging-user>"
+gh secret set PRODUCTION_HOST --body "<production-host>"
+gh secret set PRODUCTION_USER --body "<production-user>"
 gh variable set DOCKER_USER --body "<docker-hub-namespace>"
 ```
 
@@ -126,10 +126,11 @@ gh secret list          # names + updated timestamps (values are never shown)
 gh variable list
 ```
 
-For a missing secret, the deploy jobs now fail with an explicit
-`::error::STAGING_KNOWN_HOSTS secret is empty` message rather than a
-cryptic SSH error. A failed image push almost always means `DOCKER_USER` or one
-of the `DOCKER_PAT_*` tokens.
+If a required deploy secret is missing, the `Deploy Configuration` job reports
+that capability as unavailable and skips the corresponding deploy job. The
+SSH step also fails closed if a pinned known-hosts value is unexpectedly empty.
+A failed image push almost always means `DOCKER_USER` or one of the
+`DOCKER_PAT_*` tokens.
 
 ## 6. GitHub Environments (Settings → Environments)
 
