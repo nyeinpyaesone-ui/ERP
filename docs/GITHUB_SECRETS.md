@@ -12,8 +12,8 @@ Go to **Settings → Secrets and variables → Actions**.
 
 | Secret | Used by | Notes |
 |--------|---------|-------|
-| `DOCKER_PAT_BACKEND` | `ci.yml` → `docker-backend` | Access token scoped to `powerrangeranikg/erp-solution-backend` |
-| `DOCKER_PAT_FRONTEND` | `ci.yml` → `docker-frontend` | Access token scoped to `powerrangeranikg/erp-solution-frontend` |
+| `DOCKER_PAT_BACKEND` | `ci.yml` → `docker-backend` | Docker Hub read/write access token for publishing `${DOCKER_USER}/erp-solution-backend` |
+| `DOCKER_PAT_FRONTEND` | `ci.yml` → `docker-frontend` | Docker Hub read/write access token for publishing `${DOCKER_USER}/erp-solution-frontend` |
 
 The username is **not** a secret — it is the `DOCKER_USER` repository variable
 (see §2). Keep separate tokens per image for independent rotation and audit. Use a
