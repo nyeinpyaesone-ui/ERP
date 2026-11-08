@@ -1,0 +1,29 @@
+# Production runtime dependencies only.
+# Keep development, lint, type-check and test tools in requirements.txt.
+# This manifest is installed into the production backend image.
+
+# Core API
+fastapi==0.142.2
+starlette==1.7.0
+uvicorn[standard]==0.52.4
+SQLAlchemy==2.0.52
+psycopg2-binary==2.9.13
+alembic==1.20.0
+
+# Validation and settings
+pydantic==2.13.5
+pydantic-settings==2.15.0
+email-validator==2.3.0
+python-multipart==0.0.32
+python-dotenv==1.2.4
+
+# Authentication
+PyJWT==2.15.1
+passlib[bcrypt]==1.7.4
+bcrypt==4.3.0
+
+# Integrations and clients
+httpx==0.28.1
+redis==8.1.0
+stripe==8.0.0
+matplotlib==3.11.2
