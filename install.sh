@@ -54,6 +54,8 @@ for arg in "$@"; do
 done
 
 export ERP_DIR
+# This installer only provisions the production Compose target.
+export DEPLOY_TARGET_ENVIRONMENT=production
 export ERP_COMPOSE_FILE="${ERP_COMPOSE_FILE:-${ERP_DIR}/docker-compose.prod.yml}"
 export ERP_NGINX_DIR="${ERP_NGINX_DIR:-${ERP_DIR}/nginx}"
 export ERP_SSL_DIR="${ERP_SSL_DIR:-${ERP_DIR}/ssl}"
