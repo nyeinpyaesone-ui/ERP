@@ -5,25 +5,85 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
 
-from client import (
-    GitHubAPIError,
-    api_get,
-    api_post,
-    api_put,
-    repo_api_path,
-    write_json,
-)
+from client import api_get, api_post, repo_api_path, write_json
 from map_pr import build_pr_report
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def gh_merge_or_enqueue(
+    number: int, repository: str, expected_head: str
+) -> tuple[bool, str]:
+    """Ask GitHub to merge or enqueue a PR without bypassing repository rules."""
+    if not shutil.which("gh"):
+        return False, "GitHub CLI is unavailable on this runner"
+    token = os.environ.get("PR_ORCHESTRATOR_TOKEN", "")
+    if not token:
+        return False, "PR_ORCHESTRATOR_TOKEN is missing"
+    env = os.environ.copy()
+    env["GH_TOKEN"] = token
+    command = [
+        "gh",
+        "pr",
+        "merge",
+        str(number),
+        "--repo",
+        repository,
+        "--squash",
+        "--auto",
+        "--match-head-commit",
+        expected_head,
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "GitHub CLI merge request timed out"
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "unknown GitHub CLI error").strip()
+        return False, f"GitHub refused merge/queue request: {detail[-1200:]}"
+    return True, (completed.stdout or "GitHub accepted merge/auto-merge request").strip()
+
+
+def wait_for_pr_merge(
+    number: int, timeout_seconds: int, poll_seconds: int = 10
+) -> tuple[bool, str, str]:
+    """Wait for GitHub or its merge queue to complete the requested merge."""
+    deadline = time.monotonic() + timeout_seconds
+    last_state = "merge request accepted; waiting for GitHub merge requirements"
+    while time.monotonic() < deadline:
+        pr = api_get(repo_api_path(f"/pulls/{number}"))
+        if pr.get("merged") is True:
+            merge_sha = str(pr.get("merge_commit_sha") or "")
+            if merge_sha:
+                return True, merge_sha, "GitHub confirmed the PR merge"
+            return False, "", "GitHub reports merged but did not return merge_commit_sha"
+        if pr.get("state") != "open":
+            return False, "", f"PR left the open state without a confirmed merge ({pr.get('state')})"
+        auto_merge = pr.get("auto_merge")
+        last_state = (
+            "GitHub auto-merge enabled; waiting for required checks/reviews"
+            if auto_merge
+            else "PR remains open; waiting for merge-queue or repository policy"
+        )
+        time.sleep(min(poll_seconds, max(1, deadline - time.monotonic())))
+    return False, "", f"merge/queue wait timed out: {last_state}"
 
 
 def wait_for_main_ci(
@@ -55,7 +115,15 @@ def wait_for_main_ci(
 
 
 def dispatch_and_wait_for_staging(timeout_seconds: int) -> tuple[bool, str]:
-    started_at = utc_now()
+    query = urlencode(
+        {"branch": "main", "event": "workflow_dispatch", "per_page": 100}
+    )
+    before = api_get(repo_api_path("/actions/runs") + f"?{query}")
+    previous_ids = {
+        int(item["id"])
+        for item in before.get("workflow_runs", [])
+        if item.get("name") == "CI"
+    }
     api_post(
         repo_api_path("/actions/workflows/ci.yml/dispatches"),
         {"ref": "main", "inputs": {"deploy_staging": "true"}},
@@ -64,20 +132,15 @@ def dispatch_and_wait_for_staging(timeout_seconds: int) -> tuple[bool, str]:
     workflow_run: dict[str, Any] | None = None
 
     while time.monotonic() < deadline:
-        query = urlencode(
-            {"branch": "main", "event": "workflow_dispatch", "per_page": 100}
-        )
         response = api_get(repo_api_path("/actions/runs") + f"?{query}")
         candidates = [
             item
             for item in response.get("workflow_runs", [])
             if item.get("name") == "CI"
-            and item.get("created_at", "") >= started_at
+            and int(item.get("id", 0)) not in previous_ids
         ]
         if candidates:
-            workflow_run = sorted(
-                candidates, key=lambda item: item.get("created_at", "")
-            )[-1]
+            workflow_run = max(candidates, key=lambda item: int(item["id"]))
             workflow_run = api_get(
                 repo_api_path(f"/actions/runs/{workflow_run['id']}")
             )
@@ -143,37 +206,29 @@ def execute(plan: list[dict[str, Any]], timeout_minutes: int, deploy_staging: bo
             )
             continue
 
-        try:
-            merge_response, status = api_put(
-                repo_api_path(f"/pulls/{number}/merge"),
-                {"sha": expected_head, "merge_method": "squash"},
+        accepted, merge_request_detail = gh_merge_or_enqueue(
+            number, repository, expected_head
+        )
+        if not accepted:
+            skipped.append({"number": number, "reason": merge_request_detail})
+            stopped_reason = (
+                f"GitHub did not accept PR #{number} for merge; stopping batch"
             )
-        except GitHubAPIError as error:
-            skipped.append(
-                {"number": number, "reason": f"GitHub blocked merge: {error}"}
-            )
-            if error.status in {409, 422}:
-                stopped_reason = "merge race or conflict; remaining candidates deferred"
-                break
-            continue
+            break
 
-        if status != 200 or merge_response.get("merged") is not True:
+        merged_ok, merge_sha, merge_detail = wait_for_pr_merge(
+            number, timeout_seconds
+        )
+        if not merged_ok:
             skipped.append(
                 {
                     "number": number,
-                    "reason": merge_response.get("message", "merge_not_confirmed"),
+                    "reason": f"{merge_request_detail}; {merge_detail}",
                 }
             )
-            continue
-
-        merge_sha = str(merge_response.get("sha", ""))
-        if not merge_sha:
-            stopped_reason = f"PR #{number} merged without a returned merge SHA"
-            break
-
-        pr_after = api_get(repo_api_path(f"/pulls/{number}"))
-        if pr_after.get("merged") is not True:
-            stopped_reason = f"PR #{number} merge was not confirmed by GitHub"
+            stopped_reason = (
+                f"PR #{number} was not confirmed merged; stopping batch"
+            )
             break
 
         ci_ok, ci_detail = wait_for_main_ci(merge_sha, timeout_seconds)
@@ -182,6 +237,7 @@ def execute(plan: list[dict[str, Any]], timeout_minutes: int, deploy_staging: bo
                 "number": number,
                 "head_sha": expected_head,
                 "merge_sha": merge_sha,
+                "merge_confirmation": merge_detail,
                 "ci": ci_detail,
                 "ci_success": ci_ok,
                 "url": candidate.get("url", ""),
