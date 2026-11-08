@@ -4,6 +4,7 @@ kind: Kustomization
 namespace: erp-solution-staging
 resources:
   - ../../base
+  - namespace.yaml
 
 namePrefix: staging-
 
