@@ -84,6 +84,21 @@ class MapPRTests(unittest.TestCase):
         self.assertFalse(report["eligible"])
         self.assertTrue(any(reason.startswith("changes_requested:") for reason in report["reasons"]))
 
+    def test_empty_classic_status_contexts_do_not_override_green_checks(self) -> None:
+        report = self.report(combined_status={"state": "pending", "total_count": 0, "statuses": []})
+        self.assertTrue(report["eligible"])
+
+    def test_failed_classic_status_context_blocks(self) -> None:
+        report = self.report(
+            combined_status={
+                "state": "failure",
+                "total_count": 1,
+                "statuses": [{"context": "legacy-check", "state": "failure"}],
+            }
+        )
+        self.assertFalse(report["eligible"])
+        self.assertIn("commit_status_failure", report["reasons"])
+
     def test_head_or_base_drift_is_blocked(self) -> None:
         report = self.report(expected_head_sha="different")
         self.assertFalse(report["eligible"])
