@@ -117,11 +117,11 @@ STRIPE_PUBLISHABLE_KEY=
 EOF
 
 chmod 600 "$tmp_file"
-if [ -e "$env_file" ] || [ -L "$env_file" ]; then
+if ! ln -- "$tmp_file" "$env_file"; then
   echo "Refusing to overwrite existing $env_file" >&2
   exit 1
 fi
-mv -- "$tmp_file" "$env_file"
+rm -f -- "$tmp_file"
 trap - EXIT HUP INT TERM
 
 printf 'Created %s (mode 0600). Secret values were not printed.\n' "$env_file"
