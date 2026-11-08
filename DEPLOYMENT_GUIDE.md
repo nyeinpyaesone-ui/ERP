@@ -50,36 +50,32 @@ The deployment system uses:
 - **Ports**: 80, 443, 22 (SSH) open
 
 ### Required Secrets (GitHub)
-Configure these in GitHub repository settings → Secrets and variables → Actions:
 
-| Secret | Description |
-|--------|-------------|
-| `DOCKER_PAT_BACKEND` | Docker Hub PAT for backend images |
-| `DOCKER_PAT_FRONTEND` | Docker Hub PAT for frontend images |
-| `DB_PASSWORD` | PostgreSQL password |
-| `REDIS_PASSWORD` | Redis password |
-| `SECRET_KEY` | JWT secret (32+ chars) |
-| `CORS_ORIGINS_PROD` | Production CORS origins |
-| `CORS_ORIGINS_STAGING` | Staging CORS origins |
-| `API_URL_PROD` | Production API URL |
-| `API_URL_STAGING` | Staging API URL |
-| `WS_URL_PROD` | Production WebSocket URL |
-| `WS_URL_STAGING` | Staging WebSocket URL |
-| `SSH_PRIVATE_KEY_PROD` | SSH private key for production |
-| `SSH_PRIVATE_KEY_STAGING` | SSH private key for staging |
-| `SSH_HOST_PROD` | Production server hostname/IP |
-| `SSH_HOST_STAGING` | Staging server hostname/IP |
-| `SSH_USER_PROD` | Production SSH user |
-| `SSH_USER_STAGING` | Staging SSH user |
+The exact names are consumed by .github/workflows/ci.yml. Configure repository-level
+Actions secrets with scripts/configure-github-actions.sh:
+
+| Secret | Scope |
+|---|---|
+| DOCKER_PAT_BACKEND / DOCKER_PAT_FRONTEND | Separate image-scoped Docker Hub push tokens |
+| STAGING_SSH_PRIVATE_KEY / PRODUCTION_SSH_PRIVATE_KEY | Separate, dedicated, unencrypted deploy keys |
+| STAGING_KNOWN_HOSTS / PRODUCTION_KNOWN_HOSTS | Out-of-band verified pinned host keys |
+| STAGING_HOST / STAGING_USER | Staging host and non-root deploy account |
+| PRODUCTION_HOST / PRODUCTION_USER | Production host and non-root deploy account |
 
 ### Required Variables (GitHub)
-Configure these in GitHub repository settings → Variables:
 
-| Variable | Description |
-|----------|-------------|
-| `DOCKER_USER` | Docker Hub username |
-| `STAGING_DOMAIN` | Staging domain (e.g., staging.yourdomain.com) |
-| `PRODUCTION_DOMAIN` | Production domain (e.g., api.yourdomain.com) |
+| Variable | Purpose |
+|---|---|
+| DOCKER_USER | Docker Hub namespace |
+| STAGING_DOMAIN | Staging deployment URL hostname |
+| PRODUCTION_DOMAIN | Production deployment URL hostname |
+
+Database, Redis, JWT and integration credentials are runtime host configuration,
+not GitHub Actions secrets. Keep independent .env.staging and .env.production
+files on their respective hosts, mode 0600.
+
+DOCKER_USER is mandatory. Compose and deployment scripts do not silently fall
+back to a personal Docker Hub namespace.
 
 ## Initial Server Setup
 
@@ -152,7 +148,7 @@ otherwise deployment is manual via `./scripts/deploy-blue-green.sh`.
 
 1. **Two Environments**: Blue (active) and Green (staging)
 2. **Shared Database**: Both environments use the same PostgreSQL/Redis
-3. **Traffic Switch**: Nginx upstream symlink swap (< 1 second)
+3. **Traffic Switch**: Nginx upstream file is updated in place, validated, and reloaded; the previous file is retained for rollback
 4. **Health Verification**: Comprehensive checks before switch
 5. **Instant Rollback**: Swap symlink back if issues detected
 
@@ -178,7 +174,7 @@ otherwise deployment is manual via `./scripts/deploy-blue-green.sh`.
 4. Run smoke tests (health, ready, API root)
         │
         ▼
-5. Switch Nginx upstream (atomic symlink)
+5. Update and validate the Nginx upstream file, then reload Nginx
         │
         ▼
 6. Verify post-switch with external checks
