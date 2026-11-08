@@ -28,10 +28,13 @@ Optional:
   --backend-token-file FILE
   --frontend-token-file FILE
   --opencode-key-file FILE  Optional OpenCode automation secret
-  --replace-existing-config Replace existing Actions variables and deploy secrets
+  --replace-existing-config Replace existing Actions variables and staging/production deploy secrets
 
-Existing Docker PAT secrets are preserved. Supply token files only when a PAT
-secret is absent. Host-key files must contain independently verified host keys.
+Existing values are preserved when already configured. A differing repository
+variable requires --replace-existing-config. Existing SSH/deploy secrets are
+preserved unless that flag is passed. Docker PAT and OpenCode secrets are
+preserved even with the flag. Supply token files only when a PAT secret is
+absent. Host-key files must contain independently verified host keys.
 The script creates missing GitHub Environments and adds missing ref policies;
 it never removes policies or modifies existing reviewer/approval settings.
 USAGE
