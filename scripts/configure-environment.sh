@@ -57,7 +57,7 @@ cors_origins="${cors_origins:-https://$domain}"
 IFS=',' read -r -a cors_origin_list <<< "$cors_origins"
 [ "${#cors_origin_list[@]}" -gt 0 ] || { echo "At least one CORS origin is required" >&2; exit 2; }
 for origin in "${cors_origin_list[@]}"; do
-  [[ "$origin" =~ ^https://([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(:[0-9]{1,5})?$ ]] || {
+  [[ "$origin" =~ ^https://([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(:[0-9]{1,5})?$ ]] || {
     echo "CORS origins must be comma-separated HTTPS origins without paths" >&2
     exit 2
   }
