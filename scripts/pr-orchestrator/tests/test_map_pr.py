@@ -65,12 +65,12 @@ class MapPRTests(unittest.TestCase):
         self.assertIn("draft_pr", report["reasons"])
 
     def test_unfinished_or_failed_check_is_blocked(self) -> None:
-        checks = [
-            {"name": "CI", "status": "completed", "conclusion": "failure"}
-        ]
+        checks = [{"name": "CI", "status": "completed", "conclusion": "failure"}]
         report = self.report(check_runs=checks)
         self.assertFalse(report["eligible"])
-        self.assertTrue(any(reason.startswith("checks_not_green:") for reason in report["reasons"]))
+        self.assertTrue(
+            any(reason.startswith("checks_not_green:") for reason in report["reasons"])
+        )
 
     def test_changes_requested_is_blocked(self) -> None:
         reviews = self.reviews + [
@@ -82,10 +82,14 @@ class MapPRTests(unittest.TestCase):
         ]
         report = self.report(reviews=reviews)
         self.assertFalse(report["eligible"])
-        self.assertTrue(any(reason.startswith("changes_requested:") for reason in report["reasons"]))
+        self.assertTrue(
+            any(reason.startswith("changes_requested:") for reason in report["reasons"])
+        )
 
     def test_empty_classic_status_contexts_do_not_override_green_checks(self) -> None:
-        report = self.report(combined_status={"state": "pending", "total_count": 0, "statuses": []})
+        report = self.report(
+            combined_status={"state": "pending", "total_count": 0, "statuses": []}
+        )
         self.assertTrue(report["eligible"])
 
     def test_failed_classic_status_context_blocks(self) -> None:
@@ -141,9 +145,7 @@ class MapPRTests(unittest.TestCase):
         self.assertEqual(
             classify_risk(["backend/requirements-runtime.txt"]), "dependency"
         )
-        self.assertEqual(
-            classify_risk([".github/workflows/ci.yml"]), "infrastructure"
-        )
+        self.assertEqual(classify_risk([".github/workflows/ci.yml"]), "infrastructure")
         self.assertEqual(
             classify_risk(["backend/frontend-react/src/App.tsx"]), "frontend"
         )
