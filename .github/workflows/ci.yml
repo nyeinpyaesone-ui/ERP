@@ -88,7 +88,7 @@ jobs:
           STAGING_DOMAIN_VAR: ${{ vars.STAGING_DOMAIN }}
           PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
           PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
-          PRODUCTION_DOMAIN_VAR: ${{ vars.PRODUCTION_DOMAIN }} ${{ secrets.PRODUCTION_USER }}
+          PRODUCTION_DOMAIN_VAR: ${{ vars.PRODUCTION_DOMAIN }}
         run: |
           set -euo pipefail
           user="${DOCKER_USER_VAR:-local}"
@@ -97,7 +97,7 @@ jobs:
             exit 1
           fi
           valid_domain() {
-            [[ "$1" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]
+            [[ "$1" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]
           }
           if [ -n "${STAGING_DOMAIN_VAR}" ] && ! valid_domain "${STAGING_DOMAIN_VAR}"; then
             echo "::error::STAGING_DOMAIN must be a lowercase FQDN without scheme, port, or path."
