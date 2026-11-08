@@ -567,8 +567,6 @@ jobs:
           cat "$DEPLOY_TMP/nginx/upstream-green.conf" > nginx/upstream-green.conf
           chmod 0644 nginx/upstream-green.conf
           rm -rf "$DEPLOY_TMP"
-          docker pull "${DOCKER_USER}/erp-solution-backend:${VERSION}"
-          docker pull "${DOCKER_USER}/erp-solution-frontend:${VERSION}"
           if [ "$ACTION" = "rollback" ]; then
             ./scripts/deploy-blue-green.sh staging "$VERSION" --rollback
           else
@@ -683,8 +681,6 @@ jobs:
           cat "$DEPLOY_TMP/nginx/upstream-green.conf" > nginx/upstream-green.conf
           chmod 0644 nginx/upstream-green.conf
           rm -rf "$DEPLOY_TMP"
-          docker pull "${DOCKER_USER}/erp-solution-backend:${VERSION}"
-          docker pull "${DOCKER_USER}/erp-solution-frontend:${VERSION}"
           ./scripts/deploy-blue-green.sh production "$VERSION"
           REMOTE
       - name: Set deployment status to success
