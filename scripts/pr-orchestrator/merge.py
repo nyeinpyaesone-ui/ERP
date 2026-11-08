@@ -9,16 +9,11 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
 
 from client import api_get, api_post, repo_api_path, write_json
 from map_pr import build_pr_report
-
-
-def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def gh_merge_or_enqueue(
