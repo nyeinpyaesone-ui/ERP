@@ -1,40 +1,51 @@
 ---
 name: ERP Ops
-description: CI/CD, secrets and environments contract, blue-green deploys, repo-guard, and host constraints for /home/admin/ERP - exact job graph, can_push/can_deploy logic, Trivy specifics, release flow, and flaky-network workarounds
+description: CI/CD, secrets and environments contract, blue-green deploys, repo-guard, and host constraints for ERP
 ---
 
-# ERP Ops (CI/CD, deploys, repo hygiene)
+# ERP Ops
 
-## CI job graph (`.github/workflows/ci.yml`, all actions 40-char SHA-pinned, D-009)
+## Active deployment architecture
 
-config (detect) → { Secret Scan (Gitleaks), Code Quality (ruff+black enforced, mypy advisory), Tests (pytest 285 + alembic 001→008 on postgres:15), Frontend Build (lint+vitest+build) } → docker-backend + docker-frontend (push on main w/ can_push) → security (Trivy, SARIF×2) → Deploy to Staging / Deploy to Production.
+- Active CI/CD target: Docker Hub images + Docker Compose blue-green on two separate hosts.
+- Kubernetes manifests under infra/k8s are a separate scaffold. They reference GHCR image names and have no matching image publish/deploy job. Do not apply them as the active production path.
+- Root deploy.sh is legacy. The active workflow calls scripts/deploy-blue-green.sh, which sources scripts/lib.sh.
+- The host-local deploy runtime must have its matching .env.staging or .env.production file (mode 0600), plus read-only Docker Hub pull access. Never transfer runtime secrets from GitHub Actions.
 
-- `config` computes: `can_push` = DOCKER_USER var + both `DOCKER_PAT_BACKEND`/`DOCKER_PAT_FRONTEND` secrets (both SET 2026-10-11). `can_deploy` additionally requires ALL of: `SSH_PRIVATE_KEY`, `STAGING_KNOWN_HOSTS`, `STAGING_HOST`, `STAGING_USER`, `PRODUCTION_KNOWN_HOSTS`, `PRODUCTION_HOST`, `PRODUCTION_USER` — absent → jobs SKIP (fail-closed, D-012; not a bug).
-- Environments: `staging` (main pushes only) + `production` (v* tags only), protection on both (D-017). Deploy over SSH via `scripts/deploy-blue-green.sh` (sources `scripts/lib.sh`).
-- Trivy: consumes the build jobs' single-line image ref (a "Resolve single image refs" step takes the FIRST line — metadata-action emits one ref per line; passing the raw multi-line value is the bug that used to kill the job). `exit-code` has no default → findings are advisory in SARIF, never fail CI (gating = pending policy call).
-- Other workflows: codeql.yml (schedule+push), opencode.yml (event-guarded), release.yml (tag `v*` or dispatch → verify images → GitHub Release from CHANGELOG.md).
-- **Gitleaks gotcha (v3.0.0):** the action requires an explicit
-  `env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}` (plus workflow
-  `pull-requests: read`) or **PR scans fail** with "GITHUB_TOKEN is now
-  required to scan pull requests" while push scans stay green — the
-  asymmetry is the tell. Fixed in `ci.yml`; keep the env when bumping the pin.
-- Snyk is REMOVED (D-016) — Trivy is the only container scanner; do not reintroduce Snyk or unpinned actions.
+## CI contract (.github/workflows/ci.yml)
 
-## Repo guard / hygiene
+- Gitleaks → quality (Ruff/Black enforced, MyPy advisory) → PostgreSQL-backed tests → frontend build / image build → Trivy → deploy jobs.
+- can_push = DOCKER_USER repository variable + DOCKER_PAT_BACKEND + DOCKER_PAT_FRONTEND.
+- can_deploy_staging = can_push + STAGING_SSH_PRIVATE_KEY + STAGING_KNOWN_HOSTS + STAGING_HOST + STAGING_USER.
+- can_deploy_production = can_push + PRODUCTION_SSH_PRIVATE_KEY + PRODUCTION_KNOWN_HOSTS + PRODUCTION_HOST + PRODUCTION_USER.
+- Missing values are a fail-closed skip, not a successful deployment.
+- No push or tag deploys automatically. Dispatch CI on main with deploy_staging=true for staging; dispatch CI on a v* tag with deploy_production=true for production.
+- GitHub Environments staging and production constrain deployment refs. The config bootstrapper adds main branch policy and v* tag policy, and refuses unexpected extra policies rather than weakening existing controls.
+- All workflow actions remain pinned to full commit SHAs. Gitleaks v3 requires GITHUB_TOKEN on PR scans. Trivy is the only container scanner; do not reintroduce Snyk.
 
-- `make guard` → `scripts/repo-guard.sh`: fails on nested `.git` (T-019 incident class), missing tracked files, empty `scripts/*.sh`. Run after long background jobs, before pushes.
-- Counts: never hardcode file/commit counts in README/STATUS (T-018 lesson) — use `git ls-files | wc -l`.
-- Commits: Conventional Commits; `git push` needs retry loops here (intermittent GnuTLS to github.com); `gh api` usually works when git-over-https fails.
-- `gh run watch <id> --interval 20 --exit-status` (no --compact flag). Get job ids: `gh run view <id> --json jobs --jq '.jobs[] | select(.name=="...") | .databaseId'`, logs via `gh run view <id> --job=<jobId> --log`.
+## Configuration workflow
 
-## Host constraints (this machine)
+Run bash scripts/configure-github-actions.sh from a trusted operator workstation with gh, jq and ssh-keygen installed and GitHub repository administration / Actions secret-write permissions.
 
-- proot/Termux-class aarch64: Docker can NEVER run here (D-013/D-018; `/proc/self` uid 0 → newuidmap fails). Local DB path = native PG18/Redis binaries only. CI (postgres:15 service, both image builds) is the verification for anything container-related.
-- `install.sh --preflight` detects runtime class and reports native-mode readiness.
-- OpenCode harness: service restarts under memory pressure (upstream issue anomalyco/opencode#54567); opencode-ai/opencode is ARCHIVED — issues go to anomalyco/opencode.
+The bootstrapper:
+- Sets DOCKER_USER, STAGING_DOMAIN and PRODUCTION_DOMAIN repository variables.
+- Sets separate staging/production SSH keys, pinned known_hosts, hosts and users.
+- Preserves existing Docker Hub PAT secrets unless an operator explicitly chooses to replace them.
+- Ensures staging/main and production/v* Environment deployment-ref policies.
+- Refuses root deploy users, shared staging/production hosts, identical SSH keys, and unexpected extra environment policies.
+- Does not create server runtime files, connect to servers, or deploy.
 
-## First-deploy checklist (blocked items = user inputs)
+## First-deploy blockers
 
-1. Set the 7 deploy secrets (G-01) → `can_deploy=true` → staging deploy activates on next main push.
-2. `gh variable set STAGING_DOMAIN/PRODUCTION_DOMAIN` (G-02).
-3. Staging server via `./install.sh` (G-03), then `./scripts/deploy-blue-green.sh staging v1.2.3` + `--rollback` drill (G-04), backup drill (G-09).
+1. Run the configuration bootstrapper using real infrastructure values.
+2. Provision separate staging and production hosts with dedicated non-root deploy accounts and correct directory/Docker permissions.
+3. Create each host's runtime env file: production via sudo ./install.sh; staging from .env.staging.template with unique values. Set mode 0600.
+4. Configure read-only Docker Hub credentials on each host using a credential helper.
+5. Add a required reviewer to the production GitHub Environment if independent production approval is required.
+6. Verify image tags, host health/readiness, backups and rollback before dispatching a deployment.
+
+## Host constraints and verification
+
+- The original development host is proot/Termux-class aarch64; Docker daemon operations are not reliable there. CI is the verification path for Compose and image builds.
+- Run make guard after long jobs and before pushes. Never hardcode file/commit counts in docs.
+- Use gh run view <id> --json jobs and fetch job logs to inspect failures; never mark a task complete without tool evidence.
