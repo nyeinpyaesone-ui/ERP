@@ -47,7 +47,159 @@ jobs:
           if [ -n "${MANUAL_TAG}" ]; then
             TAG="${MANUAL_TAG}"
           else
-            TAG="$(git tag --points-at "${WORKFLOW_HEAD_SHA}" | grep -E '^v[0-9A-Za-z][0-9A-Za-z._-]{0,127}$' | sort -V | tail -n1 || true)"
+            TAG="$(git tag --points-at "${WORKFLOW_HEAD_SHA}" | grep -E '^v[0-9A-Za-z][0-9A-Za-z._-]{0,127}
+
+          if [ -z "${TAG}" ]; then
+            echo "No version tag on this successful CI revision; no release is needed."
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ ! "${TAG}" =~ ^v[0-9A-Za-z][0-9A-Za-z._-]{0,127}$ ]]; then
+            echo "::error::Release tag must use the v* version format."
+            exit 1
+          fi
+          if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} not found in the checked-out repository."
+            exit 1
+          fi
+
+          # A manual release request must not bypass the successful CI gate.
+          if [ -n "${MANUAL_TAG}" ]; then
+            TAG_SHA="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+            CI_RUNS="$(gh run list --workflow ci.yml --commit "${TAG_SHA}" --json event,conclusion --limit 50)"
+            if ! printf '%s' "${CI_RUNS}" | jq -e 'any(.[]; .event == "push" and .conclusion == "success")' >/dev/null; then
+              echo "::error::No successful push-triggered CI run exists for ${TAG}."
+              exit 1
+            fi
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release publishing configuration
+        if: steps.tag.outputs.tag != ''
+        env:
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+          BACKEND_TOKEN: ${{ secrets.DOCKER_PAT_BACKEND }}
+          FRONTEND_TOKEN: ${{ secrets.DOCKER_PAT_FRONTEND }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DOCKER_USER}" ] || [ -z "${BACKEND_TOKEN}" ] || [ -z "${FRONTEND_TOKEN}" ]; then
+            echo "::error::DOCKER_USER and both image-scoped Docker Hub tokens are required to publish a release."
+            exit 1
+          fi
+
+      - name: Log in to Docker Hub for backend verification
+        if: steps.tag.outputs.tag != ''
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ vars.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PAT_BACKEND }}
+
+      - name: Verify backend image exists
+        if: steps.tag.outputs.tag != ''
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+        run: |
+          set -euo pipefail
+          docker manifest inspect "${DOCKER_USER}/erp-solution-backend:${TAG}" >/dev/null
+
+      - name: Log in to Docker Hub for frontend verification
+        if: steps.tag.outputs.tag != ''
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ vars.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PAT_FRONTEND }}
+
+      - name: Verify frontend image exists
+        if: steps.tag.outputs.tag != ''
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+        run: |
+          set -euo pipefail
+          docker manifest inspect "${DOCKER_USER}/erp-solution-frontend:${TAG}" >/dev/null
+
+      - name: Extract release notes from CHANGELOG.md
+        if: steps.tag.outputs.tag != ''
+        id: notes
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          : > release-notes.md
+          if git cat-file -e "${TAG}:CHANGELOG.md" 2>/dev/null; then
+            git show "${TAG}:CHANGELOG.md" > changelog-at-tag.md
+            awk -v tag="${TAG#v}" '
+              BEGIN { found = 0 }
+              /^## / {
+                if (found) exit
+                line = $0
+                gsub(/^##[[:space:]]*\[?/, "", line)
+                gsub(/\]?[[:space:]]*$/, "", line)
+                gsub(/^[^0-9]*/, "", line)
+                if (index(line, tag) > 0) { found = 1; print; next }
+              }
+              found { print }
+            ' changelog-at-tag.md > changelog-section.md || true
+
+            if [ -s changelog-section.md ]; then
+              cp changelog-section.md release-notes.md
+            fi
+          fi
+
+          if [ ! -s release-notes.md ]; then
+            echo "::warning::No CHANGELOG.md section for ${TAG}; using commit list"
+            PREV="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)"
+            {
+              echo "## Changes in ${TAG}"
+              echo
+              if [ -n "${PREV}" ]; then
+                git log --pretty=format:'- %s (%h)' "${PREV}..${TAG}"
+              else
+                git log --pretty=format:'- %s (%h)' --max-count=50 "${TAG}"
+              fi
+            } > release-notes.md
+            echo >> release-notes.md
+          fi
+          echo "Notes: $(wc -l < release-notes.md) lines"
+
+      - name: Publish release
+        if: steps.tag.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "ERP SOLUTION ${TAG}" \
+            --notes-file release-notes.md \
+            --verify-tag
+
+      - name: Attach verified image references to release body
+        if: steps.tag.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+        run: |
+          set -euo pipefail
+          {
+            echo
+            echo "## Container images"
+            echo
+            echo '```'
+            echo "${DOCKER_USER}/erp-solution-backend:${TAG}"
+            echo "${DOCKER_USER}/erp-solution-frontend:${TAG}"
+            echo '```'
+          } >> release-notes.md
+          gh release edit "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --notes-file release-notes.md
+ | sort -V | tail -n1 || true)"
+            if [ -z "${TAG}" ]; then
+              TAG="$(git describe --tags --exact-match "${WORKFLOW_HEAD_SHA}" 2>/dev/null || true)"
+            fi
           fi
 
           if [ -z "${TAG}" ]; then
