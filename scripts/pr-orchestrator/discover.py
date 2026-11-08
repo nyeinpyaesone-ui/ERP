@@ -7,7 +7,7 @@ import os
 import sys
 from urllib.parse import urlencode
 
-from client import api_paginate, repo_api_path, write_json
+from client import GitHubAPIError, api_paginate, repo_api_path, write_json
 
 
 def main() -> int:
@@ -56,7 +56,7 @@ def main() -> int:
                 )
         print(json.dumps(result, indent=2))
         return 0
-    except Exception as error:  # fail the discovery job, never invent a matrix
+    except (GitHubAPIError, OSError, RuntimeError, TypeError, ValueError) as error:
         print(f"PR discovery failed closed: {error}", file=sys.stderr)
         return 1
 
