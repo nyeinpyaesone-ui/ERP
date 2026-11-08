@@ -68,8 +68,17 @@ bash scripts/provision-k8s-secrets.sh \
 ```
 
 For staging, use `--environment staging`, the staging cluster context, and
-the staging-specific env file. The provisioner has no development mapping;
-do not reuse staging or production Secret values in development.
+the staging-specific env file. Create the development namespace separately
+with `kubectl --context <development-context> create namespace erp-solution-dev`;
+the provisioner intentionally has no development Secret mapping. Do not reuse
+staging or production Secret values in development.
+
+Create the shared monitoring namespace separately, when enabling the monitoring
+scaffold:
+
+```bash
+kubectl --context <cluster-context> apply -f infra/k8s/monitoring/namespace.yaml
+```
 
 Verify only the Secret metadata (not its data) and render both overlays:
 
