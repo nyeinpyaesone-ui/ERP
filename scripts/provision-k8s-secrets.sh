@@ -67,7 +67,7 @@ has_value() {
   value="$(awk -F= -v wanted="$key" '$1 == wanted { sub(/^[^=]*=/, ""); print; exit }' "$secret_file")"
   [ -n "$value" ] || return 1
   case "$value" in
-    REPLACE_WITH_*|CHANGE_ME*|<*|your-*|example-*)
+    REPLACE_WITH_*|CHANGE_ME*|*'<'*|your-*|example-*)
       return 1
       ;;
   esac
