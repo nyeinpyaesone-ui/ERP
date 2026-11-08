@@ -14,10 +14,10 @@ on:
         required: false
         type: string
 
-# Overlapping pushes must not race each other through the blue-green deploy.
-# Superseded runs on a branch are cancelled; deploy-relevant refs are serialized.
+# PR runs are isolated by ref and may be superseded. All non-PR runs share
+# one lock so different release tags cannot race the same blue-green hosts.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || 'deployments' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
