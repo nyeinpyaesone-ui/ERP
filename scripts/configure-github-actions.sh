@@ -156,6 +156,12 @@ validate_secure_file "Production known-hosts" "$production_known_hosts"
 ssh-keygen -F "$staging_host" -f "$staging_known_hosts" >/dev/null || { echo "Staging known-hosts file does not contain $staging_host" >&2; exit 2; }
 ssh-keygen -F "$production_host" -f "$production_known_hosts" >/dev/null || { echo "Production known-hosts file does not contain $production_host" >&2; exit 2; }
 
+command -v gh >/dev/null 2>&1 || { echo "GitHub CLI (gh) is required" >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
+gh auth status --hostname github.com
+gh repo view "$repo" >/dev/null
+secret_names="$(gh secret list --repo "$repo" --json name --jq '.[].name')"
+
 if [ "$generate_keys" = true ]; then
   [ -z "$staging_key" ] && [ -z "$production_key" ] || { echo "Use either --generate-keys or provide both key files" >&2; exit 2; }
   [ "$apply" = true ] || { echo "--generate-keys creates local private keys; also pass --apply" >&2; exit 2; }
@@ -169,11 +175,27 @@ if [ "$generate_keys" = true ]; then
   chmod 700 "$key_dir"
   staging_key="$key_dir/staging_ed25519"
   production_key="$key_dir/production_ed25519"
-  [ ! -e "$staging_key" ] && [ ! -e "$staging_key.pub" ] || { echo "Refusing to overwrite staging key files" >&2; exit 1; }
-  [ ! -e "$production_key" ] && [ ! -e "$production_key.pub" ] || { echo "Refusing to overwrite production key files" >&2; exit 1; }
-  ssh-keygen -q -t ed25519 -N "" -C "erp-staging-github-actions" -f "$staging_key"
-  ssh-keygen -q -t ed25519 -N "" -C "erp-production-github-actions" -f "$production_key"
-  chmod 600 "$staging_key" "$production_key"
+
+  ensure_key_pair() {
+    local name="$1" key="$2" comment="$3" secret_name="$4"
+    if [ -f "$key" ] && [ -f "$key.pub" ] && [ ! -L "$key" ] && [ ! -L "$key.pub" ]; then
+      echo "Reusing existing local $name SSH key pair"
+      return 0
+    fi
+    if [ -e "$key" ] || [ -e "$key.pub" ] || [ -L "$key" ] || [ -L "$key.pub" ]; then
+      echo "Incomplete or unsafe $name key pair at $key; refusing to overwrite it." >&2
+      exit 1
+    fi
+    if grep -Fxq "$secret_name" <<< "$secret_names" && [ "$replace_existing_config" != true ]; then
+      echo "$secret_name already exists, but its private key is not available locally. Supply the original key file or pass --replace-existing-config with a new key pair." >&2
+      exit 1
+    fi
+    ssh-keygen -q -t ed25519 -N "" -C "$comment" -f "$key"
+    chmod 600 "$key"
+  }
+
+  ensure_key_pair staging "$staging_key" "erp-staging-github-actions" STAGING_SSH_PRIVATE_KEY
+  ensure_key_pair production "$production_key" "erp-production-github-actions" PRODUCTION_SSH_PRIVATE_KEY
 fi
 
 need_value --staging-key "$staging_key"
@@ -184,12 +206,6 @@ validate_secure_file "Production private key" "$production_key"
 ssh-keygen -y -P "" -f "$staging_key" >/dev/null
 ssh-keygen -y -P "" -f "$production_key" >/dev/null
 
-command -v gh >/dev/null 2>&1 || { echo "GitHub CLI (gh) is required" >&2; exit 1; }
-command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
-gh auth status --hostname github.com
-gh repo view "$repo" >/dev/null
-
-secret_names="$(gh secret list --repo "$repo" --json name --jq '.[].name')"
 for required in DOCKER_PAT_BACKEND DOCKER_PAT_FRONTEND; do
   if ! grep -Fxq "$required" <<< "$secret_names"; then
     token_file="$backend_token_file"
@@ -205,6 +221,19 @@ for token_file in "$backend_token_file" "$frontend_token_file" "$opencode_key_fi
   if [ -n "$token_file" ]; then
     validate_secure_file "Token input file" "$token_file"
     [ -s "$token_file" ] || { echo "Token input files must be non-empty" >&2; exit 2; }
+  fi
+done
+
+variables_json="$(gh variable list --repo "$repo" --json name,value)"
+for item in "DOCKER_USER:$docker_user" "STAGING_DOMAIN:$staging_domain" "PRODUCTION_DOMAIN:$production_domain"; do
+  name="${item%%:*}"
+  desired="${item#*:}"
+  if jq -e --arg name "$name" 'any(.[]; .name == $name)' <<< "$variables_json" >/dev/null; then
+    existing="$(jq -r --arg name "$name" '.[] | select(.name == $name) | .value' <<< "$variables_json")"
+    if [ "$existing" != "$desired" ] && [ "$replace_existing_config" != true ]; then
+      echo "Repository variable $name already exists with a different value. Pass --replace-existing-config to update it." >&2
+      exit 1
+    fi
   fi
 done
 
@@ -228,6 +257,34 @@ set_secret_from_file() {
 set_secret_value() {
   local name="$1" value="$2"
   printf '%s' "$value" | gh secret set "$name" --repo "$repo"
+}
+set_deploy_secret_from_file() {
+  local name="$1" file="$2"
+  if grep -Fxq "$name" <<< "$secret_names" && [ "$replace_existing_config" != true ]; then
+    echo "Preserved existing deployment secret: $name"
+    return 0
+  fi
+  set_secret_from_file "$name" "$file"
+}
+set_deploy_secret_value() {
+  local name="$1" value="$2"
+  if grep -Fxq "$name" <<< "$secret_names" && [ "$replace_existing_config" != true ]; then
+    echo "Preserved existing deployment secret: $name"
+    return 0
+  fi
+  set_secret_value "$name" "$value"
+}
+set_repository_variable() {
+  local name="$1" value="$2" current
+  current="$(jq -r --arg name "$name" '.[] | select(.name == $name) | .value' <<< "$variables_json")"
+  if jq -e --arg name "$name" 'any(.[]; .name == $name)' <<< "$variables_json" >/dev/null; then
+    if [ "$current" = "$value" ]; then
+      echo "Preserved existing repository variable: $name"
+      return 0
+    fi
+    [ "$replace_existing_config" = true ] || { echo "Refusing to replace repository variable $name without --replace-existing-config" >&2; exit 1; }
+  fi
+  gh variable set "$name" --repo "$repo" --body "$value"
 }
 ensure_environment() {
   local env_name="$1"
@@ -266,18 +323,18 @@ ensure_environment production
 ensure_policy staging main branch
 ensure_policy production 'v*' tag
 
-gh variable set DOCKER_USER --repo "$repo" --body "$docker_user"
-gh variable set STAGING_DOMAIN --repo "$repo" --body "$staging_domain"
-gh variable set PRODUCTION_DOMAIN --repo "$repo" --body "$production_domain"
+set_repository_variable DOCKER_USER "$docker_user"
+set_repository_variable STAGING_DOMAIN "$staging_domain"
+set_repository_variable PRODUCTION_DOMAIN "$production_domain"
 
-set_secret_value STAGING_HOST "$staging_host"
-set_secret_value STAGING_USER "$staging_user"
-set_secret_from_file STAGING_KNOWN_HOSTS "$staging_known_hosts"
-set_secret_from_file STAGING_SSH_PRIVATE_KEY "$staging_key"
-set_secret_value PRODUCTION_HOST "$production_host"
-set_secret_value PRODUCTION_USER "$production_user"
-set_secret_from_file PRODUCTION_KNOWN_HOSTS "$production_known_hosts"
-set_secret_from_file PRODUCTION_SSH_PRIVATE_KEY "$production_key"
+set_deploy_secret_value STAGING_HOST "$staging_host"
+set_deploy_secret_value STAGING_USER "$staging_user"
+set_deploy_secret_from_file STAGING_KNOWN_HOSTS "$staging_known_hosts"
+set_deploy_secret_from_file STAGING_SSH_PRIVATE_KEY "$staging_key"
+set_deploy_secret_value PRODUCTION_HOST "$production_host"
+set_deploy_secret_value PRODUCTION_USER "$production_user"
+set_deploy_secret_from_file PRODUCTION_KNOWN_HOSTS "$production_known_hosts"
+set_deploy_secret_from_file PRODUCTION_SSH_PRIVATE_KEY "$production_key"
 
 if ! grep -Fxq DOCKER_PAT_BACKEND <<< "$secret_names"; then
   set_secret_from_file DOCKER_PAT_BACKEND "$backend_token_file"
