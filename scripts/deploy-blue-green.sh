@@ -18,8 +18,7 @@ SSL_DIR="${ERP_SSL_DIR}"
 # State files live beside the env file, so an install outside /opt/erp-solution
 # keeps its own blue/green bookkeeping instead of reading another tree's.
 ACTIVE_COLOR_FILE="${ERP_DIR}/.active_color"
-PREVIOUS_VERSION_FILE="${ERP_DIR}/.previous_version"
-PREVIOUS_IMAGE_FILE="${ERP_DIR}/.previous_image"
+ACTIVE_VERSION_FILE="${ERP_DIR}/.active_version"
 
 # CLI arguments, captured before load_env runs. .env.production also defines
 # ENVIRONMENT for the backend (dev|test|prod), so exporting it would overwrite
@@ -243,15 +242,8 @@ switch_traffic() {
     # Update active color file on host
     echo "${new_color}" > "${ACTIVE_COLOR_FILE}"
     
-    # Store the OUTGOING version for rollback (the version we're leaving behind)
-    if [ -f "${PREVIOUS_VERSION_FILE}" ]; then
-        mv "${PREVIOUS_VERSION_FILE}" "${PREVIOUS_VERSION_FILE}.bak"
-    fi
-    echo "${VERSION}" > "${PREVIOUS_VERSION_FILE}"
-    
-    # Also store the image tag for true rollback
-    local new_image="${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION}"
-    echo "${new_image}" > "${PREVIOUS_IMAGE_FILE}"
+    # Record the version now serving traffic.
+    printf '%s\n' "${VERSION}" > "${ACTIVE_VERSION_FILE}"
 }
 
 stop_old_environment() {
@@ -268,63 +260,6 @@ stop_old_environment() {
     fi
     
     success "Old ${color} environment stopped"
-}
-
-perform_rollback() {
-    info "Performing rollback..."
-    
-    local current_color=$(get_active_color)
-    local previous_color=$(get_inactive_color)
-    local previous_version=""
-    local previous_image=""
-    
-    if [ -f "${PREVIOUS_VERSION_FILE}" ]; then
-        previous_version=$(cat "${PREVIOUS_VERSION_FILE}")
-    else
-        error "No previous version recorded for rollback"
-        return 1
-    fi
-    
-    if [ -f "${PREVIOUS_IMAGE_FILE}" ]; then
-        previous_image=$(cat "${PREVIOUS_IMAGE_FILE}")
-    else
-        previous_image="${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${previous_version}"
-    fi
-    
-    warn "Rolling back from ${current_color} to ${previous_color} (version: ${previous_version})"
-    
-    # Pull the previous image
-    info "Pulling previous image: ${previous_image}"
-    docker pull "${previous_image}" 2>&1 | tee -a "${LOG_FILE}"
-    
-    # Retag as current VERSION for the inactive color
-    docker tag "${previous_image}" "${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION}" 2>&1 | tee -a "${LOG_FILE}"
-    docker tag "${previous_image}" "${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION}" 2>&1 | tee -a "${LOG_FILE}"
-    
-    # START the previous environment (it was stopped after the failed deploy)
-    info "Starting previous environment: ${previous_color}"
-    start_inactive_environment "${previous_color}"
-    
-    # Wait for it to be healthy
-    if ! wait_for_health "${previous_color}"; then
-        error "Previous environment failed health checks after rollback start"
-        return 1
-    fi
-    
-    # Run smoke tests on the rolled-back environment
-    if ! run_smoke_tests "${previous_color}"; then
-        error "Rollback environment failed smoke tests"
-        return 1
-    fi
-    
-    # Switch traffic back to the previous environment
-    switch_traffic "${previous_color}" "$(get_active_color)"
-
-    # Stop the failed environment (captured before the switch above, since
-    # switch_traffic rewrites ACTIVE_COLOR_FILE)
-    stop_old_environment "${current_color}"
-    
-    success "Rollback completed to ${previous_color} (version: ${previous_version})"
 }
 
 load_env() {
@@ -369,13 +304,20 @@ main() {
     validate_environment
     
     if [ "${ROLLBACK}" = "true" ] || [ "${ROLLBACK}" = "--rollback" ]; then
-        perform_rollback
-        exit 0
+        if [[ "${VERSION}" == "latest" || ! "${VERSION}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
+            error "Rollback requires an explicit immutable image tag; 'latest' is not allowed."
+            exit 1
+        fi
+        info "Rollback requested: deploying image tag ${VERSION} through the normal blue-green health-check and traffic-switch flow."
     fi
-    
+
     local active_color=$(get_active_color)
     local inactive_color=$(get_inactive_color)
-    
+    local previous_active_version=""
+    if [ -f "${ACTIVE_VERSION_FILE}" ]; then
+        previous_active_version="$(cat "${ACTIVE_VERSION_FILE}")"
+    fi
+
     info "Active color: ${active_color}"
     info "Inactive color: ${inactive_color}"
     
@@ -414,6 +356,11 @@ main() {
     if ! run_smoke_tests "${inactive_color}"; then
         error "Post-switch smoke tests failed, rolling back..."
         switch_traffic "${active_color}" "${inactive_color}"
+        if [ -n "${previous_active_version}" ]; then
+            printf '%s\n' "${previous_active_version}" > "${ACTIVE_VERSION_FILE}"
+        else
+            rm -f "${ACTIVE_VERSION_FILE}"
+        fi
         stop_old_environment "${inactive_color}"
         exit 1
     fi
