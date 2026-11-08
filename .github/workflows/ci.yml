@@ -114,6 +114,11 @@ jobs:
             exit 1
           fi
 
+          if [ -n "${STAGING_DOMAIN_VAR}" ] && [ "${STAGING_DOMAIN_VAR}" = "${PRODUCTION_DOMAIN_VAR}" ]; then
+            echo "::error::STAGING_DOMAIN and PRODUCTION_DOMAIN must be different."
+            exit 1
+          fi
+
           can_push=false
           if [ -n "${DOCKER_USER_VAR}" ] && [ -n "${PAT_BACKEND}" ] && [ -n "${PAT_FRONTEND}" ]; then
             can_push=true
@@ -145,7 +150,9 @@ jobs:
             echo "|---|---|"
             echo "| Image namespace | \`${user}\` |"
             echo "| Push images to Docker Hub | \`${can_push}\` |"
+            echo "| Staging domain configured | \`$([ -n "${STAGING_DOMAIN_VAR}" ] && echo true || echo false)\` |"
             echo "| Staging deploy | \`${can_deploy_staging}\` |"
+            echo "| Production domain configured | \`$([ -n "${PRODUCTION_DOMAIN_VAR}" ] && echo true || echo false)\` |"
             echo "| Production deploy | \`${can_deploy_production}\` |"
             echo ""
             if [ "${can_push}" = false ]; then
