@@ -107,8 +107,8 @@ Frontend: the browser bundle reads `VITE_API_URL` at build time
 ## 4. Configure GitHub Actions
 
 The repository has a guarded setup script. It validates values before writing
-and preserves the existing \`DOCKER_PAT_BACKEND\` and \`DOCKER_PAT_FRONTEND\`
-secrets. It creates the \`staging\` and \`production\` GitHub Environments if
+and preserves the existing `DOCKER_PAT_BACKEND` and `DOCKER_PAT_FRONTEND`
+secrets. It creates the `staging` and `production` GitHub Environments if
 missing with custom deployment-ref policies enabled and adds only the required
 branch/tag rules. If an existing environment has custom policies disabled, the
 script stops and asks an administrator to enable them in Settings; it does not
@@ -119,15 +119,15 @@ First prepare two host-key files on a trusted operator workstation. Obtain the
 expected SSH host fingerprints from each hosting provider, compare them with
 the scan result, and only then save the verified keys:
 
-\`\`\`bash
+```bash
 ssh-keyscan -H <staging-host> > /secure/path/staging_known_hosts
 ssh-keyscan -H <production-host> > /secure/path/production_known_hosts
 ssh-keygen -F <staging-host> -f /secure/path/staging_known_hosts
 ssh-keygen -F <production-host> -f /secure/path/production_known_hosts
 chmod 600 /secure/path/*_known_hosts
-\`\`\`
+```
 
-Do not treat \`ssh-keyscan\` itself as authentication; it only collects the key
+Do not treat `ssh-keyscan` itself as authentication; it only collects the key
 presented by the network peer. Verify the fingerprint independently before
 using the result.
 
@@ -136,7 +136,7 @@ repository namespace, FQDNs, host addresses, and SSH login users. The script
 generates separate Ed25519 keys locally and stores their private halves as
 the corresponding GitHub Actions secrets:
 
-\`\`\`bash
+```bash
 bash scripts/configure-github-actions.sh \\
   --repo OWNER/ERP \\
   --docker-user <docker-hub-namespace> \\
@@ -150,78 +150,86 @@ bash scripts/configure-github-actions.sh \\
   --production-known-hosts /secure/path/production_known_hosts \\
   --generate-keys \\
   --apply
-\`\`\`
+```
 
 Install the two public keys printed by the script into the matching host
-accounts' \`~/.ssh/authorized_keys\`. Restrict those accounts and keys to the
+accounts' `~/.ssh/authorized_keys`. Restrict those accounts and keys to the
 deployment directory and the minimum Docker/Compose operations required.
 Never copy a staging private key to production or vice versa.
 
 The existing Docker PAT secrets are preserved. If a PAT secret is ever missing,
 create separate image-scoped read/write tokens on Docker Hub and supply only
-the matching token file with \`--backend-token-file\` or
-\`--frontend-token-file\`; do not paste PAT values in chat, shell history, or
+the matching token file with `--backend-token-file` or
+`--frontend-token-file`; do not paste PAT values in chat, shell history, or
 repository files.
 
-The optional \`OPENCODE_API_KEY\` is not required for Docker publishing or
+The optional `OPENCODE_API_KEY` is not required for Docker publishing or
 deployment. When the OpenCode automation integration is intentionally enabled,
-supply \`--opencode-key-file /secure/path/opencode-key.txt\`; the setup script
+supply `--opencode-key-file /secure/path/opencode-key.txt`; the setup script
 adds it only when the repository secret is absent and never overwrites an
 existing key.
 
-Validate repository configuration without writing by omitting \`--apply\`.
+Validate repository configuration without writing by omitting `--apply`.
 The script requires the real host/domain values and verified known-host files.
-It also requires \`gh\` authenticated to the target repository and \`jq\`
+It also requires `gh` authenticated to the target repository and `jq`
 installed.
+
+On repeat runs, matching variables and existing deployment secrets are
+preserved. If a repository variable differs, the script stops unless
+`--replace-existing-config` is supplied. That flag also permits replacing
+staging/production host, user, host-key, and SSH-key secrets; it never rotates
+Docker PAT or OpenCode secrets. To rotate generated SSH keys, use a new
+`--key-dir` together with `--replace-existing-config`, then install the new
+public keys on their matching hosts before deploying.
 
 ## 5. Configure runtime hosts
 
 Run the runtime generator once on each dedicated server. Use the exact
 hostname/domain that is served by that environment; the generated backend CORS
-origin defaults to \`https://app.<domain>\`.
+origin defaults to `https://app.<domain>`.
 
 Staging host:
 
-\`\`\`bash
+```bash
 bash scripts/configure-environment.sh \\
   --environment staging \\
   --domain <staging-domain> \\
   --docker-user <docker-hub-namespace> \\
   --version <published-sha-tag> \\
   --dir /opt/erp-solution
-\`\`\`
+```
 
 Production host:
 
-\`\`\`bash
+```bash
 bash scripts/configure-environment.sh \\
   --environment production \\
   --domain <production-domain> \\
   --docker-user <docker-hub-namespace> \\
   --version <published-v-tag> \\
   --dir /opt/erp-solution
-\`\`\`
+```
 
 The generator refuses to overwrite an existing env file, creates unique
-database, Redis, and application secrets, and writes mode \`0600\`. It does not
+database, Redis, and application secrets, and writes mode `0600`. It does not
 print the secret values. Back up the files only through your approved encrypted
 secret-management process. Both hosts must be separate because the Compose
-stack has fixed container names. The application-level \`ENVIRONMENT\` remains
-\`prod\` on both hosts; the deploy target chooses the staging or production
+stack has fixed container names. The application-level `ENVIRONMENT` remains
+`prod` on both hosts; the deploy target chooses the staging or production
 configuration file.
 
 Each host also needs read-only Docker Hub credentials so it can pull both
 images. Provision a native Docker credential helper first, then run
-\`scripts/configure-host-registry.sh\` interactively with a read-only token:
+`scripts/configure-host-registry.sh` interactively with a read-only token:
 
-\`\`\`bash
+```bash
 bash scripts/configure-host-registry.sh \\
   --docker-user <docker-hub-namespace> \\
   --image-tag <published-sha-or-v-tag>
-\`\`\`
+```
 
 The host script refuses to store a token in Docker's base64-only
-\`config.json\`, requires a credential helper, and checks both image manifests.
+`config.json`, requires a credential helper, and checks both image manifests.
 Use the same namespace and tag that CI published.
 
 ## 6. Verification
