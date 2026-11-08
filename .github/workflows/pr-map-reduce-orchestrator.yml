@@ -58,6 +58,12 @@ jobs:
             .github/workflows/pr-map-reduce-orchestrator.yml
       - name: Compile orchestration scripts
         run: python -m compileall -q scripts/pr-orchestrator
+      - name: Install pinned Python lint tools
+        run: python -m pip install --disable-pip-version-check "ruff==0.16.10" "black==26.10.0"
+      - name: Lint and format-check orchestration scripts
+        run: |
+          ruff check scripts/pr-orchestrator
+          black --check scripts/pr-orchestrator
       - name: Run orchestrator unit tests
         env:
           PYTHONPATH: scripts/pr-orchestrator
@@ -91,6 +97,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MAX_PRS: ${{ inputs.max_prs }}
         run: python scripts/pr-orchestrator/discover.py
+      - name: Upload discovery snapshot
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pr-discovery-snapshot
+          path: discovery.json
+          if-no-files-found: error
+          retention-days: 30
 
   map-prs:
     name: Map PR #${{ matrix.number }}
@@ -197,11 +210,11 @@ jobs:
       && needs.reduce.outputs.selected_count != '0'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
+      pull-requests: read
       checks: read
       statuses: read
-    timeout-minutes: 300
+    timeout-minutes: 360
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
