@@ -89,18 +89,19 @@ if [ -z "$current_context" ]; then
   echo "No current kubectl context is configured; refusing to continue" >&2
   exit 1
 fi
+namespace_exists=true
 if ! kubectl --context "$context" get namespace "$namespace" >/dev/null 2>&1; then
-  if [ "$create_namespace" != true ] || [ "$apply" != true ]; then
-    echo "Namespace $namespace does not exist. Pass --create-namespace --apply to create it explicitly." >&2
+  namespace_exists=false
+  if [ "$create_namespace" != true ]; then
+    echo "Namespace $namespace does not exist. Pass --create-namespace to validate or create it." >&2
     exit 1
   fi
-  kubectl --context "$context" create namespace "$namespace" --dry-run=client -o yaml |
-    kubectl --context "$context" apply -f - >/dev/null
-fi
-
-if [ "$create_namespace" = true ] && [ "$apply" != true ]; then
-  echo "--create-namespace requires --apply because it changes cluster state." >&2
-  exit 2
+  if [ "$apply" = true ]; then
+    kubectl --context "$context" create namespace "$namespace" --dry-run=client -o yaml |
+      kubectl --context "$context" apply -f - >/dev/null
+  else
+    echo "Dry-run: namespace $namespace will be created when --apply is used."
+  fi
 fi
 
 existing="$(kubectl --context "$context" --namespace "$namespace" get secret "$secret_name" --ignore-not-found -o name)"
