@@ -9,12 +9,12 @@ Secret; provision it **before** applying an environment overlay.
 
 | Environment | Namespace | Secret name |
 |---|---|---|
-| Production | `erp_solution` | `erp_solution-secrets` |
-| Staging | `erp_solution-staging` | `staging-erp_solution-secrets` |
+| Production | `erp-solution` | `erp-solution-secrets` |
+| Staging | `erp-solution-staging` | `staging-erp-solution-secrets` |
 
 The staging overlay applies the `staging-` name prefix and changes the
 namespace. Kustomize also rewrites the workload `secretRef` name, so the
-staging Secret must be named `staging-erp_solution-secrets`. Confirm rendered
+staging Secret must be named `staging-erp-solution-secrets`. Confirm rendered
 names with `kubectl kustomize` before applying.
 
 ## Provisioning
@@ -66,8 +66,8 @@ the staging-specific env file. Existing Secrets are not overwritten unless
 Verify only the Secret metadata (not its data) and render both overlays:
 
 ```bash
-kubectl --context <production-context> -n erp_solution get secret erp_solution-secrets
-kubectl --context <staging-context> -n erp_solution-staging get secret staging-erp_solution-secrets
+kubectl --context <production-context> -n erp_solution get secret erp-solution-secrets
+kubectl --context <staging-context> -n erp-solution-staging get secret staging-erp-solution-secrets
 kubectl kustomize infra/k8s/overlays/staging
 kubectl kustomize infra/k8s/overlays/production
 ```
