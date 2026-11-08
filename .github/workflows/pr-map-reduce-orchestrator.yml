@@ -15,7 +15,7 @@ on:
         default: 50
         type: number
       max_merges:
-        description: "Maximum serial merges in this batch (1-20)"
+        description: "Maximum serial merges in this batch (1-5)"
         required: true
         default: 5
         type: number
@@ -201,7 +201,6 @@ jobs:
       pull-requests: write
       checks: read
       statuses: read
-      actions: write
     timeout-minutes: 300
     steps:
       - name: Checkout
@@ -235,3 +234,11 @@ jobs:
             args+=(--deploy-staging)
           fi
           python scripts/pr-orchestrator/merge.py "${args[@]}"
+      - name: Upload merge execution results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: merge-execution-results
+          path: merge-results.json
+          if-no-files-found: warn
+          retention-days: 30
