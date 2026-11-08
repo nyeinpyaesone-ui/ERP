@@ -16,10 +16,14 @@ def main() -> int:
         if not 1 <= maximum <= 100:
             raise ValueError("MAX_PRS must be between 1 and 100")
 
-        query = urlencode({"state": "open", "per_page": 100, "sort": "created", "direction": "asc"})
+        query = urlencode(
+            {"state": "open", "per_page": 100, "sort": "created", "direction": "asc"}
+        )
         pulls = api_paginate(f"{repo_api_path('/pulls')}?{query}")
         matching = [pull for pull in pulls if pull.get("base", {}).get("ref") == "main"]
-        matching.sort(key=lambda item: (item.get("created_at", ""), item.get("number", 0)))
+        matching.sort(
+            key=lambda item: (item.get("created_at", ""), item.get("number", 0))
+        )
         selected = matching[:maximum]
 
         matrix = {
@@ -52,8 +56,7 @@ def main() -> int:
                     + "\n"
                 )
                 file.write(f"total={len(matching)}\n")
-                file.write(f"truncated={str(result['truncated']).lower()}\n"
-                )
+                file.write(f"truncated={str(result['truncated']).lower()}\n")
         print(json.dumps(result, indent=2))
         return 0
     except (GitHubAPIError, OSError, RuntimeError, TypeError, ValueError) as error:
