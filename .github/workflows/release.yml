@@ -141,8 +141,8 @@ jobs:
               /^## / {
                 if (found) exit
                 line = $0
-                gsub(/^##[[:space:]]*\\[?/, "", line)
-                gsub(/\\]?[[:space:]]*$/, "", line)
+                gsub(/^##[[:space:]]*\[?/, "", line)
+                gsub(/\]?[[:space:]]*$/, "", line)
                 gsub(/^[^0-9]*/, "", line)
                 if (index(line, tag) > 0) { found = 1; print; next }
               }
