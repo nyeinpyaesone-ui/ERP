@@ -82,7 +82,7 @@ Variables are not secret — they are safe to read in logs and to use in
 | `STAGING_DOMAIN` | `deploy-staging` | Staging hostname for deployment links |
 | `PRODUCTION_DOMAIN` | `deploy-production` | Production hostname for deployment links |
 
-If `DOCKER_USER` or either Docker Hub push token is unset, images are built and validated but are not published; the deploy jobs are skipped. Staging deploys the immutable `sha-*` tag from that build by default. Production deploys the immutable Git release tag (`v*`).
+If `DOCKER_USER` or either Docker Hub push token is unset, images are built locally under the non-published `local` namespace and are not pushed; deploy jobs are skipped. `DOCKER_USER` must be a lowercase Docker Hub namespace. Staging deploys the immutable `sha-*` tag from that build by default. Production deploys the version tag (`v*`).
 
 ## 3. Optional — runtime only, not referenced by CI
 
