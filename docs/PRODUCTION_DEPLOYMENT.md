@@ -34,15 +34,16 @@
 git clone https://github.com/nyeinpyaesone-ui/ERP.git
 cd ERP
 
-# 2. Create production .env
-cp backend/.env.example backend/.env
-# Edit: DATABASE_URL, REDIS_URL, SECRET_KEY
+# 2. Create the root production env file
+cp .env.production.template .env.production
+chmod 600 .env.production
+# Set unique production DB, Redis, and SECRET_KEY values.
 
 # 3. Start production stack
-docker compose -f docker-compose.prod.yml up -d
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d
 
 # 4. Run migrations
-docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+docker compose --env-file .env.production -f docker-compose.prod.yml exec backend alembic upgrade head
 
 # 5. Verify (nginx is the only published port in the prod stack)
 curl http://localhost/api/v1/health
