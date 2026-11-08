@@ -19,8 +19,9 @@ WORKDIR /app
 
 # Keep the runtime OS footprint small. PostgreSQL and Redis readiness are
 # checked through the already-installed Python drivers, not external CLIs.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 ca-certificates \
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends libpq5 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder --chown=10001:10001 /root/.local /home/app/.local
