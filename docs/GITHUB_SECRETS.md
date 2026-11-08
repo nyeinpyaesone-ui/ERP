@@ -16,8 +16,9 @@ Go to **Settings → Secrets and variables → Actions**.
 | `DOCKER_PAT_FRONTEND` | `ci.yml` → `docker-frontend` | Access token scoped to `powerrangeranikg/erp-solution-frontend` |
 
 The username is **not** a secret — it is the `DOCKER_USER` repository variable
-(see §2). Separate tokens per image keep a frontend-only push from being able
-to overwrite the backend image.
+(see §2). Keep separate tokens per image for independent rotation and audit. Use a
+restricted registry service account; apply repository-level access controls
+where the Docker Hub account or organization supports them.
 
 Generate a token at <https://hub.docker.com/settings/access/tokens>.
 
