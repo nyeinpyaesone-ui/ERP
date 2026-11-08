@@ -2,12 +2,12 @@
 # Configure repository-level GitHub Actions variables, secrets and deployment
 # environments for the ERP Compose blue/green pipeline.
 set -Eeuo pipefail
-IFS=$'\\n\\t'
+IFS=$'\n\t'
 
 REPO="${GITHUB_REPOSITORY:-nyeinpyaesone-ui/ERP}"
 
-die() { printf 'ERROR: %s\\n' "$*" >&2; exit 1; }
-info() { printf '==> %s\\n' "$*"; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+info() { printf '==> %s\n' "$*"; }
 prompt() {
   local __name="$1" __label="$2" __value=""
   read -r -p "$__label: " __value
@@ -22,12 +22,12 @@ prompt_file() {
   printf -v "$__name" '%s' "$__value"
 }
 validate_domain() {
-  [[ "$1" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z]{2,63}$ ]] ||
+  [[ "$1" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]] ||
     die "Expected a DNS hostname without scheme/path: $1"
 }
 validate_host() {
-  [[ "$1" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z]{2,63}$ ||
-     "$1" =~ ^([0-9]{1,3}\\.){3}[0-9]{1,3}$ ]] ||
+  [[ "$1" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ||
+     "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] ||
     die "Expected a hostname or IPv4 address without port: $1"
 }
 validate_user() {
@@ -62,13 +62,14 @@ ensure_environment_policy() {
 }
 command -v gh >/dev/null 2>&1 || die "GitHub CLI (gh) is required."
 command -v ssh-keygen >/dev/null 2>&1 || die "ssh-keygen is required."
+command -v jq >/dev/null 2>&1 || die "jq is required."
 gh auth status --hostname github.com >/dev/null 2>&1 || die "Authenticate gh with repository administration and Actions secrets/variables permissions first."
 gh repo view "$REPO" --json nameWithOwner --jq .nameWithOwner | grep -Fx "$REPO" >/dev/null ||
   die "Authenticated GitHub context cannot resolve $REPO."
 
-printf '\\nERP GitHub Actions configuration\\nRepository: %s\\n\\n' "$REPO"
-printf 'This configures GitHub repository settings only. It does not connect to or deploy to either server.\\n'
-printf 'Have the approved SSH keys, pinned known_hosts files and Docker Hub tokens ready.\\n\\n'
+printf '\nERP GitHub Actions configuration\nRepository: %s\n\n' "$REPO"
+printf 'This configures GitHub repository settings only. It does not connect to or deploy to either server.\n'
+printf 'Have the approved SSH keys, pinned known_hosts files and Docker Hub tokens ready.\n\n'
 
 DOCKER_USER="${DOCKER_USER:-powerrangeranikg}"
 read -r -p "Docker Hub namespace [$DOCKER_USER]: " input
