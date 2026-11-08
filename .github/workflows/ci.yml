@@ -159,6 +159,13 @@ jobs:
         run: |
           cd backend && mypy app/ --ignore-missing-imports
 
+      - name: Validate deployment scripts and Compose configuration
+        run: |
+          set -euo pipefail
+          bash -n scripts/lib.sh
+          bash -n scripts/deploy-blue-green.sh
+          docker compose --env-file .env.production.template -f docker-compose.prod.yml config --quiet
+
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
