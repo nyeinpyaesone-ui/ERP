@@ -122,9 +122,9 @@ jobs:
 
           can_push=false
           # Never publish from a pull request, even when repository secrets are available.
-          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ] \\
-             && [ -n "${DOCKER_USER_VAR}" ] \\
-             && [ -n "${PAT_BACKEND}" ] \\
+          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ] \
+             && [ -n "${DOCKER_USER_VAR}" ] \
+             && [ -n "${PAT_BACKEND}" ] \
              && [ -n "${PAT_FRONTEND}" ]; then
             can_push=true
           fi
