@@ -108,7 +108,7 @@ Frontend: the browser bundle reads `VITE_API_URL` at build time
 The repository includes an interactive bootstrapper that validates host/key
 inputs, sets the variables and secrets listed above, and creates the `staging`
 and `production` GitHub Environments with `main` and `v*` deployment-ref
-policies. It reads secret values from local files/stdin; it does not print them.
+policies. It reads secret values from local files/stdin; it does not print them. It refuses to proceed if either Environment already has additional deployment-ref policies, because GitHub policies are additive and an extra broad rule could weaken the intended restriction.
 Run it from a trusted operator workstation after authenticating `gh` with
 repository administration and Actions secret/variable permissions:
 
