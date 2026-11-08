@@ -50,13 +50,17 @@ set_variable() {
   gh variable set "$key" --repo "$REPO" --body "$value"
 }
 ensure_environment_policy() {
-  local environment="$1" policy_type="$2" pattern="$3" existing
+  local environment="$1" policy_type="$2" pattern="$3" policies matching unexpected
   info "Ensuring GitHub Environment $environment and $policy_type policy $pattern"
   gh api --method PUT "repos/$REPO/environments/$environment" >/dev/null
-  existing="$(gh api "repos/$REPO/environments/$environment/deployment-branch-policies" |
-    jq --arg pattern "$pattern" --arg kind "$policy_type" \
+  policies="$(gh api "repos/$REPO/environments/$environment/deployment-branch-policies")"
+  matching="$(printf '%s' "$policies" | jq --arg pattern "$pattern" --arg kind "$policy_type" \
     '[.branch_policies[]? | select(.name == $pattern and .type == $kind)] | length')"
-  if [ "$existing" = "0" ]; then
+  unexpected="$(printf '%s' "$policies" | jq --arg pattern "$pattern" --arg kind "$policy_type" \
+    '[.branch_policies[]? | select(.name != $pattern or .type != $kind)] | length')"
+  [ "$unexpected" = "0" ] ||
+    die "Environment $environment has additional deployment-ref policies. Review/remove them manually before using this bootstrapper; policies are additive."
+  if [ "$matching" = "0" ]; then
     gh api --method POST "repos/$REPO/environments/$environment/deployment-branch-policies" \
       -f name="$pattern" -f type="$policy_type" >/dev/null
   fi
