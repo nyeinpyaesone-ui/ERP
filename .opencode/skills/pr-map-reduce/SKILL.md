@@ -110,7 +110,7 @@ For each selected PR:
 
 1. Fetch the live PR and current \`main\` SHA.
 2. Re-run map/preflight against the current head and base SHAs.
-3. Submit the GitHub merge API request with the expected head SHA.
+3. Submit `gh pr merge --auto --match-head-commit <expected SHA>` and never pass `--admin`; this allows the configured merge queue to enforce repository policy.
 4. Confirm GitHub reports \`merged=true\` and returns a merge commit SHA.
 5. Wait for the repository's \`CI\` workflow on that exact merge SHA, \`event=push\`, \`branch=main\`.
 6. Proceed only when the run concludes \`success\`. Stop on failure, timeout, missing run, changed head, conflict, or policy rejection.
