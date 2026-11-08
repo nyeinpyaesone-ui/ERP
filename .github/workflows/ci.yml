@@ -510,8 +510,8 @@ jobs:
           ROLLBACK_INPUT: ${{ inputs.rollback }}
         run: |
           set -euo pipefail
-          if [ -n "${ROLLBACK_INPUT}" ] && [[ "${ROLLBACK_INPUT}" == "latest" || ! "${ROLLBACK_INPUT}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
-            echo "::error::Rollback requires an immutable image tag, not latest."
+          if [ -n "${ROLLBACK_INPUT}" ] && [[ ! "${ROLLBACK_INPUT}" =~ ^(sha-[[:xdigit:]]{7,40}|v[0-9A-Za-z][0-9A-Za-z._-]{0,127})$ ]]; then
+            echo "::error::Rollback tag must be a versioned v* release or a sha-* image tag."
             exit 1
           fi
 
