@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: erp_solution
+  name: erp-solution
   labels:
     app.kubernetes.io/name: erp_solution
     app.kubernetes.io/part-of: erp_solution-system
@@ -10,7 +10,7 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: erp_solution-monitoring
+  name: erp-solution-monitoring
   labels:
     app.kubernetes.io/name: monitoring
     app.kubernetes.io/part-of: erp_solution-system
