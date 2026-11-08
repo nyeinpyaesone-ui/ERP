@@ -99,6 +99,29 @@ class MapPRTests(unittest.TestCase):
         self.assertFalse(report["eligible"])
         self.assertIn("commit_status_failure", report["reasons"])
 
+    def test_latest_check_result_supersedes_older_same_app_run(self) -> None:
+        from map_pr import latest_check_runs
+
+        checks = [
+            {
+                "name": "CI",
+                "app": {"id": 1},
+                "status": "completed",
+                "conclusion": "failure",
+                "completed_at": "2026-11-08T00:00:00Z",
+            },
+            {
+                "name": "CI",
+                "app": {"id": 1},
+                "status": "completed",
+                "conclusion": "success",
+                "completed_at": "2026-11-09T00:00:00Z",
+            },
+        ]
+        latest = latest_check_runs(checks)
+        self.assertEqual(len(latest), 1)
+        self.assertEqual(latest[0]["conclusion"], "success")
+
     def test_head_or_base_drift_is_blocked(self) -> None:
         report = self.report(expected_head_sha="different")
         self.assertFalse(report["eligible"])
