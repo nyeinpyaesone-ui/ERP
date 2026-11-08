@@ -52,15 +52,14 @@ ensure_environment_policy() {
   local environment="$1" policy_type="$2" pattern="$3" existing
   info "Ensuring GitHub Environment $environment and $policy_type policy $pattern"
   gh api --method PUT "repos/$REPO/environments/$environment" >/dev/null
-  existing="$(gh api "repos/$REPO/environments/$environment/deployment-branch-policies" \\
-    --jq --arg pattern "$pattern" --arg kind "$policy_type" \
+  existing="$(gh api "repos/$REPO/environments/$environment/deployment-branch-policies" |
+    jq --arg pattern "$pattern" --arg kind "$policy_type" \
     '[.branch_policies[]? | select(.name == $pattern and .type == $kind)] | length')"
   if [ "$existing" = "0" ]; then
-    gh api --method POST "repos/$REPO/environments/$environment/deployment-branch-policies" \\
+    gh api --method POST "repos/$REPO/environments/$environment/deployment-branch-policies" \
       -f name="$pattern" -f type="$policy_type" >/dev/null
   fi
 }
-
 command -v gh >/dev/null 2>&1 || die "GitHub CLI (gh) is required."
 command -v ssh-keygen >/dev/null 2>&1 || die "ssh-keygen is required."
 gh auth status --hostname github.com >/dev/null 2>&1 || die "Authenticate gh with repository administration and Actions secrets/variables permissions first."
