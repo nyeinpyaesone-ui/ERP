@@ -15,7 +15,7 @@ RUN apt-get update \
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt \
-    && pip install --no-cache-dir --user --upgrade \
+    && pip install --no-cache-dir --user --upgrade --ignore-installed \
         "setuptools>=78.1.1" \
         "wheel>=0.46.2" \
         "jaraco.context>=6.1.0"
