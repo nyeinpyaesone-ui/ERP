@@ -52,7 +52,21 @@ RUN apk update \
 RUN python -m pip install --no-cache-dir --upgrade \
     "pip>=26.1.2" \
     "setuptools>=82.0.0" \
-    "wheel>=0.46.2"
+    "wheel>=0.46.2" \
+    && python -m pip uninstall --yes setuptools wheel \
+    && python - <<'PY'
+from importlib import metadata
+
+for package in ("setuptools", "wheel"):
+    matches = [
+        str(distribution._path)
+        for distribution in metadata.distributions()
+        if (distribution.metadata.get("Name") or "").lower() == package
+    ]
+    if matches:
+        raise SystemExit(f"Unexpected runtime build-tool metadata for {package}: {matches}")
+print("Runtime packaging build tools are absent.")
+PY
 
 COPY --from=builder --chown=10001:10001 /root/.local /home/app/.local
 COPY --chown=10001:10001 . .
