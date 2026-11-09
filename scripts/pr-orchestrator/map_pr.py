@@ -20,6 +20,17 @@ from client import (
 )
 
 ALLOWED_CHECK_CONCLUSIONS = {"success", "skipped", "neutral"}
+REQUIRED_GREEN_CHECKS = {
+    "Code Quality",
+    "CodeQL",
+    "Deploy Configuration",
+    "Frontend Build",
+    "Build Backend Image",
+    "Build Frontend Image",
+    "Security Scan",
+    "Secret Scan (Gitleaks)",
+    "Tests",
+}
 RISK_ORDER = {
     "documentation": 1,
     "dependency": 2,
@@ -170,6 +181,20 @@ def evaluate_pr(
         ]
         if incomplete:
             reasons.append("checks_not_green:" + ",".join(sorted(set(incomplete))))
+
+    required_not_green = []
+    for check_name in sorted(REQUIRED_GREEN_CHECKS):
+        matching = [run for run in effective_checks if run.get("name") == check_name]
+        if not matching or any(
+            run.get("status") != "completed" or run.get("conclusion") != "success"
+            for run in matching
+        ):
+            required_not_green.append(check_name)
+    if required_not_green:
+        reasons.append(
+            "required_checks_missing_or_not_green:"
+            + ",".join(required_not_green)
+        )
 
     # GitHub's classic commit-status API is independent of Actions check-runs.
     # A pending combined status with zero contexts is not a failure when the
