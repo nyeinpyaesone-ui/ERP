@@ -3,23 +3,36 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
+# Refresh the Debian package index and apply available security updates before
+# installing build dependencies. This keeps the image from retaining stale
+# packages inherited from the upstream Python base image.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
+        gcc \
+        libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt \
-    && pip install --no-cache-dir --user --upgrade "setuptools>=78.1.1"
+    && pip install --no-cache-dir --user --upgrade \
+        "setuptools>=78.1.1" \
+        "wheel>=0.46.2" \
+        "jaraco.context>=6.1.0"
 
 # Runtime stage
 FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 ca-certificates zlib1g \
-    && apt-get install -y --only-upgrade zlib1g \
+# Apply available Debian security updates in the final runtime image too;
+# updating only the builder would leave vulnerable OS packages in production.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
+        libpq5 \
+        ca-certificates \
+        zlib1g \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --shell /bin/bash app
 
