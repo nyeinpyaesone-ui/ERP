@@ -247,7 +247,7 @@ export default function AIChat() {
                   conversationId === conv.id ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50 text-gray-700'
                 }`}
               >
-                <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                <MessageSquare className="w-4 h-4 shrink-0" />
                 <span className="truncate flex-1">{conv.title || 'Untitled'}</span>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={(e) => archiveConversation(conv.id, e)} className="p-1 hover:bg-gray-200 rounded">
@@ -342,7 +342,7 @@ export default function AIChat() {
           {messages.map((msg, i) => (
             <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
               {msg.role === 'assistant' && (
-                <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center shrink-0 mt-1">
                   <Sparkles className="w-4 h-4 text-indigo-600" />
                 </div>
               )}
@@ -361,7 +361,7 @@ export default function AIChat() {
                 )}
               </div>
               {msg.role === 'user' && (
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center shrink-0 mt-1">
                   <User className="w-4 h-4 text-gray-600" />
                 </div>
               )}

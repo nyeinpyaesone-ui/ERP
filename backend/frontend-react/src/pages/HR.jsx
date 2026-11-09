@@ -17,7 +17,7 @@ export default function HR() {
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Human Resources</h1>
       <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
         {[{id:'employees',label:'Employees',icon:Users},{id:'departments',label:'Departments',icon:Building}].map(t => (
-          <button key={t.id} onClick={()=>setActiveTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${activeTab===t.id?'bg-white text-indigo-600 shadow-sm':'text-gray-600'}`}><t.icon className="w-4 h-4"/>{t.label}</button>
+          <button key={t.id} onClick={()=>setActiveTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${activeTab===t.id?'bg-white text-indigo-600 shadow-xs':'text-gray-600'}`}><t.icon className="w-4 h-4"/>{t.label}</button>
         ))}
       </div>
       {activeTab === 'employees' && (
