@@ -192,8 +192,7 @@ def evaluate_pr(
             required_not_green.append(check_name)
     if required_not_green:
         reasons.append(
-            "required_checks_missing_or_not_green:"
-            + ",".join(required_not_green)
+            "required_checks_missing_or_not_green:" + ",".join(required_not_green)
         )
 
     # GitHub's classic commit-status API is independent of Actions check-runs.
@@ -202,9 +201,7 @@ def evaluate_pr(
     classic_statuses = combined_status.get("statuses") or []
     classic_state = combined_status.get("state") or "pending"
     classic_total = int(combined_status.get("total_count") or len(classic_statuses))
-    if classic_state != "success" and (
-        classic_total > 0 or classic_state != "pending"
-    ):
+    if classic_state != "success" and (classic_total > 0 or classic_state != "pending"):
         reasons.append(f"commit_status_{classic_state}")
 
     latest_reviews = _latest_reviews_by_user(reviews)
