@@ -175,8 +175,12 @@ def evaluate_pr(
     # A pending combined status with zero contexts is not a failure when the
     # check-runs API above contains completed successful checks.
     classic_statuses = combined_status.get("statuses") or []
-    if classic_statuses and combined_status.get("state") != "success":
-        reasons.append(f"commit_status_{combined_status.get('state') or 'missing'}")
+    classic_state = combined_status.get("state") or "pending"
+    classic_total = int(combined_status.get("total_count") or len(classic_statuses))
+    if classic_state != "success" and (
+        classic_total > 0 or classic_state != "pending"
+    ):
+        reasons.append(f"commit_status_{classic_state}")
 
     latest_reviews = _latest_reviews_by_user(reviews)
     requested_changes = [
