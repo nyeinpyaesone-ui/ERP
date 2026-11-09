@@ -1,4 +1,4 @@
-.PHONY: help install dev build test clean docker-up docker-down push status lint guard
+.PHONY: help install dev build test clean docker-up docker-down push status lint guard jev-detect jev-intercept-start jev-intercept-judge jev-validate
 
 help:
 	@echo "ERP SOLUTION — Available Commands"
@@ -63,3 +63,20 @@ status:
 	git status -sb
 	@echo "Commits: $$(git rev-list --count HEAD)"
 	@echo "Files:   $$(git ls-files | wc -l)"
+
+# Jev skills integration
+jev-detect:
+	@python3 .opencode/skills/jev-dynamic-detect/scripts/detect_optimized.py "$(task)"
+
+jev-intercept-start:
+	@cd backend && . venv/bin/activate && JEV_INTERCEPT=1 uvicorn app.main:app --reload
+
+jev-intercept-judge:
+	@cd backend && . venv/bin/activate && python ../.opencode/skills/jev-intercept/scripts/jev_judge.py
+
+jev-validate:
+	@python3 /home/admin/.opencode/skills/jev/scripts/jev.py decide /home/admin/.opencode/skills/jev-devops/assets/1-triage.json --dry-run
+	@python3 /home/admin/.opencode/skills/jev/scripts/jev.py decide /home/admin/.opencode/skills/jev-devops/assets/2-code-review.json --dry-run
+	@python3 /home/admin/.opencode/skills/jev/scripts/jev.py decide /home/admin/.opencode/skills/jev-devops/assets/3-route.json --dry-run
+	@python3 /home/admin/.opencode/skills/jev/scripts/jev.py decide /home/admin/.opencode/skills/jev-devops/assets/4-documents.json --dry-run
+	@python3 /home/admin/.opencode/skills/jev/scripts/jev.py decide /home/admin/.opencode/skills/jev-devops/assets/5-context.json --dry-run

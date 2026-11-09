@@ -50,6 +50,7 @@ RESOURCES: tuple[str, ...] = (
     "integrations",
     "invoices",
     "inventory",
+    "jev_intercept",
     "migrations",
     "notifications",
     "payments",

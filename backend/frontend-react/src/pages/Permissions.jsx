@@ -182,7 +182,7 @@ export default function PermissionsManager() {
             key={tab.id}
             onClick={() => { setActiveTab(tab.id); setError(null); setSuccess(null); }}
             className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${
-              activeTab === tab.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              activeTab === tab.id ? 'bg-white text-indigo-600 shadow-xs' : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             <tab.icon className="w-4 h-4" />
