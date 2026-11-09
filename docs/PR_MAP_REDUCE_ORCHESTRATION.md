@@ -10,7 +10,7 @@ It does not pretend that a language-model sub-agent has approved code. The accom
 
 The repository includes project-scoped OpenCode agent definitions under .opencode/agents. The primary pr-orchestrator delegates read-only specialist work to the scope, backend, frontend, security, platform, tests, and documentation agents. Their task envelopes include the exact PR head/base SHAs. They return PASS, BLOCK, or NEEDS_EVIDENCE with source evidence; they cannot approve or merge.
 
-The deterministic GitHub Actions workflow is the execution authority for merge eligibility, changed-file overlap, serial merges, and main-CI barriers.
+The deterministic GitHub Actions workflow is the execution authority for merge eligibility, changed-file overlap, serial merges, and main-CI barriers. It does not invoke OpenCode or the specialist AI subagents; those reviews must be run separately through the OpenCode primary coordinator and must not be claimed as complete unless actual findings are supplied.
 
 ## Workflow
 
