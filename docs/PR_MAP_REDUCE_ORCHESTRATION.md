@@ -33,7 +33,7 @@ Use **Actions → PR Map-Reduce Orchestrator → Run workflow** on the `main` br
 |---|---:|---|
 | `mode` | `plan` | `plan` is read-only; `merge` enables the guarded merge stage |
 | `max_prs` | 50 | Discovery cap, 1–100 |
-| `max_merges` | 5 | Maximum selected PRs per batch, 1–20 |
+| `max_merges` | 5 | Maximum selected PRs per batch, 1–5 |
 | `ci_wait_minutes` | 20 | CI/deployment wait timeout per barrier, 1–30 |
 | `deploy_staging` | false | Dispatch staging only after all selected PRs merge and their exact main CI runs pass |
 
@@ -63,7 +63,7 @@ The default batch size is five. The plan artifact includes selected, blocked, an
 
 ## Merge and event loop
 
-Merge mode is allowed only for a workflow dispatch on `refs/heads/main`. Before each merge, the executor refreshes the PR, the current main SHA, reviews, checks, statuses, and changed files. It submits the request through GitHub CLI auto-merge with the expected head SHA as a compare-and-swap guard. This lets GitHub place changes into a required merge queue; the workflow never uses the administrator bypass flag. It waits for GitHub to confirm the PR is merged before checking the exact merge SHA.
+Merge mode is allowed only for a workflow dispatch on `refs/heads/main`. Before each merge, the executor refreshes the PR, the current main SHA, reviews, checks, statuses, and changed files. Before any merge request, the executor verifies that classic branch protection for `main` is readable, enforces rules for administrators, requires at least one approving review and one required status check, and requires branches to be up to date. Missing or unreadable protection fails the entire batch closed. It then submits a guarded squash merge through GitHub CLI with the expected head SHA as a compare-and-swap condition; it never uses administrator bypass or auto-merge enablement. GitHub remains the final authority for required checks, approvals, and merge-queue rules. A queue-only or otherwise incompatible policy may reject the direct request, in which case the batch stops without bypassing it. The executor waits for GitHub to confirm the PR is merged before checking the exact merge SHA.
 
 GitHub merge queues require the repository `CI` workflow to subscribe to `merge_group: checks_requested`. That CI path builds temporary backend/frontend images locally, runs the HIGH/CRITICAL Trivy gate, and never publishes those images. After GitHub confirms a merge, the executor waits for the repository's `CI` workflow for that exact merge SHA with `event=push` and `branch=main`. A failed, missing, canceled, or timed-out run stops the batch. Later PRs are not merged until the preceding main CI barrier succeeds.
 
@@ -102,6 +102,6 @@ Unit tests cover eligibility, stale heads, draft/fork blocking, reviewer changes
 
 ## Current limitations
 
-- Branch-protection details were not readable through the connected API identity during implementation (GitHub returned 403). Mergeability and status evidence are rechecked; GitHub's own merge/merge-queue service still enforces the actual repository policy.
+- Merge execution requires the workflow credential to read classic branch protection for `main`; administrator enforcement, at least one approval, strict required status checks, and one required status context are mandatory. The connected inspection identity could not read that endpoint, and the repository's visible branch/ruleset metadata did not establish an active protection policy. Merge execution therefore remains blocked until the repository owner configures and verifies the required policy.
 - CI run and staging deployment waits are bounded. Missing credentials, unavailable permissions, or unmet environment approvals produce an explicit blocked/failed result, not a success claim.
 - A single batch is bounded and serial after the parallel map phase. Deferred or blocked PRs remain open for a later re-map; the orchestrator never closes or force-merges them.
