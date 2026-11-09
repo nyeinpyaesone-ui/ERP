@@ -33,7 +33,7 @@ Project-scoped agents are defined in .opencode/agents:
 - pr-test-reviewer: exact-head test and CI evidence.
 - pr-docs-reviewer: operational documentation and source-of-truth drift.
 
-The specialist subagents are read-only and cannot launch nested subagents. The primary coordinator can invoke them in parallel. They return independent findings; the deterministic GitHub Actions map/reduce workflow remains the only merge executor.
+The specialist subagents are read-only and cannot launch nested subagents. The primary coordinator can invoke them in parallel. They return independent findings; the deterministic GitHub Actions map/reduce workflow remains the only merge executor. The GitHub Actions workflow does not itself invoke OpenCode or these AI subagents; specialist review must be run separately through the OpenCode primary coordinator. Do not represent unexecuted agent reviews as completed evidence.
 
 ## Zero-shot task contract
 
@@ -110,7 +110,8 @@ For each selected PR:
 
 1. Fetch the live PR and current \`main\` SHA.
 2. Re-run map/preflight against the current head and base SHAs.
-3. Submit `gh pr merge --auto --match-head-commit <expected SHA>` and never pass `--admin`; this allows the configured merge queue to enforce repository policy.
+3. Verify classic branch protection is readable and enforces administrators, at least one approving review, at least one required status check, and strict up-to-date branches. Stop if any condition is missing or unreadable.
+4. Submit `gh pr merge --squash --match-head-commit <expected SHA>`; never pass `--admin` or enable auto-merge. GitHub remains the final merge authority; a merge-queue-only policy that rejects this request stops the batch.
 4. Confirm GitHub reports \`merged=true\` and returns a merge commit SHA.
 5. Wait for the repository's \`CI\` workflow on that exact merge SHA, \`event=push\`, \`branch=main\`.
 6. Proceed only when the run concludes \`success\`. Stop on failure, timeout, missing run, changed head, conflict, or policy rejection.
@@ -131,6 +132,7 @@ This is a bounded loop, not an infinite retry. Retry only after a new discovery/
 - Default mode is \`plan\`; no branch mutation occurs in plan mode.
 - Merge mode can run only from \`refs/heads/main\`.
 - No direct pushes to \`main\`, force merges, admin bypasses, automatic approvals, secret disclosure, or production deploys.
+- Classic main-branch protection must enforce administrators, at least one approval, strict required checks, and at least one required status check; otherwise merge execution fails closed.
 - GitHub required checks, reviews, merge queue, rulesets, and environment approvals are never bypassed.
 - A 403/404, missing secret, API error, unknown mergeability, missing report, or unavailable CI result fails closed.
 - Keep evidence artifacts for every run: discovery snapshot, per-PR map reports, reduced plan, and merge result.
