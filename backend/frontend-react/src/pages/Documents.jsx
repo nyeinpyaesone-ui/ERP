@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FileText, Upload, Trash2, Download, Search, File, Image, FileSpreadsheet } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function Documents() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   const onDrop = useCallback(async (acceptedFiles) => {
     for (const file of acceptedFiles) {
@@ -16,8 +13,8 @@ export default function Documents() {
       formData.append('file', file);
       formData.append('title', file.name);
       try {
-        await axios.post(`${API_URL}/api/v1/documents/upload`, formData, {
-          headers: { ...axiosConfig.headers, 'Content-Type': 'multipart/form-data' }
+        await api.post(`/documents/upload`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
         });
       } catch (e) { console.error(e); }
     }
@@ -31,7 +28,7 @@ export default function Documents() {
 
   const fetchDocuments = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/v1/documents/documents`, axiosConfig);
+      const res = await api.get(`/documents/documents`);
       setDocuments(res.data);
     } catch (e) { console.error(e); }
   };
@@ -41,7 +38,7 @@ export default function Documents() {
   const deleteDoc = async (id) => {
     if (!confirm('Delete this document?')) return;
     try {
-      await axios.delete(`${API_URL}/api/v1/documents/documents/${id}`, axiosConfig);
+      await api.delete(`/documents/documents/${id}`);
       fetchDocuments();
     } catch (e) { console.error(e); }
   };

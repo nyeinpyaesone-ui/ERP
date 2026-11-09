@@ -218,10 +218,10 @@ def downgrade() -> None:
         ["entity_type"],
         unique=False,
     )
-    op.create_index(
-        "ix_search_indexes_searchable_text",
-        "search_indexes",
-        ["searchable_text"],
-        unique=False,
-        postgresql_using="gin",
+    # Mirrors the expression index created in 004. A plain
+    # `USING gin (searchable_text)` is invalid on a text column.
+    op.execute(
+        "CREATE INDEX ix_search_indexes_searchable_text "
+        "ON search_indexes "
+        "USING gin (to_tsvector('english', searchable_text))"
     )

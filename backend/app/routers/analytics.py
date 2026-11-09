@@ -1,10 +1,9 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
 from app.database import get_db
 from app.models import (
     ActivityLog,
@@ -16,13 +15,15 @@ from app.models import (
     Project,
     Task,
 )
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
 
 @router.get("/dashboard")
 def get_dashboard_analytics(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("analytics", "read")),
 ):
     # Revenue
     total_revenue = (
@@ -107,10 +108,11 @@ def get_dashboard_analytics(
 
 @router.get("/monthly-trends")
 def get_monthly_trends(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("analytics", "read")),
 ):
     months_back = 6
-    start_date = datetime.now() - timedelta(days=30 * months_back)
+    start_date = datetime.now(UTC) - timedelta(days=30 * months_back)
 
     revenue_by_month = (
         db.query(

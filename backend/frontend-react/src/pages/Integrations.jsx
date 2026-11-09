@@ -1,23 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Plug, Webhook, Plus, Trash2, Send, CheckCircle, Slack, MessageCircle, Zap } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function Integrations() {
   const [integrations, setIntegrations] = useState([]);
   const [webhooks, setWebhooks] = useState([]);
   const [activeTab, setActiveTab] = useState('integrations');
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/v1/integrations/integrations`, axiosConfig).then(r => setIntegrations(r.data));
-    axios.get(`${API_URL}/api/v1/integrations/webhooks`, axiosConfig).then(r => setWebhooks(r.data));
+    api.get(`/integrations/integrations`).then(r => setIntegrations(r.data));
+    api.get(`/integrations/webhooks`).then(r => setWebhooks(r.data));
   }, []);
 
   const testWebhook = async (id) => {
     try {
-      const res = await axios.post(`${API_URL}/api/v1/integrations/webhooks/${id}/test`, {}, axiosConfig);
+      const res = await api.post(`/integrations/webhooks/${id}/test`, {});
       alert(`Webhook test: ${res.data.status}`);
     } catch (e) { alert('Test failed'); }
   };
@@ -38,7 +35,7 @@ export default function Integrations() {
       <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
         {[{id:'integrations',label:'Services',icon:Plug},{id:'webhooks',label:'Webhooks',icon:Webhook}].map(t => (
           <button key={t.id} onClick={()=>setActiveTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${activeTab===t.id?'bg-white text-indigo-600 shadow-sm':'text-gray-600'}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${activeTab===t.id?'bg-white text-indigo-600 shadow-xs':'text-gray-600'}`}>
             <t.icon className="w-4 h-4" />{t.label}
           </button>
         ))}
