@@ -1,46 +1,86 @@
-# Build stage
-FROM python:3.11.18-slim-trixie AS builder
+# Build stage: Alpine avoids carrying unused Debian system utilities into runtime.
+FROM python:3.11.18-alpine3.24 AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk update \
+    && apk upgrade --no-cache \
+    && apk add --no-cache --virtual .build-deps \
+        build-base \
+        linux-headers \
+        freetype-dev \
+        libpng-dev \
+        libjpeg-turbo-dev \
+        postgresql-dev \
+        pkgconf \
+        zlib-dev
 
-# Keep the build toolchain above the fixed versions for CVE-2026-23949
-# (setuptools' vendored jaraco.context) and CVE-2026-24049 (wheel).
-RUN python -m pip install --no-cache-dir --upgrade "setuptools>=82.0.0" "wheel>=0.46.2"
+# CVE-2026-23949, CVE-2026-24049 and CVE-2026-8643 fixed toolchain versions.
+RUN python -m pip install --no-cache-dir --upgrade \
+    "pip>=26.1.2" \
+    "setuptools>=82.0.0" \
+    "wheel>=0.46.2"
 
 COPY requirements-runtime.txt .
-RUN pip install --no-cache-dir --user -r requirements-runtime.txt
+# Matplotlib does not publish musllinux wheels; compile it against Alpine's
+# supported system libraries while the other dependencies use compatible wheels.
+RUN python -m pip install --no-cache-dir --user --no-binary=matplotlib -r requirements-runtime.txt \
+    && python -m pip check
 
-# Runtime stage
-FROM python:3.11.18-slim-trixie AS runtime
+# Runtime stage: no compiler, headers, or package manager cache is shipped.
+FROM python:3.11.18-alpine3.24 AS runtime
 
 WORKDIR /app
 
-# Keep the runtime OS footprint small. PostgreSQL and Redis readiness are
-# checked through the already-installed Python drivers, not external CLIs.
-RUN apt-get update \
-    && apt-get upgrade -y --no-install-recommends \
-    && apt-get install -y --no-install-recommends libpq5 ca-certificates \
-    # The base image's system Python installer includes setuptools/wheel;
-    # update them to patched releases before shipping the runtime image.
-    && python -m pip install --no-cache-dir --upgrade "setuptools>=82.0.0" "wheel>=0.46.2" \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk update \
+    && apk upgrade --no-cache \
+    && apk add --no-cache \
+        bash \
+        ca-certificates \
+        fontconfig \
+        freetype \
+        libgfortran \
+        libjpeg-turbo \
+        libpng \
+        libpq \
+        libstdc++ \
+        ttf-dejavu \
+        zlib \
+    && update-ca-certificates
+
+# Update image-provided Python packaging tools to non-vulnerable releases.
+RUN python -m pip install --no-cache-dir --upgrade \
+    "pip>=26.1.2" \
+    "setuptools>=82.0.0" \
+    "wheel>=0.46.2"
 
 COPY --from=builder --chown=10001:10001 /root/.local /home/app/.local
 COPY --chown=10001:10001 . .
 
 RUN chmod +x /app/entrypoint.sh \
-    && install -d -m 0755 -o 10001 -g 10001 /app/uploads /app/static /home/app
+    && install -d -m 0755 -o 10001 -g 10001 \
+        /app/uploads \
+        /app/static \
+        /home/app \
+    && python - <<'PY'
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import psycopg2
+
+figure, axis = plt.subplots()
+axis.plot([1, 2], [1, 2])
+figure.savefig("/tmp/matplotlib-smoke.png")
+plt.close(figure)
+PY
 
 USER 10001:10001
 
 ENV HOME=/home/app
 ENV PATH="/home/app/.local/bin:${PATH}"
 ENV PYTHONPATH=/app
+ENV MPLBACKEND=Agg
+ENV MPLCONFIGDIR=/tmp/matplotlib
 
 EXPOSE 8000
 
