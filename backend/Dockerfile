@@ -36,7 +36,7 @@ RUN apk add --no-cache \
     libpng \
     libpq \
     libstdc++ \
-    && adduser -D --home /home/app --shell /bin/bash app \
+    && adduser -D -h /home/app -s /bin/bash app \
     && python -m pip install --no-cache-dir --upgrade "pip>=26.1.2"
 
 COPY --from=builder --chown=app:app /root/.local /home/app/.local
