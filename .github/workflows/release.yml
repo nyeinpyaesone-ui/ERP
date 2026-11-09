@@ -1,0 +1,210 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing v* tag whose CI-verified images should be released"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish CI-verified GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # Always check out trusted main; never check out a workflow-run or PR SHA.
+      - name: Checkout trusted release metadata
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch release tags
+        run: git fetch --force --tags origin
+
+      - name: Resolve tag and wait for successful CI
+        id: tag
+        env:
+          MANUAL_TAG: ${{ inputs.tag }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ -n "${MANUAL_TAG}" ]; then
+            TAG="${MANUAL_TAG}"
+          else
+            TAG="${EVENT_REF#refs/tags/}"
+          fi
+
+          if [[ ! "${TAG}" =~ ^v[0-9A-Za-z][0-9A-Za-z._-]{0,127}$ ]]; then
+            echo "::error::Release tag must use the v* version format."
+            exit 1
+          fi
+          if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} not found in the repository."
+            exit 1
+          fi
+
+          TAG_SHA="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+          if [ "${EVENT_REF}" = "refs/tags/${TAG}" ] && [ "${EVENT_SHA}" != "${TAG_SHA}" ]; then
+            echo "::error::Pushed tag does not resolve to the event commit."
+            exit 1
+          fi
+
+          # Tag pushes and CI start independently. Wait for CI on this exact
+          # commit; do not publish a release if CI fails or never starts.
+          if [ -n "${MANUAL_TAG}" ]; then
+            ALLOWED_EVENTS='["push","workflow_dispatch"]'
+          else
+            ALLOWED_EVENTS='["push"]'
+          fi
+          CI_OK=false
+          for attempt in $(seq 1 60); do
+            CI_RUNS="$(gh run list --workflow ci.yml --commit "${TAG_SHA}" --json event,status,conclusion --limit 50)"
+            if printf '%s' "${CI_RUNS}" | jq -e --argjson allowed "${ALLOWED_EVENTS}" 'any(.[]; .event as $event | ($allowed | index($event)) != null and .conclusion == "success")' >/dev/null; then
+              CI_OK=true
+              break
+            fi
+            if printf '%s' "${CI_RUNS}" | jq -e --argjson allowed "${ALLOWED_EVENTS}" 'any(.[]; .event as $event | ($allowed | index($event)) != null and (.status == "queued" or .status == "in_progress" or .status == "waiting" or .status == "requested"))' >/dev/null; then
+              sleep 30
+              continue
+            fi
+            if printf '%s' "${CI_RUNS}" | jq -e --argjson allowed "${ALLOWED_EVENTS}" 'any(.[]; .event as $event | ($allowed | index($event)) != null and .status == "completed" and .conclusion != "success")' >/dev/null; then
+              echo "::error::CI did not complete successfully for release tag ${TAG}."
+              exit 1
+            fi
+            sleep 30
+          done
+
+          if [ "${CI_OK}" != true ]; then
+            echo "::error::No successful push-triggered CI run found for ${TAG} within 30 minutes."
+            exit 1
+          fi
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release publishing configuration
+        env:
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+          BACKEND_TOKEN: ${{ secrets.DOCKER_PAT_BACKEND }}
+          FRONTEND_TOKEN: ${{ secrets.DOCKER_PAT_FRONTEND }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DOCKER_USER}" ] || [[ ! "${DOCKER_USER}" =~ ^[a-z0-9][a-z0-9_-]{0,127}$ ]] || [ -z "${BACKEND_TOKEN}" ] || [ -z "${FRONTEND_TOKEN}" ]; then
+            echo "::error::A valid DOCKER_USER and both image-scoped Docker Hub tokens are required to publish a release."
+            exit 1
+          fi
+
+      - name: Log in to Docker Hub for backend verification
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ vars.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PAT_BACKEND }}
+
+      - name: Verify backend image exists
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+        run: |
+          set -euo pipefail
+          docker manifest inspect "${DOCKER_USER}/erp-solution-backend:${TAG}" >/dev/null
+
+      - name: Log in to Docker Hub for frontend verification
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ vars.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PAT_FRONTEND }}
+
+      - name: Verify frontend image exists
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+        run: |
+          set -euo pipefail
+          docker manifest inspect "${DOCKER_USER}/erp-solution-frontend:${TAG}" >/dev/null
+
+      - name: Extract release notes from CHANGELOG.md at the tag
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          : > release-notes.md
+          if git cat-file -e "${TAG}:CHANGELOG.md" 2>/dev/null; then
+            git show "${TAG}:CHANGELOG.md" > changelog-at-tag.md
+            awk -v tag="${TAG#v}" '
+              BEGIN { found = 0 }
+              /^## / {
+                if (found) exit
+                line = $0
+                gsub(/^##[[:space:]]*\[?/, "", line)
+                gsub(/\]?[[:space:]]*$/, "", line)
+                gsub(/^[^0-9]*/, "", line)
+                if (index(line, tag) > 0) { found = 1; print; next }
+              }
+              found { print }
+            ' changelog-at-tag.md > changelog-section.md || true
+
+            if [ -s changelog-section.md ]; then
+              cp changelog-section.md release-notes.md
+            fi
+          fi
+
+          if [ ! -s release-notes.md ]; then
+            echo "::warning::No CHANGELOG.md section for ${TAG}; using commit list"
+            PREV="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)"
+            {
+              echo "## Changes in ${TAG}"
+              echo
+              if [ -n "${PREV}" ]; then
+                git log --pretty=format:'- %s (%h)' "${PREV}..${TAG}"
+              else
+                git log --pretty=format:'- %s (%h)' --max-count=50 "${TAG}"
+              fi
+            } > release-notes.md
+            echo >> release-notes.md
+          fi
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "ERP SOLUTION ${TAG}" \
+            --notes-file release-notes.md \
+            --verify-tag
+
+      - name: Attach verified image references to release body
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+        run: |
+          set -euo pipefail
+          {
+            echo
+            echo "## Container images"
+            echo
+            echo '```'
+            echo "${DOCKER_USER}/erp-solution-backend:${TAG}"
+            echo "${DOCKER_USER}/erp-solution-frontend:${TAG}"
+            echo '```'
+          } >> release-notes.md
+          gh release edit "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --notes-file release-notes.md

@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -352,7 +352,7 @@ async def chat(
     db.commit()
 
     # Update conversation
-    conversation.updated_at = datetime.utcnow()
+    conversation.updated_at = datetime.now(UTC)
     db.commit()
 
     log_activity(
@@ -704,7 +704,7 @@ def get_usage_analytics(
 
     from sqlalchemy import func
 
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = datetime.now(UTC) - timedelta(days=days)
 
     # Total usage
     total = db.query(LLMUsage).filter(LLMUsage.created_at >= start_date).count()

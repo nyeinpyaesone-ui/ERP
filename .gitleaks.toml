@@ -1,0 +1,10 @@
+# The deleted Kubernetes Secret manifest used this literal template
+# marker, not a credential. Scope the exception to its exact historical
+# commit, file, and placeholder value; do not weaken other secret scanning.
+[[allowlists]]
+description = "Known Kubernetes template placeholder in one historical commit"
+condition = "AND"
+commits = ["74235a961c917cc3de6e23a8c0480eedb24fd6c9"]
+paths = ["infra/k8s/base/secrets\\.yaml"]
+regexTarget = "secret"
+regexes = ["^REPLACE_WITH_32_BYTE_KEY$"]

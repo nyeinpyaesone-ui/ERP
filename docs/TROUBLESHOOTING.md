@@ -5,9 +5,9 @@
 ### Backend won't start
 ```bash
 # Check PostgreSQL is running
-docker-compose ps
+docker compose ps
 # Check logs
-docker-compose logs backend
+docker compose logs backend
 # Verify environment variables
 cat backend/.env
 ```

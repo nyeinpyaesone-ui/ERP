@@ -1,20 +1,18 @@
-version: "3.8"
-
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: erp_solution-postgres
     environment:
-      POSTGRES_USER: erp
-      POSTGRES_PASSWORD: erp_secret
-      POSTGRES_DB: erp_solution
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U erp"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-erp_user}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,10 +34,10 @@ services:
       dockerfile: Dockerfile
     container_name: erp_solution-backend
     environment:
-      DATABASE_URL: postgresql://erp:erp_secret@postgres:5432/erp_solution
-      REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: your-secret-key-change-in-production
-      ENVIRONMENT: development
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      ENVIRONMENT: ${ENVIRONMENT:-dev}
     ports:
       - "8000:8000"
     depends_on:
@@ -60,8 +58,10 @@ services:
     ports:
       # nginx inside the image listens on 80 (see backend/frontend-react/Dockerfile)
       - "3000:80"
-    environment:
-      REACT_APP_API_URL: http://localhost:8000
+    # No API URL env here: the frontend is a static Vite build served by nginx,
+    # which proxies /api to the backend (backend/frontend-react/nginx.conf).
+    # The old REACT_APP_API_URL was never read by the source — src/api/axios.js
+    # uses VITE_API_URL, and runtime env cannot reach a pre-built bundle anyway.
     depends_on:
       - backend
 

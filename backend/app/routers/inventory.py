@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -185,7 +185,7 @@ def update_product(
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(product, key, value)
-    product.updated_at = datetime.utcnow()
+    product.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(product)
     return product
@@ -250,7 +250,7 @@ def create_movement(
             detail=f"Invalid movement_type. Allowed: {', '.join(ALLOWED_MOVEMENT_TYPES)}",
         )
 
-    product.updated_at = datetime.utcnow()
+    product.updated_at = datetime.now(UTC)
     movement = InventoryMovement(
         product_id=data.product_id,
         movement_type=data.movement_type,
