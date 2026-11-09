@@ -49,13 +49,12 @@ RUN apk update \
     && update-ca-certificates
 
 # Update image-provided Python packaging tools to non-vulnerable releases.
+# Remove unused build-time distributions and the old ensurepip bootstrap wheel.
 RUN python -m pip install --no-cache-dir --upgrade \
     "pip>=26.1.2" \
     "setuptools>=82.0.0" \
     "wheel>=0.46.2" \
     && python -m pip uninstall --yes setuptools wheel \
-    # The official Python 3.11 image bundles an old setuptools wheel for
-    # ensurepip bootstrap; runtime pip is already updated, so it is unused.
     && if [ -d /usr/local/lib/python3.11/ensurepip/_bundled ]; then \
         find /usr/local/lib/python3.11/ensurepip/_bundled -maxdepth 1 -type f -name 'setuptools-*.whl' -delete; \
     fi \
