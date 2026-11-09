@@ -54,8 +54,14 @@ RUN python -m pip install --no-cache-dir --upgrade \
     "setuptools>=82.0.0" \
     "wheel>=0.46.2" \
     && python -m pip uninstall --yes setuptools wheel \
+    # The official Python 3.11 image bundles an old setuptools wheel for
+    # ensurepip bootstrap; runtime pip is already updated, so it is unused.
+    && if [ -d /usr/local/lib/python3.11/ensurepip/_bundled ]; then \
+        find /usr/local/lib/python3.11/ensurepip/_bundled -maxdepth 1 -type f -name 'setuptools-*.whl' -delete; \
+    fi \
     && python - <<'PY'
 from importlib import metadata
+from pathlib import Path
 
 for package in ("setuptools", "wheel"):
     matches = [
@@ -65,7 +71,12 @@ for package in ("setuptools", "wheel"):
     ]
     if matches:
         raise SystemExit(f"Unexpected runtime build-tool metadata for {package}: {matches}")
-print("Runtime packaging build tools are absent.")
+
+bundled = Path("/usr/local/lib/python3.11/ensurepip/_bundled")
+remaining = list(bundled.glob("setuptools-*.whl")) if bundled.exists() else []
+if remaining:
+    raise SystemExit(f"Unused vulnerable ensurepip wheels remain: {remaining}")
+print("Runtime packaging tools and bundled setuptools wheels are absent.")
 PY
 
 COPY --from=builder --chown=10001:10001 /root/.local /home/app/.local
