@@ -92,6 +92,13 @@ class MapPRTests(unittest.TestCase):
         )
         self.assertTrue(report["eligible"])
 
+    def test_failed_empty_classic_status_blocks(self) -> None:
+        report = self.report(
+            combined_status={"state": "failure", "total_count": 0, "statuses": []}
+        )
+        self.assertFalse(report["eligible"])
+        self.assertIn("commit_status_failure", report["reasons"])
+
     def test_failed_classic_status_context_blocks(self) -> None:
         report = self.report(
             combined_status={
