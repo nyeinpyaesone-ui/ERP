@@ -201,7 +201,8 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
-    needs: quality
+    # Backend tests are independent of lint/type checks; keep the quality gate
+    # on the image jobs so validation runs concurrently without weakening CI.
     timeout-minutes: 45
     # PostgreSQL backs the `alembic upgrade head` step below. Redis is
     # deliberately absent: tests mock redis.from_url and token_store fails
@@ -256,7 +257,7 @@ jobs:
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest
-    needs: quality
+    # Frontend validation is independent of backend quality checks.
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -291,7 +292,7 @@ jobs:
   docker-backend:
     name: Build Backend Image
     runs-on: ubuntu-latest
-    needs: [test, config]
+    needs: [quality, test, config]
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
       image_sha_tag: ${{ steps.immutable.outputs.image_tag }}
@@ -352,7 +353,7 @@ jobs:
   docker-frontend:
     name: Build Frontend Image
     runs-on: ubuntu-latest
-    needs: [frontend-build, config]
+    needs: [quality, frontend-build, config]
     # Validate the image on PRs too; config keeps push disabled when secrets are unavailable.
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
