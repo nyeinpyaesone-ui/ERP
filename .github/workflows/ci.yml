@@ -466,6 +466,7 @@ jobs:
         with:
           image-ref: ${{ needs.docker-backend.outputs.image_sha_ref }}
           exit-code: '1'
+          version: 'v0.76.2'
           severity: CRITICAL,HIGH
           format: sarif
           output: trivy-backend.sarif
@@ -484,6 +485,7 @@ jobs:
         with:
           image-ref: ${{ needs.docker-frontend.outputs.image_sha_ref }}
           exit-code: '1'
+          version: 'v0.76.2'
           severity: CRITICAL,HIGH
           format: sarif
           output: trivy-frontend.sarif
