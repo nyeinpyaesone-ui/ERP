@@ -34,43 +34,81 @@
 git clone https://github.com/nyeinpyaesone-ui/ERP.git
 cd ERP
 
-# 2. Create production .env
-cp backend/.env.example backend/.env
-# Edit: DATABASE_URL, REDIS_URL, SECRET_KEY
+# 2. Create the root production env file
+cp .env.production.template .env.production
+chmod 600 .env.production
+# Set unique production DB, Redis, and SECRET_KEY values.
 
 # 3. Start production stack
-docker compose -f docker-compose.prod.yml up -d
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d
 
 # 4. Run migrations
-docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+docker compose --env-file .env.production -f docker-compose.prod.yml exec backend alembic upgrade head
 
 # 5. Verify (nginx is the only published port in the prod stack)
 curl http://localhost/api/v1/health
 ```
 
-### Option 2: Kubernetes (Production Scale)
+### Option 2: Kubernetes manifests (separate, not CI-integrated)
+
+The manifests under `infra/k8s/` are a separate deployment scaffold. They are
+**not** the deployment target of the current CI workflow: CI publishes
+Docker Hub Compose images, while the Kubernetes manifests reference different
+GHCR images. The manifests also have outstanding runtime issues documented in
+`infra/k8s/README-Kubernetes.md`.
+
+Do not apply these manifests to production until the GHCR image pipeline,
+container runtime contract, Redis authentication, backup tooling, storage,
+Ingress, and cluster prerequisites have been implemented and validated.
+
+Read-only validation:
 
 ```bash
-# 1. Apply the kustomize base (manifests live in infra/k8s/base/, not loose
-#    files at infra/k8s/*.yaml)
-kubectl apply -k infra/k8s/base
-
-# 2. Verify
-kubectl get pods -n erp_solution
-kubectl get svc -n erp_solution
+kubectl config current-context
+kubectl kustomize infra/k8s/overlays/staging
+kubectl kustomize infra/k8s/overlays/production
+kubectl diff -k infra/k8s/overlays/staging
+kubectl diff -k infra/k8s/overlays/production
 ```
 
-### Option 3: Blue-Green Script
+Provision Kubernetes Secrets out of band as described in
+`infra/k8s/SECRETS.md`; do not restore a committed Secret manifest.
 
-`.github/workflows/` has no release workflow — tags do not deploy anything on
-their own. Run the script on the server instead:
+### Option 3: GitHub Actions + Docker Compose blue-green deployment
+
+The active CI/CD path uses `docker-compose.prod.yml` and
+`scripts/deploy-blue-green.sh`:
+
+- A push to `main` builds and publishes immutable `sha-*` backend and
+  frontend images. It does **not** deploy automatically. To deploy staging,
+  manually dispatch the `CI` workflow on `main` with `deploy_staging=true`.
+- A `v*` Git tag builds and publishes matching release-tagged images. After
+  CI and security scans pass, the Release workflow publishes the GitHub
+  Release. It does **not** deploy production automatically. To deploy,
+  manually dispatch `CI` on that `v*` tag with `deploy_production=true`.
+- A staging rollback requires a manual CI dispatch on `main` with
+  `deploy_staging=true` and a rollback tag (`sha-*` or `v*`). It redeploys that
+  selected tag through the same health-check and traffic-switch process; it
+  does not blindly retag one image as the other.
+
+Required repository-level Actions secrets and repository variables are listed
+in `docs/GITHUB_SECRETS.md`. The target hosts must also have read-only Docker
+Hub credentials configured so they can pull the private images. GitHub
+Environment branch/tag policies apply to the deploy jobs.
+
+For a manual server-side operation:
 
 ```bash
 ./scripts/deploy-blue-green.sh production v1.2.3
 ./scripts/deploy-blue-green.sh production v1.2.2 --rollback
 ```
 
-See `DEPLOYMENT_GUIDE.md` and `docs/BLUE_GREEN_DEPLOYMENT.md`.
+The rollback command deploys the specified tag to the inactive color, checks
+health and smoke tests, and then switches traffic. It requires both backend
+and frontend images to exist under that same tag.
+
+See `docs/BLUE_GREEN_DEPLOYMENT.md` for the deployment procedure and
+rollback behavior.
 
 ## Environment Variables
 
