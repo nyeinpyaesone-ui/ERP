@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from map_pr import classify_risk, evaluate_pr
+from map_pr import REQUIRED_GREEN_CHECKS, classify_risk, evaluate_pr
 
 
 class MapPRTests(unittest.TestCase):
@@ -25,7 +25,8 @@ class MapPRTests(unittest.TestCase):
             "base": {"sha": "base-sha", "ref": "main"},
         }
         self.check_runs = [
-            {"name": "CI", "status": "completed", "conclusion": "success"}
+            {"name": name, "status": "completed", "conclusion": "success"}
+            for name in sorted(REQUIRED_GREEN_CHECKS)
         ]
         self.status = {"state": "success"}
         self.reviews = [
@@ -63,6 +64,37 @@ class MapPRTests(unittest.TestCase):
         report = self.report(pr=draft)
         self.assertFalse(report["eligible"])
         self.assertIn("draft_pr", report["reasons"])
+
+    def test_skipped_required_security_scan_is_blocked(self) -> None:
+        checks = [
+            {"name": name, "status": "completed", "conclusion": "success"}
+            for name in sorted(REQUIRED_GREEN_CHECKS - {"Security Scan"})
+        ]
+        checks.append(
+            {"name": "Security Scan", "status": "completed", "conclusion": "skipped"}
+        )
+        report = self.report(check_runs=checks)
+        self.assertFalse(report["eligible"])
+        self.assertTrue(
+            any(
+                reason.startswith("required_checks_missing_or_not_green:")
+                for reason in report["reasons"]
+            )
+        )
+
+    def test_missing_required_backend_build_is_blocked(self) -> None:
+        checks = [
+            {"name": name, "status": "completed", "conclusion": "success"}
+            for name in sorted(REQUIRED_GREEN_CHECKS - {"Build Backend Image"})
+        ]
+        report = self.report(check_runs=checks)
+        self.assertFalse(report["eligible"])
+        self.assertTrue(
+            any(
+                reason.startswith("required_checks_missing_or_not_green:")
+                for reason in report["reasons"]
+            )
+        )
 
     def test_unfinished_or_failed_check_is_blocked(self) -> None:
         checks = [{"name": "CI", "status": "completed", "conclusion": "failure"}]
