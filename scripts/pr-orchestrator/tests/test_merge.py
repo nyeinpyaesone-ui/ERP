@@ -11,6 +11,57 @@ import merge
 
 
 class MergeExecutorTests(unittest.TestCase):
+    def test_main_merge_policy_requires_admin_review_and_strict_checks(self) -> None:
+        protection = {
+            "enforce_admins": {"enabled": True},
+            "required_pull_request_reviews": {
+                "required_approving_review_count": 1
+            },
+            "required_status_checks": {
+                "strict": True,
+                "contexts": ["CI"],
+                "checks": [],
+            },
+        }
+        with patch("merge.api_get", return_value=protection):
+            allowed, detail = merge.verify_main_merge_policy()
+        self.assertTrue(allowed)
+        self.assertIn("administrator enforcement enabled", detail)
+        self.assertIn("strict checks enabled", detail)
+
+    def test_missing_main_merge_protection_fails_closed(self) -> None:
+        protection = {
+            "enforce_admins": {"enabled": False},
+            "required_pull_request_reviews": None,
+            "required_status_checks": None,
+        }
+        with patch("merge.api_get", return_value=protection):
+            allowed, detail = merge.verify_main_merge_policy()
+        self.assertFalse(allowed)
+        self.assertIn("enforce rules for administrators", detail)
+
+    def test_non_strict_status_checks_fail_closed(self) -> None:
+        protection = {
+            "enforce_admins": {"enabled": True},
+            "required_pull_request_reviews": {
+                "required_approving_review_count": 1
+            },
+            "required_status_checks": {"strict": False, "contexts": ["CI"]},
+        }
+        with patch("merge.api_get", return_value=protection):
+            allowed, detail = merge.verify_main_merge_policy()
+        self.assertFalse(allowed)
+        self.assertIn("up to date", detail)
+
+    def test_unreadable_main_merge_protection_fails_closed(self) -> None:
+        with patch(
+            "merge.api_get",
+            side_effect=merge.GitHubAPIError(403, "forbidden"),
+        ):
+            allowed, detail = merge.verify_main_merge_policy()
+        self.assertFalse(allowed)
+        self.assertIn("could not be verified", detail)
+
     def test_merge_request_uses_exact_head_and_never_admin_bypass(self) -> None:
         completed = SimpleNamespace(returncode=0, stdout="queued", stderr="")
         with (
@@ -29,7 +80,7 @@ class MergeExecutorTests(unittest.TestCase):
         self.assertEqual(
             command[command.index("--match-head-commit") + 1], "expected-head-sha"
         )
-        self.assertIn("--auto", command)
+        self.assertNotIn("--auto", command)
         self.assertNotIn("--admin", command)
         self.assertEqual(run.call_args.kwargs["env"]["GH_TOKEN"], "test-token")
 
