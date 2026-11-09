@@ -57,6 +57,13 @@ RUN python -m pip install --no-cache-dir --upgrade \
 COPY --from=builder --chown=10001:10001 /root/.local /home/app/.local
 COPY --chown=10001:10001 . .
 
+# Match the runtime user's user-site package path during the smoke test.
+ENV HOME=/home/app
+ENV PATH="/home/app/.local/bin:${PATH}"
+ENV PYTHONPATH=/app
+ENV MPLBACKEND=Agg
+ENV MPLCONFIGDIR=/tmp/matplotlib
+
 RUN chmod +x /app/entrypoint.sh \
     && install -d -m 0755 -o 10001 -g 10001 \
         /app/uploads \
@@ -75,12 +82,6 @@ plt.close(figure)
 PY
 
 USER 10001:10001
-
-ENV HOME=/home/app
-ENV PATH="/home/app/.local/bin:${PATH}"
-ENV PYTHONPATH=/app
-ENV MPLBACKEND=Agg
-ENV MPLCONFIGDIR=/tmp/matplotlib
 
 EXPOSE 8000
 
