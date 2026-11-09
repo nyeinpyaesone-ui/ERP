@@ -35,7 +35,6 @@ def gh_merge_or_enqueue(
         "--repo",
         repository,
         "--squash",
-        "--auto",
         "--match-head-commit",
         expected_head,
     ]
@@ -170,6 +169,56 @@ def dispatch_and_wait_for_staging(timeout_seconds: int) -> tuple[bool, str]:
     return False, f"staging deployment did not complete before timeout (run={run_id})"
 
 
+def verify_main_merge_policy() -> tuple[bool, str]:
+    """Require active main-branch review and strict status-check protection."""
+    try:
+        protection = api_get(repo_api_path("/branches/main/protection"))
+    except GitHubAPIError as error:
+        return (
+            False,
+            f"main branch protection could not be verified (GitHub API {error.status}); refusing merge",
+        )
+
+    enforce_admins = protection.get("enforce_admins") or {}
+    reviews = protection.get("required_pull_request_reviews") or {}
+    required_approvals = int(reviews.get("required_approving_review_count") or 0)
+    status_checks = protection.get("required_status_checks") or {}
+    required_contexts = set(status_checks.get("contexts") or [])
+    required_check_names = {
+        str(item.get("context") or item.get("app_id") or "")
+        for item in status_checks.get("checks") or []
+        if item.get("context") or item.get("app_id")
+    }
+
+    if not enforce_admins.get("enabled"):
+        return (
+            False,
+            "main branch protection must enforce rules for administrators; refusing merge",
+        )
+    if required_approvals < 1:
+        return (
+            False,
+            "main branch protection must require at least one approving review; refusing merge",
+        )
+    if not required_contexts and not required_check_names:
+        return (
+            False,
+            "main branch protection must require at least one status check; refusing merge",
+        )
+    if status_checks.get("strict") is not True:
+        return (
+            False,
+            "main branch protection must require branches to be up to date before merging; refusing merge",
+        )
+    required_checks_count = len(required_contexts | required_check_names)
+    return (
+        True,
+        f"main protection verified: administrator enforcement enabled, "
+        f"{required_approvals} required approval(s), "
+        f"{required_checks_count} required status check(s), strict checks enabled",
+    )
+
+
 def execute(
     plan: list[dict[str, Any]], timeout_minutes: int, deploy_staging: bool
 ) -> dict[str, Any]:
@@ -178,6 +227,25 @@ def execute(
     merged: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     stopped_reason = ""
+
+    protection_ok, protection_detail = verify_main_merge_policy()
+    if not protection_ok:
+        skipped = [
+            {"number": int(candidate["number"]), "reason": protection_detail}
+            for candidate in plan
+        ]
+        return {
+            "schema_version": 1,
+            "merged": merged,
+            "skipped": skipped,
+            "stopped_reason": protection_detail,
+            "all_selected_merged": False,
+            "staging": (
+                {"success": False, "detail": "staging withheld because main merge protection is not verified"}
+                if deploy_staging
+                else None
+            ),
+        }
 
     for candidate in plan:
         number = int(candidate["number"])
@@ -201,7 +269,8 @@ def execute(
                     "reason": f"live_preflight_error:{type(error).__name__}:{error}",
                 }
             )
-            continue
+            stopped_reason = f"live preflight failed for PR #{number}; stopping batch"
+            break
 
         if not report.get("eligible"):
             skipped.append(
@@ -210,7 +279,8 @@ def execute(
                     "reason": ",".join(report.get("reasons", [])),
                 }
             )
-            continue
+            stopped_reason = f"PR #{number} failed live preflight; stopping batch"
+            break
 
         accepted, merge_request_detail = gh_merge_or_enqueue(
             number, repository, expected_head
