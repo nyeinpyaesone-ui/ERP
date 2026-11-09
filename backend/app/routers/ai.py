@@ -1,15 +1,16 @@
 import json
+from datetime import UTC
 
 import httpx
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
 from app.config import settings
 from app.database import get_db
 from app.models import Contact, Deal, Invoice, Product, Project, Task
 from app.services.activity_log import log_activity
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
@@ -44,7 +45,7 @@ async def query_ollama(prompt: str, model: str = None) -> str:
 async def chat(
     message: ChatMessage,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("ai", "create")),
 ):
     # Gather business context
     context_data = {}
@@ -116,19 +117,20 @@ Provide a helpful, data-driven response. If you don't have specific data, say so
 
 @router.get("/insights")
 async def get_ai_insights(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("ai", "read")),
 ):
     from datetime import datetime, timedelta
 
     # Revenue insights
-    last_month = datetime.now() - timedelta(days=30)
+    last_month = datetime.now(UTC) - timedelta(days=30)
     invoices = db.query(Invoice).filter(Invoice.created_at >= last_month).all()
     revenue = sum(i.total or 0 for i in invoices)
 
     # Churn risk
     inactive_contacts = (
         db.query(Contact)
-        .filter(Contact.last_activity < datetime.now() - timedelta(days=90))
+        .filter(Contact.last_activity < datetime.now(UTC) - timedelta(days=90))
         .all()
     )
 
@@ -174,7 +176,7 @@ async def get_ai_insights(
 - Inactive contacts: {len(inactive_contacts)}
 - Low stock products: {len(low_stock)}
 - Total deals: {db.query(Deal).count()}
-- Active projects: {db.query(Project).filter(Project.status == 'active').count()}
+- Active projects: {db.query(Project).filter(Project.status == "active").count()}
 
 Format as JSON with fields: category, priority, message."""
 
@@ -195,14 +197,14 @@ Format as JSON with fields: category, priority, message."""
 async def forecast_revenue(
     months: int = 3,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("ai", "read")),
 ):
     from datetime import datetime, timedelta
 
     from sqlalchemy import func
 
     # Get last 6 months of paid invoices
-    end_date = datetime.now()
+    end_date = datetime.now(UTC)
     start_date = end_date - timedelta(days=180)
 
     monthly_data = (

@@ -1,19 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, Users, Package, DollarSign, Activity, Calendar, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function Analytics() {
   const [data, setData] = useState(null);
   const [trends, setTrends] = useState(null);
   const [forecast, setForecast] = useState(null);
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/v1/analytics/dashboard`, axiosConfig).then(r => setData(r.data));
-    axios.get(`${API_URL}/api/v1/analytics/monthly-trends`, axiosConfig).then(r => setTrends(r.data));
-    axios.get(`${API_URL}/api/v1/ai/forecast/revenue`, axiosConfig).then(r => setForecast(r.data)).catch(() => {});
+    api.get(`/analytics/dashboard`).then(r => setData(r.data));
+    api.get(`/analytics/monthly-trends`).then(r => setTrends(r.data));
+    api.get(`/ai/forecast/revenue`).then(r => setForecast(r.data)).catch(() => {});
   }, []);
 
   if (!data) return <div className="p-6 text-center">Loading analytics...</div>;

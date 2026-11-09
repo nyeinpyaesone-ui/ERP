@@ -69,10 +69,10 @@ docker pull powerrangeranikg/erp-solution-backend:latest
 docker pull powerrangeranikg/erp-solution-frontend:latest
 
 # Start services
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # Run migrations (-f must match the file used above)
-docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
 ```
 
 ### 8. Verify
@@ -85,7 +85,7 @@ docker ps
 curl https://api.yourdomain.com/api/v1/health
 
 # Check logs
-docker-compose logs -f backend
+docker compose logs -f backend
 ```
 
 ## DNS Configuration
@@ -110,7 +110,7 @@ sudo ufw enable
 
 ```bash
 # Database backup
-docker-compose -f docker-compose.prod.yml exec postgres pg_dump -U erp erp_solution > backup_$(date +%Y%m%d).sql
+docker compose -f docker-compose.prod.yml exec postgres pg_dump -U erp erp_solution > backup_$(date +%Y%m%d).sql
 
 # Automated backup (add to crontab)
 0 2 * * * cd /opt/erp-solution && ./scripts/backup.sh /backups
@@ -119,7 +119,7 @@ docker-compose -f docker-compose.prod.yml exec postgres pg_dump -U erp erp_solut
 ## Monitoring
 
 - **Health checks**: `curl https://api.yourdomain.com/api/v1/health`
-- **Logs**: `docker-compose -f docker-compose.prod.yml logs -f`
+- **Logs**: `docker compose -f docker-compose.prod.yml logs -f`
 - **Metrics**: not implemented yet — there is no `/metrics` endpoint
 
 ## Support

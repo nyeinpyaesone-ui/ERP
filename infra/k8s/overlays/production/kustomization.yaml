@@ -4,7 +4,7 @@ kind: Kustomization
 namespace: erp_solution
 
 resources:
-  - ../base
+  - ../../base
 
 commonLabels:
   environment: production
@@ -111,6 +111,4 @@ images:
     newTag: v3.0.0
   - name: ghcr.io/nyeinpyaesone-ui/erp_solution-worker
     newTag: v3.0.0
-
----
 

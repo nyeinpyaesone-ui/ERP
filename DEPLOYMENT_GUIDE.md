@@ -101,7 +101,7 @@ mkdir -p /opt/erp-solution/ssl /opt/erp-solution/logs/nginx /opt/erp-solution/ba
 ./scripts/setup-ssl.sh api.yourdomain.com admin@yourdomain.com
 
 # 5. Start production stack
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # 6. Verify deployment
 # /health and /ready are served by the API, so they carry the /api/v1 prefix
@@ -141,10 +141,10 @@ There is no `deploy-*`, `rollback` or `logs-*` target — deployment runs from
 
 ### Using GitHub Actions
 
-There is no deploy workflow. `.github/workflows/` holds `ci.yml` (test/lint
-gate), `codeql.yml` and `snyk-container.yml` — none of them deploy. Pushes to
-`main` run CI only, and tags release nothing. Deployment is manual, via
-`./scripts/deploy-blue-green.sh`.
+There is no standalone deploy workflow. `.github/workflows/` holds `ci.yml`
+(gates + blue-green deploy jobs, skipped until the SSH/Docker secrets exist),
+`codeql.yml` and `release.yml` — deploys run from `ci.yml` when configured,
+otherwise deployment is manual via `./scripts/deploy-blue-green.sh`.
 
 ## Blue-Green Deployment Details
 
@@ -249,13 +249,13 @@ Migrations run automatically on container startup via `entrypoint.sh`:
 
 ```bash
 # Manual migration (if needed)
-docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
 
 # Create new migration
-docker-compose -f docker-compose.prod.yml exec backend alembic revision --autogenerate -m "description"
+docker compose -f docker-compose.prod.yml exec backend alembic revision --autogenerate -m "description"
 
 # Check migration status
-docker-compose -f docker-compose.prod.yml exec backend alembic current
+docker compose -f docker-compose.prod.yml exec backend alembic current
 ```
 
 ## Monitoring & Health Checks
@@ -282,10 +282,10 @@ healthcheck:
 
 ```bash
 # All services
-docker-compose -f docker-compose.prod.yml logs -f --tail=100
+docker compose -f docker-compose.prod.yml logs -f --tail=100
 
 # Specific service
-docker-compose -f docker-compose.prod.yml logs -f backend --tail=100
+docker compose -f docker-compose.prod.yml logs -f backend --tail=100
 
 # Nginx access logs
 docker exec erp-nginx tail -f /var/log/nginx/access.log
@@ -316,7 +316,7 @@ Backup includes:
 
 ```bash
 # Restore database
-docker-compose -f docker-compose.prod.yml exec -T postgres psql -U erp erp_solution < backup.sql
+docker compose -f docker-compose.prod.yml exec -T postgres psql -U erp erp_solution < backup.sql
 
 # Restore environment
 cp backup/backend.env /opt/erp-solution/.env.production
