@@ -41,9 +41,7 @@ class MergeExecutorTests(unittest.TestCase):
     def test_non_strict_status_checks_fail_closed(self) -> None:
         protection = {
             "enforce_admins": {"enabled": True},
-            "required_pull_request_reviews": {
-                "required_approving_review_count": 1
-            },
+            "required_pull_request_reviews": {"required_approving_review_count": 1},
             "required_status_checks": {"strict": False, "contexts": ["CI"]},
         }
         with patch("merge.api_get", return_value=protection):
