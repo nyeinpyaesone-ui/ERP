@@ -18,7 +18,7 @@ help:
 NPM ?= $(shell command -v npm >/dev/null 2>&1 && echo npm || echo node /tmp/opencode/npm10/package/bin/npm-cli.js)
 
 install:
-	cd backend && python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt
+	cd backend && python3 -m venv venv && . venv/bin/activate && pip install -r requirements-dev.txt
 	cd backend/frontend-react && $(NPM) install
 	cd mobile && npm install
 
