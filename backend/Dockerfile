@@ -1,5 +1,5 @@
 # Build stage
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.11.18-slim-trixie AS builder
 
 WORKDIR /app
 
@@ -8,11 +8,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Keep the build toolchain above the fixed versions for CVE-2026-23949
+# (setuptools' vendored jaraco.context) and CVE-2026-24049 (wheel).
+RUN python -m pip install --no-cache-dir --upgrade "setuptools>=82.0.0" "wheel>=0.46.2"
+
 COPY requirements-runtime.txt .
 RUN pip install --no-cache-dir --user -r requirements-runtime.txt
 
 # Runtime stage
-FROM python:3.11-slim-bookworm AS runtime
+FROM python:3.11.18-slim-trixie AS runtime
 
 WORKDIR /app
 
@@ -21,6 +25,9 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends libpq5 ca-certificates \
+    # The base image's system Python installer includes setuptools/wheel;
+    # update them to patched releases before shipping the runtime image.
+    && python -m pip install --no-cache-dir --upgrade "setuptools>=82.0.0" "wheel>=0.46.2" \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder --chown=10001:10001 /root/.local /home/app/.local
