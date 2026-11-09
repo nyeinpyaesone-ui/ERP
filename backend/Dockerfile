@@ -9,20 +9,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt \
+    && pip install --no-cache-dir --user --upgrade "setuptools>=78.1.1"
 
 # Runtime stage
 FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-# Refresh the base interpreter tooling — the slim image ships pip 24.0 /
-# setuptools 79, which carry known advisories that Trivy flags as image
-# alerts (code-scanning "usr/local/lib/python3.11/..." findings).
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 postgresql-client redis-tools curl wget ca-certificates \
+    libpq5 ca-certificates zlib1g \
+    && apt-get install -y --only-upgrade zlib1g \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --shell /bin/bash app
 
