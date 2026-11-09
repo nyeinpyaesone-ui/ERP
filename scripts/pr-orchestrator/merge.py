@@ -185,9 +185,9 @@ def verify_main_merge_policy() -> tuple[bool, str]:
     status_checks = protection.get("required_status_checks") or {}
     required_contexts = set(status_checks.get("contexts") or [])
     required_check_names = {
-        str(item.get("context") or item.get("app_id") or "")
+        str(item["context"])
         for item in status_checks.get("checks") or []
-        if item.get("context") or item.get("app_id")
+        if item.get("context")
     }
 
     if not enforce_admins.get("enabled"):
@@ -213,9 +213,11 @@ def verify_main_merge_policy() -> tuple[bool, str]:
     required_checks_count = len(required_contexts | required_check_names)
     return (
         True,
-        f"main protection verified: administrator enforcement enabled, "
-        f"{required_approvals} required approval(s), "
-        f"{required_checks_count} required status check(s), strict checks enabled",
+        (
+            f"main protection verified: administrator enforcement enabled, "
+            f"{required_approvals} required approval(s), "
+            f"{required_checks_count} required status check(s), strict checks enabled"
+        ),
     )
 
 
