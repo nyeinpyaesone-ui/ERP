@@ -243,7 +243,10 @@ def execute(
             "stopped_reason": protection_detail,
             "all_selected_merged": False,
             "staging": (
-                {"success": False, "detail": "staging withheld because main merge protection is not verified"}
+                {
+                    "success": False,
+                    "detail": "staging withheld because main merge protection is not verified",
+                }
                 if deploy_staging
                 else None
             ),
