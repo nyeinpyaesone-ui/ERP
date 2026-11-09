@@ -112,9 +112,9 @@ For each selected PR:
 2. Re-run map/preflight against the current head and base SHAs.
 3. Verify classic branch protection is readable and enforces administrators, at least one approving review, at least one required status check, and strict up-to-date branches. Stop if any condition is missing or unreadable.
 4. Submit `gh pr merge --squash --match-head-commit <expected SHA>`; never pass `--admin` or enable auto-merge. GitHub remains the final merge authority; a merge-queue-only policy that rejects this request stops the batch.
-4. Confirm GitHub reports \`merged=true\` and returns a merge commit SHA.
-5. Wait for the repository's \`CI\` workflow on that exact merge SHA, \`event=push\`, \`branch=main\`.
-6. Proceed only when the run concludes \`success\`. Stop on failure, timeout, missing run, changed head, conflict, or policy rejection.
+5. Confirm GitHub reports \`merged=true\` and returns a merge commit SHA.
+6. Wait for the repository's \`CI\` workflow on that exact merge SHA, \`event=push\`, \`branch=main\`.
+7. Proceed only when the run concludes \`success\`. Stop on failure, timeout, missing run, changed head, conflict, or policy rejection.
 
 This is a bounded loop, not an infinite retry. Retry only after a new discovery/map pass. Never weaken tests or security gates to make the loop green.
 
