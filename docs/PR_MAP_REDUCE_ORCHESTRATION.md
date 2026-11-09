@@ -47,7 +47,8 @@ A map report is eligible only when:
 - The head SHA and base SHA still match the discovery snapshot.
 - GitHub confirms `mergeable=true` and `mergeable_state=clean`.
 - The combined commit status is `success`.
-- The newest observation for every check name/GitHub App is completed with `success`, `skipped`, or `neutral`.
+- The newest observation for every check name/GitHub App is completed and has no failure, cancellation, or timeout.
+- These mandatory checks must each be present and complete with `success`: Code Quality, CodeQL, Deploy Configuration, Frontend Build, Build Backend Image, Build Frontend Image, Security Scan, Secret Scan (Gitleaks), and Tests. Optional deploy and analysis checks may be skipped; a mandatory build or scan may not.
 - No reviewer's latest submitted review is `CHANGES_REQUESTED`.
 - Changed-file data is available.
 
