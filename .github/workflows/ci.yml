@@ -172,8 +172,8 @@ jobs:
       - name: Install backend dependencies
         run: |
           cd backend
-          pip install -r requirements.txt
-          pip install ruff black mypy
+          pip install -r requirements-dev.txt
+          pip install mypy
 
       - name: Run Ruff
         run: |
@@ -243,8 +243,7 @@ jobs:
       - name: Install backend dependencies
         run: |
           cd backend
-          pip install -r requirements.txt
-          pip install pytest pytest-cov pytest-asyncio
+          pip install -r requirements-dev.txt
 
       - name: Run Alembic migrations
         run: |
