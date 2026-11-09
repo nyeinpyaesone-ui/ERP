@@ -41,7 +41,8 @@ on:
 
 concurrency:
   group: pr-map-reduce-${{ github.repository }}-${{ github.ref }}
-  cancel-in-progress: false
+  # PR validation is supersedable; preserve manual plan/merge runs.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
