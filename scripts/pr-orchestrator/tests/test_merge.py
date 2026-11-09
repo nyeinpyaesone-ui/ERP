@@ -14,9 +14,7 @@ class MergeExecutorTests(unittest.TestCase):
     def test_main_merge_policy_requires_admin_review_and_strict_checks(self) -> None:
         protection = {
             "enforce_admins": {"enabled": True},
-            "required_pull_request_reviews": {
-                "required_approving_review_count": 1
-            },
+            "required_pull_request_reviews": {"required_approving_review_count": 1},
             "required_status_checks": {
                 "strict": True,
                 "contexts": ["CI"],
