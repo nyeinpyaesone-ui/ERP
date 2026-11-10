@@ -10,6 +10,17 @@ The ONLY real frontend (D-001). Root `/frontend` is deleted/broken — never cre
 ## Stack & layout
 
 - Vite 6.4.4 + React 18 (JSX, no TypeScript config — no tsconfig, no tsc step) + vite-plugin-pwa (generateSW).
+- **Tailwind CSS v4** (2026-10-15 migration, T-009): `@tailwindcss/vite` plugin in
+  `vite.config.js` (NOT the postcss route — `postcss.config.js` keeps only autoprefixer),
+  `src/index.css` starts with `@import "tailwindcss";` (never the v3 `@tailwind` directives),
+  and **there is no `tailwind.config.js`** (auto content detection; the unused `primary`
+  palette extension and the unused `tailwind-merge` dep were pruned in the same commit).
+  v3→v4 parity renames already applied: `flex-shrink-0`→`shrink-0`, `shadow-sm`→`shadow-xs`,
+  `outline-none`→`outline-hidden` — if styling "loses" a utility after a future edit,
+  check for v3-era class names first.
+- Deps of note: vitest **5.x** (jsdom, `vitest.config.ts`), react-router-dom **7.x**
+  (v7 = `react-router` re-export; v6 patterns like `BrowserRouter/Routes/Route/Link` unchanged).
+  `npm audit` = **0 vulnerabilities** (2026-10-15) — keep it that way; install with semver majors only after running the full battery.
 - Tests: Vitest (`vitest.config.ts`), 105 tests / 7 files. Lint: ESLint 10 flat config (`eslint.config.js`), currently 0 errors / 127 warnings — CI enforces errors fail.
 - `src/api/axios` is the ONLY API client (D-008). Pages/contexts must import it; tokens + 401 refresh live in the interceptor. Enforced by `src/**/single-client.test.js` — direct `axios`/`fetch` calls to the API fail the suite.
 

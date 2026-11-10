@@ -145,6 +145,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # Keep file bind mounts stable; the deploy script updates upstream-active.conf
+      # in place and reloads nginx only after validating the complete file.
       - ./nginx/upstream-blue.conf:/etc/nginx/conf.d/upstream-blue.conf:ro
       - ./nginx/upstream-green.conf:/etc/nginx/conf.d/upstream-green.conf:ro
       - ./nginx/upstream-active.conf:/etc/nginx/conf.d/upstream-active.conf:ro

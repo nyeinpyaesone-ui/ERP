@@ -13,6 +13,11 @@ config (detect) → { Secret Scan (Gitleaks), Code Quality (ruff+black enforced,
 - Environments: `staging` (main pushes only) + `production` (v* tags only), protection on both (D-017). Deploy over SSH via `scripts/deploy-blue-green.sh` (sources `scripts/lib.sh`).
 - Trivy: consumes the build jobs' single-line image ref (a "Resolve single image refs" step takes the FIRST line — metadata-action emits one ref per line; passing the raw multi-line value is the bug that used to kill the job). `exit-code` has no default → findings are advisory in SARIF, never fail CI (gating = pending policy call).
 - Other workflows: codeql.yml (schedule+push), opencode.yml (event-guarded), release.yml (tag `v*` or dispatch → verify images → GitHub Release from CHANGELOG.md).
+- **Gitleaks gotcha (v3.0.0):** the action requires an explicit
+  `env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}` (plus workflow
+  `pull-requests: read`) or **PR scans fail** with "GITHUB_TOKEN is now
+  required to scan pull requests" while push scans stay green — the
+  asymmetry is the tell. Fixed in `ci.yml`; keep the env when bumping the pin.
 - Snyk is REMOVED (D-016) — Trivy is the only container scanner; do not reintroduce Snyk or unpinned actions.
 
 ## Repo guard / hygiene

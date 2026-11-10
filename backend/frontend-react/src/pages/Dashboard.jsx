@@ -251,7 +251,7 @@ export default function Dashboard() {
           <div className="space-y-3">
             {(stats.recent_activity || []).slice(0, 8).map((activity, i) => (
               <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                <div className="w-2 h-2 bg-indigo-500 rounded-full flex-shrink-0" />
+                <div className="w-2 h-2 bg-indigo-500 rounded-full shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-[var(--color-text)] capitalize">{activity.action.replace(/_/g, ' ')}</p>
                   <p className="text-xs text-[var(--color-text-secondary)]">{activity.entity_type} • {activity.created_at ? new Date(activity.created_at).toLocaleString() : ''}</p>

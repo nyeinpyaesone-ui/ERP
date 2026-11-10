@@ -1,0 +1,66 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "name": "jev-dynamic-detect",
+  "router": {
+    "min_score": 2,
+    "max_candidates": 1,
+    "verbose": true,
+    "cache_ttl_seconds": 300
+  },
+  "erp_context": {
+    "sources": [
+      "git_last_commit",
+      "git_dirty",
+      "ci_status",
+      "test_coverage",
+      "error_budget"
+    ],
+    "git": {
+      "repo_path": ".",
+      "max_log_lines": 1
+    },
+    "ci": {
+      "provider": "github_actions",
+      "workflow_paths": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    "performance": {
+      "cache_enabled": true,
+      "parallel_context_fetch": false
+    }
+  },
+  "jev": {
+    "simulation_mode": true,
+    "require_approval_for_real": true,
+    "allowed_providers": [
+      "openrouter",
+      "typesafe"
+    ]
+  },
+  "output": {
+    "envelope_fields": [
+      "mode",
+      "jev_called",
+      "router_mode",
+      "task",
+      "decisions",
+      "scores",
+      "status",
+      "request_template",
+      "needs_review"
+    ],
+    "pretty_print": true
+  },
+  "standards": {
+    "compliance": [
+      "ISO/IEC 27001",
+      "SOC 2"
+    ],
+    "review_gates": [
+      "needs_review",
+      "approval_required"
+    ],
+    "audit_trail": true
+  }
+}

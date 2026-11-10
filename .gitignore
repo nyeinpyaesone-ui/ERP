@@ -81,3 +81,13 @@ ssl/
 !.env.example
 !.env.production.template
 !backend/.env.example
+
+# Jev-Intercept runtime events
+.opencode/intercept/
+
+# Blue-green deployment state (runtime-only)
+.active_color
+.active_version
+
+# Kubernetes runtime secrets (provision out-of-band)
+infra/k8s/**/secrets*.env
