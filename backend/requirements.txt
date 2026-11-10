@@ -28,7 +28,7 @@ PyJWT==2.15.1
 passlib[bcrypt]==1.7.4
 # passlib 1.7.4 breaks on bcrypt 5.x's removed __about__ module, hence the
 # upper bound. Exact-pinned (not just "<5") so the image is reproducible.
-bcrypt==4.3.0
+bcrypt==5.0.0
 
 # ── Integrations / clients ───────────────────────────────────────────────────
 httpx==0.28.1
