@@ -67,67 +67,61 @@ done
 
 success "Environment validation passed"
 
-# Wait for PostgreSQL
-info "Waiting for PostgreSQL..."
-DB_HOST=$(echo "${DATABASE_URL}" | sed -n 's/.*@\([^:]*\):.*/\1/p')
-DB_PORT=$(echo "${DATABASE_URL}" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
+# Wait for PostgreSQL and Redis using the production Python drivers.
+# This avoids shipping postgresql-client and redis-tools in the runtime image.
+info "Waiting for PostgreSQL and Redis..."
+python - <<'PY'
+import os
+import sys
+import time
 
-if [ -z "${DB_HOST}" ] || [ -z "${DB_PORT}" ]; then
-    error "Could not parse DATABASE_URL: ${DATABASE_URL}"
-    exit 1
-fi
+import redis
+from sqlalchemy import create_engine, text
 
-info "  Host: ${DB_HOST}, Port: ${DB_PORT}"
+engine = create_engine(
+    os.environ["DATABASE_URL"],
+    connect_args={"connect_timeout": 2},
+)
+redis_client = redis.Redis.from_url(
+    os.environ["REDIS_URL"],
+    socket_connect_timeout=2,
+    socket_timeout=2,
+)
 
-MAX_ATTEMPTS=60
-ATTEMPT=1
-while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-    if pg_isready -h "${DB_HOST}" -p "${DB_PORT}" -q 2>/dev/null; then
-        success "PostgreSQL is ready"
-        break
-    fi
-    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-        error "PostgreSQL not ready after ${MAX_ATTEMPTS} attempts"
-        exit 1
-    fi
-    info "  Attempt ${ATTEMPT}/${MAX_ATTEMPTS} - waiting..."
-    sleep 2
-    ((ATTEMPT++))
-done
+def wait_for(label, probe):
+    max_attempts = 60
+    for attempt in range(1, max_attempts + 1):
+        try:
+            probe()
+            print(f"[SUCCESS] {label} is ready", flush=True)
+            return
+        except Exception as exc:
+            if attempt == max_attempts:
+                print(
+                    f"[ERROR] {label} not ready after {max_attempts} attempts "
+                    f"({type(exc).__name__})",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                raise SystemExit(1) from exc
+            print(
+                f"[INFO] {label} readiness attempt {attempt}/{max_attempts} "
+                f"({type(exc).__name__}); retrying",
+                flush=True,
+            )
+            time.sleep(1)
 
-# Wait for Redis
-info "Waiting for Redis..."
-REDIS_HOST=$(echo "${REDIS_URL}" | sed -n 's/.*@\([^:]*\):.*/\1/p')
-REDIS_PORT=$(echo "${REDIS_URL}" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
+def check_postgres():
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
 
-if [ -z "${REDIS_HOST}" ] || [ -z "${REDIS_PORT}" ]; then
-    # Try alternative format redis://:password@host:port/db
-    REDIS_HOST=$(echo "${REDIS_URL}" | sed -n 's/.*@\([^:]*\):.*/\1/p')
-    REDIS_PORT=$(echo "${REDIS_URL}" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
-fi
-
-if [ -z "${REDIS_HOST}" ] || [ -z "${REDIS_PORT}" ]; then
-    warn "Could not parse REDIS_URL, using defaults"
-    REDIS_HOST="redis"
-    REDIS_PORT="6379"
-fi
-
-info "  Host: ${REDIS_HOST}, Port: ${REDIS_PORT}"
-
-ATTEMPT=1
-while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-    if redis-cli -h "${REDIS_HOST}" -p "${REDIS_PORT}" ping 2>/dev/null | grep -q PONG; then
-        success "Redis is ready"
-        break
-    fi
-    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-        error "Redis not ready after ${MAX_ATTEMPTS} attempts"
-        exit 1
-    fi
-    info "  Attempt ${ATTEMPT}/${MAX_ATTEMPTS} - waiting..."
-    sleep 2
-    ((ATTEMPT++))
-done
+try:
+    wait_for("PostgreSQL", check_postgres)
+    wait_for("Redis", redis_client.ping)
+finally:
+    engine.dispose()
+    redis_client.close()
+PY
 
 # Run database migrations
 info "Running database migrations..."

@@ -1,41 +1,111 @@
-# Build stage
-FROM python:3.11-slim AS builder
+# Build stage: Alpine avoids carrying unused Debian system utilities into runtime.
+FROM python:3.11.18-alpine3.24 AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk update \
+    && apk upgrade --no-cache \
+    && apk add --no-cache --virtual .build-deps \
+        build-base \
+        linux-headers \
+        freetype-dev \
+        libpng-dev \
+        libjpeg-turbo-dev \
+        postgresql-dev \
+        pkgconf \
+        zlib-dev
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+# CVE-2026-23949, CVE-2026-24049 and CVE-2026-8643 fixed toolchain versions.
+RUN python -m pip install --no-cache-dir --upgrade \
+    "pip>=26.1.2" \
+    "setuptools>=82.0.0" \
+    "wheel>=0.46.2"
 
-# Runtime stage
-FROM python:3.11-slim AS runtime
+COPY requirements-runtime.txt .
+# Matplotlib does not publish musllinux wheels; compile it against Alpine's
+# supported system libraries while the other dependencies use compatible wheels.
+RUN python -m pip install --no-cache-dir --user --no-binary=matplotlib -r requirements-runtime.txt \
+    && python -m pip check
+
+# Runtime stage: no compiler, headers, or package manager cache is shipped.
+FROM python:3.11.18-alpine3.24 AS runtime
 
 WORKDIR /app
 
-# Refresh the base interpreter tooling — the slim image ships pip 24.0 /
-# setuptools 79, which carry known advisories that Trivy flags as image
-# alerts (code-scanning "usr/local/lib/python3.11/..." findings).
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN apk update \
+    && apk upgrade --no-cache \
+    && apk add --no-cache \
+        bash \
+        ca-certificates \
+        fontconfig \
+        freetype \
+        libgfortran \
+        libjpeg-turbo \
+        libpng \
+        libpq \
+        libstdc++ \
+        ttf-dejavu \
+        zlib \
+    && update-ca-certificates
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 postgresql-client redis-tools curl wget ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home --shell /bin/bash app
+# Update image-provided Python packaging tools to non-vulnerable releases.
+# Remove unused build-time distributions and the old ensurepip bootstrap wheel.
+RUN python -m pip install --no-cache-dir --upgrade \
+    "pip>=26.1.2" \
+    "setuptools>=82.0.0" \
+    "wheel>=0.46.2" \
+    && python -m pip uninstall --yes setuptools wheel \
+    && if [ -d /usr/local/lib/python3.11/ensurepip/_bundled ]; then \
+        find /usr/local/lib/python3.11/ensurepip/_bundled -maxdepth 1 -type f -name 'setuptools-*.whl' -delete; \
+    fi \
+    && python - <<'PY'
+from importlib import metadata
+from pathlib import Path
 
-COPY --from=builder /root/.local /home/app/.local
-COPY --chown=app:app . .
+for package in ("setuptools", "wheel"):
+    matches = [
+        str(distribution._path)
+        for distribution in metadata.distributions()
+        if (distribution.metadata.get("Name") or "").lower() == package
+    ]
+    if matches:
+        raise SystemExit(f"Unexpected runtime build-tool metadata for {package}: {matches}")
 
-RUN chmod +x /app/entrypoint.sh
-RUN mkdir -p uploads static && chown -R app:app uploads static
+bundled = Path("/usr/local/lib/python3.11/ensurepip/_bundled")
+remaining = list(bundled.glob("setuptools-*.whl")) if bundled.exists() else []
+if remaining:
+    raise SystemExit(f"Unused vulnerable ensurepip wheels remain: {remaining}")
+print("Runtime packaging tools and bundled setuptools wheels are absent.")
+PY
 
-USER app
+COPY --from=builder --chown=10001:10001 /root/.local /home/app/.local
+COPY --chown=10001:10001 . .
 
+# Match the runtime user's user-site package path during the smoke test.
+ENV HOME=/home/app
 ENV PATH="/home/app/.local/bin:${PATH}"
 ENV PYTHONPATH=/app
+ENV MPLBACKEND=Agg
+ENV MPLCONFIGDIR=/tmp/matplotlib
+
+RUN chmod +x /app/entrypoint.sh \
+    && install -d -m 0755 -o 10001 -g 10001 \
+        /app/uploads \
+        /app/static \
+        /home/app \
+    && python - <<'PY'
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import psycopg2
+
+figure, axis = plt.subplots()
+axis.plot([1, 2], [1, 2])
+figure.savefig("/tmp/matplotlib-smoke.png")
+plt.close(figure)
+PY
+
+USER 10001:10001
 
 EXPOSE 8000
 

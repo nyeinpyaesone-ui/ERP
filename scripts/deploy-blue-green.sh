@@ -292,6 +292,11 @@ stop_old_environment() {
 
 load_env() {
     if erp_detect_env_file; then
+        expected_env_file=".env.${DEPLOY_TARGET_ENVIRONMENT}"
+        if [ "$(basename "${ERP_ENV_FILE}")" != "${expected_env_file}" ]; then
+            error "Target ${DEPLOY_TARGET_ENVIRONMENT} requires ${expected_env_file}; refusing cross-environment env-file override."
+            return 1
+        fi
         info "Loading environment from ${ERP_ENV_FILE}"
         # Parsed rather than sourced: an env file is data, and a value holding
         # a space or a $ must not be able to run code as a side effect.

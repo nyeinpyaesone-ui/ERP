@@ -1,16 +1,16 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: erp_solution-metrics
-  namespace: erp_solution-monitoring
+  name: erp-solution-metrics
+  namespace: erp-solution-monitoring
   labels:
-    app.kubernetes.io/name: erp_solution-metrics
+    app.kubernetes.io/name: erp-solution-metrics
     app.kubernetes.io/part-of: erp_solution
     release: prometheus
 spec:
   namespaceSelector:
     matchNames:
-    - erp_solution
+    - erp-solution
   selector:
     matchLabels:
       app.kubernetes.io/part-of: erp_solution
@@ -23,10 +23,10 @@ spec:
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: erp_solution-alerts
-  namespace: erp_solution-monitoring
+  name: erp-solution-alerts
+  namespace: erp-solution-monitoring
   labels:
-    app.kubernetes.io/name: erp_solution-alerts
+    app.kubernetes.io/name: erp-solution-alerts
     app.kubernetes.io/part-of: erp_solution
     release: prometheus
 spec:
@@ -36,9 +36,9 @@ spec:
     - alert: AIERPApiHighErrorRate
       expr: |
         (
-          sum(rate(http_requests_total{job=~"erp_solution-api",status=~"5.."}[5m]))
+          sum(rate(http_requests_total{job=~"erp-solution-api",status=~"5.."}[5m]))
           /
-          sum(rate(http_requests_total{job=~"erp_solution-api"}[5m]))
+          sum(rate(http_requests_total{job=~"erp-solution-api"}[5m]))
         ) > 0.05
       for: 5m
       labels:
@@ -50,7 +50,7 @@ spec:
     - alert: AIERPApiHighLatency
       expr: |
         histogram_quantile(0.95,
-          sum(rate(http_request_duration_seconds_bucket{job=~"erp_solution-api"}[5m])) by (le, namespace, pod)
+          sum(rate(http_request_duration_seconds_bucket{job=~"erp-solution-api"}[5m])) by (le, namespace, pod)
         ) > 2
       for: 5m
       labels:
@@ -61,7 +61,7 @@ spec:
 
     - alert: AIERPApiPodRestart
       expr: |
-        rate(kube_pod_container_status_restarts_total{namespace="erp_solution",container="api"}[15m]) > 0
+        rate(kube_pod_container_status_restarts_total{namespace="erp-solution",container="api"}[15m]) > 0
       for: 5m
       labels:
         severity: warning
@@ -71,7 +71,7 @@ spec:
 
     - alert: AIERPDBHighConnections
       expr: |
-        pg_stat_activity_count{namespace="erp_solution"} > 150
+        pg_stat_activity_count{namespace="erp-solution"} > 150
       for: 5m
       labels:
         severity: warning
@@ -81,7 +81,7 @@ spec:
 
     - alert: AIERPDBReplicationLag
       expr: |
-        pg_replication_lag{namespace="erp_solution"} > 300
+        pg_replication_lag{namespace="erp-solution"} > 300
       for: 5m
       labels:
         severity: critical
@@ -91,7 +91,7 @@ spec:
 
     - alert: AIERPWorkerQueueDepth
       expr: |
-        queue_depth{namespace="erp_solution"} > 1000
+        queue_depth{namespace="erp-solution"} > 1000
       for: 5m
       labels:
         severity: warning
@@ -102,9 +102,9 @@ spec:
     - alert: AIERPPVCUsage
       expr: |
         (
-          kubelet_volume_stats_used_bytes{namespace="erp_solution"}
+          kubelet_volume_stats_used_bytes{namespace="erp-solution"}
           /
-          kubelet_volume_stats_capacity_bytes{namespace="erp_solution"}
+          kubelet_volume_stats_capacity_bytes{namespace="erp-solution"}
         ) > 0.85
       for: 5m
       labels:

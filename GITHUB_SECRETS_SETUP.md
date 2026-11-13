@@ -1,45 +1,47 @@
-# GitHub Secrets Setup for Docker Push
+# GitHub Actions Configuration
 
-## Required Secrets
+The authoritative configuration contract is in docs/GITHUB_SECRETS.md.
 
-Go to: https://github.com/nyeinpyaesone-ui/ERP/settings/secrets/actions
+## Recommended setup
 
-### 1. Add Repository Variables
+From a trusted operator workstation, authenticate GitHub CLI with repository
+administration and Actions secret/variable permissions, then run:
 
-| Name | Value |
-|------|-------|
-| DOCKER_USER | powerrangeranikg |
-
-### 2. Add Repository Secrets
-
-| Name | Value |
-|------|-------|
-| DOCKER_PAT_BACKEND | (Your backend token - starts with dckr_pat_) |
-| DOCKER_PAT_FRONTEND | (Your frontend token - starts with dckr_pat_) |
-
-### 3. How to Add
-
-1. Click "New repository secret"
-2. Enter Name (e.g., DOCKER_PAT_BACKEND)
-3. Enter Value (paste your token)
-4. Click "Add secret"
-5. Repeat for all secrets
-
-## After Setup
-
-Push a tag to trigger build:
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+gh auth login
+bash scripts/configure-github-actions.sh
 ```
 
-GitHub Actions will automatically:
-- Build backend image
-- Build frontend image
-- Push both to Docker Hub
+Requirements: gh, jq, and ssh-keygen.
 
-## Verify
+The bootstrapper configures:
+- Repository variables: DOCKER_USER, STAGING_DOMAIN, PRODUCTION_DOMAIN.
+- Existing Docker Hub push secrets are preserved unless explicitly replaced.
+- Separate staging/production SSH private keys and pinned known_hosts.
+- Staging/production SSH host and non-root user secrets.
+- GitHub Environments with main and v* deployment-ref policies.
 
-Check your Docker Hub:
-- https://hub.docker.com/r/powerrangeranikg/erp-solution-backend
-- https://hub.docker.com/r/powerrangeranikg/erp-solution-frontend
+It prompts for real infrastructure values and local file paths. Never paste
+tokens or private keys into chat, source files, issue comments, or terminal
+arguments. Verify host key fingerprints out-of-band before supplying
+known_hosts files.
+
+## Current CI/CD behavior
+
+- A push to main builds/tests; it does not automatically deploy.
+- Staging requires manual CI dispatch on main with deploy_staging=true.
+- Production requires manual CI dispatch on a v* tag with
+  deploy_production=true.
+- The target hosts also need separate runtime env files and read-only Docker
+  Hub pull credentials. GitHub Actions secrets do not replace host runtime
+  configuration.
+
+Verify names only:
+
+```bash
+gh secret list --repo nyeinpyaesone-ui/ERP
+gh variable list --repo nyeinpyaesone-ui/ERP
+```
+
+See docs/PRODUCTION_DEPLOYMENT.md and infra/k8s/SECRETS.md for the separate
+runtime paths.

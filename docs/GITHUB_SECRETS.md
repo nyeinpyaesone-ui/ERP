@@ -12,12 +12,13 @@ Go to **Settings → Secrets and variables → Actions**.
 
 | Secret | Used by | Notes |
 |--------|---------|-------|
-| `DOCKER_PAT_BACKEND` | `ci.yml` → `docker-backend` | Access token scoped to `powerrangeranikg/erp-solution-backend` |
-| `DOCKER_PAT_FRONTEND` | `ci.yml` → `docker-frontend` | Access token scoped to `powerrangeranikg/erp-solution-frontend` |
+| `DOCKER_PAT_BACKEND` | `ci.yml` → `docker-backend` | Docker Hub read/write access token for publishing `${DOCKER_USER}/erp-solution-backend` |
+| `DOCKER_PAT_FRONTEND` | `ci.yml` → `docker-frontend` | Docker Hub read/write access token for publishing `${DOCKER_USER}/erp-solution-frontend` |
 
 The username is **not** a secret — it is the `DOCKER_USER` repository variable
-(see §2). Separate tokens per image keep a frontend-only push from being able
-to overwrite the backend image.
+(see §2). Keep separate tokens per image for independent rotation and audit. Use a
+restricted registry service account; apply repository-level access controls
+where the Docker Hub account or organization supports them.
 
 Generate a token at <https://hub.docker.com/settings/access/tokens>.
 
@@ -103,25 +104,136 @@ Frontend: the browser bundle reads `VITE_API_URL` at build time
 (see `backend/frontend-react/.env.example`); unset means same-origin
 `/api/v1`, which is correct for the packaged nginx setup.
 
-## 4. Setting secrets
+## 4. Configure GitHub Actions
+
+The repository has a guarded setup script. It validates values before writing
+and preserves the existing `DOCKER_PAT_BACKEND` and `DOCKER_PAT_FRONTEND`
+secrets. It creates the `staging` and `production` GitHub Environments if
+missing with custom deployment-ref policies enabled and adds only the required
+branch/tag rules. If an existing environment has custom policies disabled, the
+script stops and asks an administrator to enable them in Settings; it does not
+replace an existing environment definition or change reviewer, wait-timer, or
+other protection settings.
+
+First prepare two host-key files on a trusted operator workstation. Obtain the
+expected SSH host fingerprints from each hosting provider, compare them with
+the scan result, and only then save the verified keys:
 
 ```bash
-gh auth login
-
-gh secret set DOCKER_PAT_BACKEND < /secure/path/docker-backend-push-token.txt
-gh secret set DOCKER_PAT_FRONTEND < /secure/path/docker-frontend-push-token.txt
-gh secret set STAGING_SSH_PRIVATE_KEY < /secure/path/staging_deploy_key
-gh secret set PRODUCTION_SSH_PRIVATE_KEY < /secure/path/production_deploy_key
-gh secret set STAGING_KNOWN_HOSTS < /secure/path/staging_known_hosts
-gh secret set PRODUCTION_KNOWN_HOSTS < /secure/path/production_known_hosts
-gh secret set STAGING_HOST --body "<staging-host>"
-gh secret set STAGING_USER --body "<staging-user>"
-gh secret set PRODUCTION_HOST --body "<production-host>"
-gh secret set PRODUCTION_USER --body "<production-user>"
-gh variable set DOCKER_USER --body "<docker-hub-namespace>"
+ssh-keyscan -H <staging-host> > /secure/path/staging_known_hosts
+ssh-keyscan -H <production-host> > /secure/path/production_known_hosts
+ssh-keygen -F <staging-host> -f /secure/path/staging_known_hosts
+ssh-keygen -F <production-host> -f /secure/path/production_known_hosts
+chmod 600 /secure/path/*_known_hosts
 ```
 
-## 5. Verification
+Do not treat `ssh-keyscan` itself as authentication; it only collects the key
+presented by the network peer. Verify the fingerprint independently before
+using the result.
+
+Then configure the repository. Replace the example values with the actual
+repository namespace, FQDNs, host addresses, and SSH login users. The script
+generates separate Ed25519 keys locally and stores their private halves as
+the corresponding GitHub Actions secrets:
+
+```bash
+bash scripts/configure-github-actions.sh \\
+  --repo OWNER/ERP \\
+  --docker-user <docker-hub-namespace> \\
+  --staging-domain <staging-fqdn> \\
+  --production-domain <production-fqdn> \\
+  --staging-host <staging-host> \\
+  --staging-user <staging-ssh-user> \\
+  --production-host <production-host> \\
+  --production-user <production-ssh-user> \\
+  --staging-known-hosts /secure/path/staging_known_hosts \\
+  --production-known-hosts /secure/path/production_known_hosts \\
+  --generate-keys \\
+  --apply
+```
+
+Install the two public keys printed by the script into the matching host
+accounts' `~/.ssh/authorized_keys`. Restrict those accounts and keys to the
+deployment directory and the minimum Docker/Compose operations required.
+Never copy a staging private key to production or vice versa.
+
+The existing Docker PAT secrets are preserved. If a PAT secret is ever missing,
+create separate image-scoped read/write tokens on Docker Hub and supply only
+the matching token file with `--backend-token-file` or
+`--frontend-token-file`; do not paste PAT values in chat, shell history, or
+repository files.
+
+The optional `OPENCODE_API_KEY` is not required for Docker publishing or
+deployment. When the OpenCode automation integration is intentionally enabled,
+supply `--opencode-key-file /secure/path/opencode-key.txt`; the setup script
+adds it only when the repository secret is absent and never overwrites an
+existing key.
+
+Validate repository configuration without writing by omitting `--apply`.
+The script requires the real host/domain values and verified known-host files.
+It also requires `gh` authenticated to the target repository and `jq`
+installed.
+
+On repeat runs, matching variables and existing deployment secrets are
+preserved. If a repository variable differs, the script stops unless
+`--replace-existing-config` is supplied. That flag also permits replacing
+staging/production host, user, host-key, and SSH-key secrets; it never rotates
+Docker PAT or OpenCode secrets. To rotate generated SSH keys, use a new
+`--key-dir` together with `--replace-existing-config`, then install the new
+public keys on their matching hosts before deploying.
+
+## 5. Configure runtime hosts
+
+Run the runtime generator once on each dedicated server. Use the exact
+hostname/domain that is served by that environment; the generated backend CORS
+origin defaults to `https://<domain>` so it matches the exact host in `STAGING_DOMAIN` or `PRODUCTION_DOMAIN`. Pass `--cors-origins` when additional frontend origins must be allowed.
+
+Staging host (prepare the protected install directory first):
+
+```bash
+install -d -m 0750 /opt/erp-solution
+bash scripts/configure-environment.sh \\
+  --environment staging \\
+  --domain <staging-domain> \\
+  --docker-user <docker-hub-namespace> \\
+  --version <published-sha-tag> \\
+  --dir /opt/erp-solution
+```
+
+Production host:
+
+```bash
+bash scripts/configure-environment.sh \\
+  --environment production \\
+  --domain <production-domain> \\
+  --docker-user <docker-hub-namespace> \\
+  --version <published-v-tag> \\
+  --dir /opt/erp-solution
+```
+
+The generator refuses to overwrite an existing env file, creates unique
+database, Redis, and application secrets, and writes mode `0600`. It does not
+print the secret values. Back up the files only through your approved encrypted
+secret-management process. Both hosts must be separate because the Compose
+stack has fixed container names. The application-level `ENVIRONMENT` remains
+`prod` on both hosts; the deploy target chooses the staging or production
+configuration file.
+
+Each host also needs read-only Docker Hub credentials so it can pull both
+images. Provision a native Docker credential helper first, then run
+`scripts/configure-host-registry.sh` interactively with a read-only token:
+
+```bash
+bash scripts/configure-host-registry.sh \\
+  --docker-user <docker-hub-namespace> \\
+  --image-tag <published-sha-or-v-tag>
+```
+
+The host script refuses to store a token in Docker's base64-only
+`config.json`, requires a credential helper, and checks both image manifests.
+Use the same namespace and tag that CI published.
+
+## 6. Verification
 
 ```bash
 gh secret list          # names + updated timestamps (values are never shown)
@@ -131,28 +243,27 @@ gh variable list
 If a required deploy secret is missing, the `Deploy Configuration` job reports
 that capability as unavailable and skips the corresponding deploy job. The
 SSH step also fails closed if a pinned known-hosts value is unexpectedly empty.
-A failed image push almost always means `DOCKER_USER` or one of the
-`DOCKER_PAT_*` tokens.
+A failed image push usually means a missing/wrong `DOCKER_USER`, a PAT without
+write access to its matching repository, or a repository name mismatch.
 
-## 6. GitHub Environments (Settings → Environments)
+## 7. GitHub Environments (Settings → Environments)
 
 `ci.yml`'s deploy jobs declare `environment: staging` / `environment: production`.
 Both environments must exist, otherwise the jobs fail at the deployment-record
-step. Configured policy (created 2026-10-11):
+step. Required policy:
 
 | Environment | Deployment branch policy | Rationale |
 |-------------|--------------------------|-----------|
-| `staging` | selected branches → `main` only | staging deploys on every push to main |
-| `production` | selected tags → `v*` only | production deploys only from release tags |
+| `staging` | selected branches → `main` only | staging deploys only after explicit manual workflow_dispatch approval on main |
+| `production` | selected tags → `v*` only | production deploys only after explicit manual workflow_dispatch approval on a v* tag |
 
-The policies are fail-closed: no other ref can create a deployment. No
-required reviewers are configured — deploys are automated blue-green; add a
-reviewer rule here if human approval is ever wanted (the job will pause
-waiting for it).
+The policies are fail-closed: no other ref can create a deployment. No required reviewers are configured by this setup script. The workflow itself
+requires an explicit manual dispatch boolean for each environment; add GitHub
+Environment reviewers separately when formal approval is required.
 
-The `copilot` environment is auto-created by GitHub Copilot's coding agent —
-leave it alone. Do not create environments named after tools (`Docker` etc.);
-nothing references them.
+The setup script creates only `staging` and `production`. Leave unrelated
+environments alone; do not create environments named after tools (`Docker`,
+etc.) because the workflows do not reference them.
 
 ```bash
 gh api repos/OWNER/ERP/environments --jq '.environments[].name'

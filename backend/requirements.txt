@@ -1,6 +1,6 @@
-# Runtime dependencies.
-# Pinned to the versions installed in backend/venv so local runs match the
-# Docker image (python:3.11-slim) and CI.  Run `make venv` after changing.
+# Full development and test environment.
+# Production containers install only requirements-runtime.txt; CI/local
+# development installs this complete manifest. Run `make venv` after changing.
 
 # ── Core ─────────────────────────────────────────────────────────────────────
 fastapi==0.142.2

@@ -29,17 +29,22 @@ There is no tracked `base/secrets.yaml` template. Never create or commit one.
 ## Before any cluster deployment
 
 1. Confirm the intended Kubernetes context and account.
-2. Follow [SECRETS.md](SECRETS.md) to provision Secrets out of band.
-3. Build and publish the exact GHCR images referenced by the manifests.
-4. Validate the manifests and their runtime contract against the actual
+2. Create the target application namespace and Secret with
+   `scripts/provision-k8s-secrets.sh`, using an explicit `--context`, a protected
+   secret file, and `--create-namespace --apply` only after reviewing the
+   namespace. This is separate from applying the workload overlay.
+3. Create the monitoring namespace separately with
+   `kubectl --context <context> apply -f infra/k8s/monitoring/namespace.yaml`.
+4. Build and publish the exact GHCR images referenced by the manifests.
+5. Validate the manifests and their runtime contract against the actual
    container images. In particular, verify container ports, health endpoints,
    ConfigMap keys, Secret keys, storage classes, Ingress/TLS, and service
    accounts.
-5. Fix and test the Redis password configuration and backup CronJob image:
+6. Fix and test the Redis password configuration and backup CronJob image:
    the current Redis ConfigMap contains a shell-style variable expression
    that Redis does not expand, and the current PostgreSQL image does not
    provide the AWS CLI invoked by the backup command.
-6. Review the rendered output and cluster diff before applying anything.
+7. Review the rendered output and cluster diff before applying anything.
 
 ## Read-only manifest validation
 

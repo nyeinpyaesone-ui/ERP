@@ -9,44 +9,82 @@ Secret; provision it **before** applying an environment overlay.
 
 | Environment | Namespace | Secret name |
 |---|---|---|
-| Production | `erp_solution` | `erp_solution-secrets` |
-| Staging | `erp_solution-staging` | `staging-erp_solution-secrets` |
+| Development | `erp-solution-dev` | not provisioned by this script |
+| Staging | `erp-solution-staging` | `staging-erp-solution-secrets` |
+| Production | `erp-solution` | `erp-solution-secrets` |
 
 The staging overlay applies the `staging-` name prefix and changes the
 namespace. Kustomize also rewrites the workload `secretRef` name, so the
-staging Secret must be named `staging-erp_solution-secrets`. Confirm rendered
+staging Secret must be named `staging-erp-solution-secrets`. Confirm rendered
 names with `kubectl kustomize` before applying.
 
 ## Provisioning
 
-Create the environment file outside the repository on a trusted operator
-machine. Restrict its permissions (for example, `chmod 600`) and populate it
-from the approved secret manager. Do not paste values into shell history,
-tickets, chat, CI logs, or Git.
+Use `infra/k8s/secrets.env.template` only as a key-name reference; it contains
+placeholders and must never be applied. Create the real environment file
+outside the repository on a trusted operator machine. Restrict its permissions
+(`chmod 600`) and populate it from the approved secret manager. The provisioner
+rejects `REPLACE_WITH_*` and other placeholder values. Do not paste values into
+shell history, tickets, chat, CI logs, or Git.
 
-Production:
+Required keys are taken from the current base manifest's explicit
+`secretKeyRef` entries:
+
+- `DB_USER`
+- `DB_PASSWORD`
+- `REDIS_PASSWORD`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+
+The Secret is provisioned by `scripts/provision-k8s-secrets.sh`. It defaults
+to validation-only mode, requires an explicit Kubernetes context, refuses
+files inside the repository or with group/other permissions, and never prints
+Secret data.
+
+Validate the Secret input and intended context first. With
+`--create-namespace`, the script reports the namespace it would create but
+does not change the cluster in validation mode:
 
 ```bash
-kubectl create secret generic erp_solution-secrets \
-  --namespace erp_solution \
-  --from-env-file=/secure/path/erp-production.env \
-  --dry-run=client -o yaml | kubectl apply -f -
+bash scripts/provision-k8s-secrets.sh \
+  --environment production \
+  --context <production-context> \
+  --file /secure/path/erp-production.env \
+  --create-namespace
 ```
 
-Staging:
+Apply only after reviewing the context, namespace, and Secret target. The
+explicit `--apply --create-namespace` flags create the namespace if missing
+and then create the Secret. Existing Secret data is not replaced unless
+`--replace-existing` is also supplied:
 
 ```bash
-kubectl create secret generic staging-erp_solution-secrets \
-  --namespace erp_solution-staging \
-  --from-env-file=/secure/path/erp-staging.env \
-  --dry-run=client -o yaml | kubectl apply -f -
+bash scripts/provision-k8s-secrets.sh \
+  --environment production \
+  --context <production-context> \
+  --file /secure/path/erp-production.env \
+  --create-namespace \
+  --apply
 ```
 
-Then validate the Secret exists without printing its data:
+For staging, use `--environment staging`, the staging cluster context, and
+the staging-specific env file. Create the development namespace separately
+with `kubectl --context <development-context> create namespace erp-solution-dev`;
+the provisioner intentionally has no development Secret mapping. Do not reuse
+staging or production Secret values in development.
+
+Create the shared monitoring namespace separately, when enabling the monitoring
+scaffold:
 
 ```bash
-kubectl -n erp_solution get secret erp_solution-secrets
-kubectl -n erp_solution-staging get secret staging-erp_solution-secrets
+kubectl --context <cluster-context> apply -f infra/k8s/monitoring/namespace.yaml
+```
+
+Verify only the Secret metadata (not its data) and render both overlays:
+
+```bash
+kubectl --context <production-context> -n erp-solution get secret erp-solution-secrets
+kubectl --context <staging-context> -n erp-solution-staging get secret staging-erp-solution-secrets
 kubectl kustomize infra/k8s/overlays/staging
 kubectl kustomize infra/k8s/overlays/production
 ```

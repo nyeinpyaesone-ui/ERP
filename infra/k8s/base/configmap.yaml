@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: erp_solution-config
-  namespace: erp_solution
+  name: erp-solution-config
+  namespace: erp-solution
   labels:
     app.kubernetes.io/name: erp_solution
     app.kubernetes.io/component: config
@@ -13,14 +13,14 @@ data:
   APP_LOG_LEVEL: "info"
 
   # Database
-  DB_HOST: "erp_solution-postgres"
+  DB_HOST: "erp-solution-postgres"
   DB_PORT: "5432"
   DB_NAME: "erp_solution_production"
   DB_POOL_MIN: "5"
   DB_POOL_MAX: "20"
 
   # Redis
-  REDIS_HOST: "erp_solution-redis"
+  REDIS_HOST: "erp-solution-redis"
   REDIS_PORT: "6379"
   REDIS_DB: "0"
 

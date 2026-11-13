@@ -77,6 +77,7 @@ jobs:
         id: detect
         env:
           DOCKER_USER_VAR: ${{ vars.DOCKER_USER }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
           PAT_BACKEND: ${{ secrets.DOCKER_PAT_BACKEND }}
           PAT_FRONTEND: ${{ secrets.DOCKER_PAT_FRONTEND }}
           STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
@@ -85,13 +86,26 @@ jobs:
           PRODUCTION_KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
           STAGING_HOST: ${{ secrets.STAGING_HOST }}
           STAGING_USER: ${{ secrets.STAGING_USER }}
+          STAGING_DOMAIN_VAR: ${{ vars.STAGING_DOMAIN }}
           PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
           PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          PRODUCTION_DOMAIN_VAR: ${{ vars.PRODUCTION_DOMAIN }}
         run: |
           set -euo pipefail
           user="${DOCKER_USER_VAR:-local}"
           if [ -n "${DOCKER_USER_VAR}" ] && [[ ! "${DOCKER_USER_VAR}" =~ ^[a-z0-9][a-z0-9_-]{0,127}$ ]]; then
             echo "::error::DOCKER_USER must be a valid lowercase Docker Hub namespace."
+            exit 1
+          fi
+          valid_domain() {
+            [[ "$1" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]
+          }
+          if [ -n "${STAGING_DOMAIN_VAR}" ] && ! valid_domain "${STAGING_DOMAIN_VAR}"; then
+            echo "::error::STAGING_DOMAIN must be a lowercase FQDN without scheme, port, or path."
+            exit 1
+          fi
+          if [ -n "${PRODUCTION_DOMAIN_VAR}" ] && ! valid_domain "${PRODUCTION_DOMAIN_VAR}"; then
+            echo "::error::PRODUCTION_DOMAIN must be a lowercase FQDN without scheme, port, or path."
             exit 1
           fi
           echo "docker_user=${user}" >> "$GITHUB_OUTPUT"
@@ -101,8 +115,17 @@ jobs:
             exit 1
           fi
 
+          if [ -n "${STAGING_DOMAIN_VAR}" ] && [ "${STAGING_DOMAIN_VAR}" = "${PRODUCTION_DOMAIN_VAR}" ]; then
+            echo "::error::STAGING_DOMAIN and PRODUCTION_DOMAIN must be different."
+            exit 1
+          fi
+
           can_push=false
-          if [ -n "${DOCKER_USER_VAR}" ] && [ -n "${PAT_BACKEND}" ] && [ -n "${PAT_FRONTEND}" ]; then
+          # Never publish from a pull request, even when repository secrets are available.
+          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ] \
+             && [ -n "${DOCKER_USER_VAR}" ] \
+             && [ -n "${PAT_BACKEND}" ] \
+             && [ -n "${PAT_FRONTEND}" ]; then
             can_push=true
           fi
           echo "can_push=${can_push}" >> "$GITHUB_OUTPUT"
@@ -110,7 +133,8 @@ jobs:
           can_deploy_staging=false
           if [ "${can_push}" = true ] \
              && [ -n "${STAGING_SSH_KEY}" ] \
-             && [ -n "${STAGING_KNOWN_HOSTS}" ] && [ -n "${STAGING_HOST}" ] && [ -n "${STAGING_USER}" ]; then
+             && [ -n "${STAGING_KNOWN_HOSTS}" ] && [ -n "${STAGING_HOST}" ] && [ -n "${STAGING_USER}" ] \
+             && [ -n "${STAGING_DOMAIN_VAR}" ] && valid_domain "${STAGING_DOMAIN_VAR}"; then
             can_deploy_staging=true
           fi
           echo "can_deploy_staging=${can_deploy_staging}" >> "$GITHUB_OUTPUT"
@@ -118,7 +142,8 @@ jobs:
           can_deploy_production=false
           if [ "${can_push}" = true ] \
              && [ -n "${PRODUCTION_SSH_KEY}" ] \
-             && [ -n "${PRODUCTION_KNOWN_HOSTS}" ] && [ -n "${PRODUCTION_HOST}" ] && [ -n "${PRODUCTION_USER}" ]; then
+             && [ -n "${PRODUCTION_KNOWN_HOSTS}" ] && [ -n "${PRODUCTION_HOST}" ] && [ -n "${PRODUCTION_USER}" ] \
+             && [ -n "${PRODUCTION_DOMAIN_VAR}" ] && valid_domain "${PRODUCTION_DOMAIN_VAR}"; then
             can_deploy_production=true
           fi
           echo "can_deploy_production=${can_deploy_production}" >> "$GITHUB_OUTPUT"
@@ -130,18 +155,22 @@ jobs:
             echo "|---|---|"
             echo "| Image namespace | \`${user}\` |"
             echo "| Push images to Docker Hub | \`${can_push}\` |"
+            echo "| Staging domain configured | \`$([ -n "${STAGING_DOMAIN_VAR}" ] && echo true || echo false)\` |"
             echo "| Staging deploy | \`${can_deploy_staging}\` |"
+            echo "| Production domain configured | \`$([ -n "${PRODUCTION_DOMAIN_VAR}" ] && echo true || echo false)\` |"
             echo "| Production deploy | \`${can_deploy_production}\` |"
             echo ""
-            if [ "${can_push}" = false ]; then
+            if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+              echo "Pull requests build and scan images locally; registry publishing is disabled."
+            elif [ "${can_push}" = false ]; then
               echo "DOCKER_USER and/or Docker Hub push tokens are unset, so images are"
-              echo "built and validated but not pushed. See docs/GITHUB_SECRETS.md."
+              echo "built and validated locally but not pushed. See docs/GITHUB_SECRETS.md."
             fi
             if [ "${can_deploy_staging}" = false ]; then
-              echo "Staging deploy is skipped until its image-push and staging SSH configuration exists."
+              echo "Staging deploy is skipped until image push, staging SSH, pinned host keys, and STAGING_DOMAIN are configured."
             fi
             if [ "${can_deploy_production}" = false ]; then
-              echo "Production deploy is skipped until its image-push and production SSH configuration exists."
+              echo "Production deploy is skipped until image push, production SSH, pinned host keys, and PRODUCTION_DOMAIN are configured."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -181,9 +210,55 @@ jobs:
       - name: Validate deployment scripts and Compose configuration
         run: |
           set -euo pipefail
-          bash -n scripts/lib.sh
-          bash -n scripts/deploy-blue-green.sh
+          for script in \
+            install.sh \
+            scripts/lib.sh \
+            scripts/deploy-blue-green.sh \
+            scripts/configure-environment.sh \
+            scripts/configure-github-actions.sh \
+            scripts/configure-host-registry.sh \
+            scripts/provision-k8s-secrets.sh; do
+            bash -n "$script"
+          done
+
+          # Exercise the generator with disposable values. No generated secret
+          # is printed or persisted outside this job's temporary directory.
+          temp_env_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_env_dir"' EXIT
+          bash scripts/configure-environment.sh \
+            --environment staging \
+            --domain staging.example.test \
+            --docker-user example \
+            --version sha-0123456 \
+            --cors-origins "https://staging.example.test,https://admin.example.test" \
+            --dir "$temp_env_dir"
+          test "$(stat -c '%a' "$temp_env_dir/.env.staging")" = "600"
+          grep -Fxq 'CORS_ORIGINS=https://staging.example.test,https://admin.example.test' "$temp_env_dir/.env.staging"
+          docker compose --env-file "$temp_env_dir/.env.staging" -f docker-compose.prod.yml config --quiet
           docker compose --env-file .env.production.template -f docker-compose.prod.yml config --quiet
+
+          # Render the Kubernetes scaffold as a validation-only path. This does
+          # not apply resources or require a cluster context.
+          if command -v kubectl >/dev/null 2>&1; then
+            for environment in development staging production; do
+              kubectl kustomize "infra/k8s/overlays/$environment" > "$temp_env_dir/k8s-$environment.yaml"
+              test -s "$temp_env_dir/k8s-$environment.yaml"
+            done
+            grep -Fq '  namespace: erp-solution-dev' "$temp_env_dir/k8s-development.yaml"
+            grep -Fq '  namespace: erp-solution-staging' "$temp_env_dir/k8s-staging.yaml"
+            grep -Fq '  namespace: erp-solution' "$temp_env_dir/k8s-production.yaml"
+            if grep -Eq '^  (name|namespace): erp_solution' "$temp_env_dir"/k8s-*.yaml; then
+              echo "::error::Kubernetes output contains an invalid underscore-based resource name or namespace."
+              exit 1
+            fi
+          elif command -v kustomize >/dev/null 2>&1; then
+            for environment in development staging production; do
+              kustomize build "infra/k8s/overlays/$environment" > "$temp_env_dir/k8s-$environment.yaml"
+              test -s "$temp_env_dir/k8s-$environment.yaml"
+            done
+          else
+            echo "::warning::kubectl/kustomize is unavailable; Kubernetes overlays were not rendered in this job."
+          fi
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -229,6 +304,21 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
+
+      - name: Verify production runtime dependency manifest
+        run: |
+          set -euo pipefail
+          cd backend
+          python -m venv /tmp/erp-runtime-smoke
+          /tmp/erp-runtime-smoke/bin/python -m pip install --disable-pip-version-check -r requirements-runtime.txt
+          DATABASE_URL=postgresql://erp_user:erp_password@localhost:5432/erp_db \
+          REDIS_URL=redis://localhost:6379/0 \
+          SECRET_KEY=ci-runtime-smoke-secret-key-32-characters \
+          ENVIRONMENT=test \
+          PYTHONPATH="$PWD" \
+            /tmp/erp-runtime-smoke/bin/python -c "from app.main import app; import app.scripts.seed_defaults; assert app is not None; print('Production runtime imports passed')" \
+          && /tmp/erp-runtime-smoke/bin/python -m alembic --version \
+          && /tmp/erp-runtime-smoke/bin/python -m uvicorn --version
 
       - name: Install backend dependencies
         run: |
@@ -291,7 +381,7 @@ jobs:
     name: Build Backend Image
     runs-on: ubuntu-latest
     needs: [test, config]
-    if: github.event_name != 'pull_request'
+    # Build on PRs too; config forces PR images to load locally without publishing.
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
       image_sha_tag: ${{ steps.immutable.outputs.image_tag }}
@@ -414,17 +504,60 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-latest
     needs: [docker-backend, docker-frontend, config]
-    # Trivy scans published images; the deploy jobs require this job to pass.
-    if: github.event_name != 'pull_request' && needs.config.outputs.can_push == 'true'
+    # Scan locally loaded PR/unpublished images as well as published release images.
+    if: >-
+      always()
+      && needs.docker-backend.result == 'success'
+      && needs.docker-frontend.result == 'success'
+      && needs.config.result == 'success'
     timeout-minutes: 20
-    # Scan immutable SHA tags. HIGH/CRITICAL findings fail this job; SARIF
-    # upload still runs so findings remain visible in GitHub code scanning.
+    # Each GitHub Actions job has an isolated runner/daemon. Rebuild locally here
+    # when images were not published, so Trivy scans the exact immutable tags.
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Docker Buildx
+        if: needs.config.outputs.can_push != 'true'
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Load backend image into security runner
+        if: needs.config.outputs.can_push != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./backend
+          load: true
+          tags: ${{ needs.docker-backend.outputs.image_sha_ref }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Load frontend image into security runner
+        if: needs.config.outputs.can_push != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./backend/frontend-react
+          load: true
+          tags: ${{ needs.docker-frontend.outputs.image_sha_ref }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,scope=frontend
       - name: Log in to Docker Hub for backend scan
+        if: needs.config.outputs.can_push == 'true'
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ needs.config.outputs.docker_user }}
           password: ${{ secrets.DOCKER_PAT_BACKEND }}
+
+      # Human-readable diagnostics are retained in the job log and artifact.
+      # This pass is informational; the SARIF pass below owns the blocking gate.
+      - name: Report backend HIGH/CRITICAL findings
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
+        with:
+          image-ref: ${{ needs.docker-backend.outputs.image_sha_ref }}
+          exit-code: '0'
+          severity: CRITICAL,HIGH
+          format: table
+          output: trivy-backend.txt
 
       - name: Run Trivy on backend
         id: trivy-backend
@@ -438,10 +571,21 @@ jobs:
           output: trivy-backend.sarif
 
       - name: Log in to Docker Hub for frontend scan
+        if: needs.config.outputs.can_push == 'true'
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ needs.config.outputs.docker_user }}
           password: ${{ secrets.DOCKER_PAT_FRONTEND }}
+
+      - name: Report frontend HIGH/CRITICAL findings
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
+        with:
+          image-ref: ${{ needs.docker-frontend.outputs.image_sha_ref }}
+          exit-code: '0'
+          severity: CRITICAL,HIGH
+          format: table
+          output: trivy-frontend.txt
 
       - name: Run Trivy on frontend
         id: trivy-frontend
@@ -455,18 +599,33 @@ jobs:
           output: trivy-frontend.sarif
 
       - name: Upload Trivy backend results
-        if: always() && hashFiles('trivy-backend.sarif') != ''
+        if: always() && github.event_name != 'pull_request' && hashFiles('trivy-backend.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend
 
       - name: Upload Trivy frontend results
-        if: always() && hashFiles('trivy-frontend.sarif') != ''
+        if: always() && github.event_name != 'pull_request' && hashFiles('trivy-frontend.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: trivy-frontend.sarif
           category: trivy-frontend
+
+      # Keep machine-readable and human-readable reports for PR and non-PR runs,
+      # including runs where Trivy reports findings and the enforcement gate fails.
+      - name: Archive Trivy reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: trivy-image-reports-${{ github.run_id }}
+          path: |
+            trivy-backend.sarif
+            trivy-frontend.sarif
+            trivy-backend.txt
+            trivy-frontend.txt
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Enforce image vulnerability gate
         if: always()
