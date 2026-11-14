@@ -67,66 +67,39 @@ done
 
 success "Environment validation passed"
 
-# Wait for PostgreSQL
+# Wait for PostgreSQL using the already-installed psycopg2 driver.
 info "Waiting for PostgreSQL..."
-DB_HOST=$(echo "${DATABASE_URL}" | sed -n 's/.*@\([^:]*\):.*/\1/p')
-DB_PORT=$(echo "${DATABASE_URL}" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
-
-if [ -z "${DB_HOST}" ] || [ -z "${DB_PORT}" ]; then
-    error "Could not parse DATABASE_URL: ${DATABASE_URL}"
-    exit 1
-fi
-
-info "  Host: ${DB_HOST}, Port: ${DB_PORT}"
-
 MAX_ATTEMPTS=60
 ATTEMPT=1
-while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-    if pg_isready -h "${DB_HOST}" -p "${DB_PORT}" -q 2>/dev/null; then
+while [ "$ATTEMPT" -le "$MAX_ATTEMPTS" ]; do
+    if python -c 'import os, psycopg2; connection = psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=3); connection.close()' >/dev/null 2>&1; then
         success "PostgreSQL is ready"
         break
     fi
-    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+    if [ "$ATTEMPT" -eq "$MAX_ATTEMPTS" ]; then
         error "PostgreSQL not ready after ${MAX_ATTEMPTS} attempts"
         exit 1
     fi
     info "  Attempt ${ATTEMPT}/${MAX_ATTEMPTS} - waiting..."
     sleep 2
-    ((ATTEMPT++))
+    ATTEMPT=$((ATTEMPT + 1))
 done
 
-# Wait for Redis
+# Wait for Redis using redis-py instead of redis-tools.
 info "Waiting for Redis..."
-REDIS_HOST=$(echo "${REDIS_URL}" | sed -n 's/.*@\([^:]*\):.*/\1/p')
-REDIS_PORT=$(echo "${REDIS_URL}" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
-
-if [ -z "${REDIS_HOST}" ] || [ -z "${REDIS_PORT}" ]; then
-    # Try alternative format redis://:password@host:port/db
-    REDIS_HOST=$(echo "${REDIS_URL}" | sed -n 's/.*@\([^:]*\):.*/\1/p')
-    REDIS_PORT=$(echo "${REDIS_URL}" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
-fi
-
-if [ -z "${REDIS_HOST}" ] || [ -z "${REDIS_PORT}" ]; then
-    warn "Could not parse REDIS_URL, using defaults"
-    REDIS_HOST="redis"
-    REDIS_PORT="6379"
-fi
-
-info "  Host: ${REDIS_HOST}, Port: ${REDIS_PORT}"
-
 ATTEMPT=1
-while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-    if redis-cli -h "${REDIS_HOST}" -p "${REDIS_PORT}" ping 2>/dev/null | grep -q PONG; then
+while [ "$ATTEMPT" -le "$MAX_ATTEMPTS" ]; do
+    if python -c 'import os, redis; redis.Redis.from_url(os.environ["REDIS_URL"], socket_connect_timeout=3, socket_timeout=3).ping()' >/dev/null 2>&1; then
         success "Redis is ready"
         break
     fi
-    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+    if [ "$ATTEMPT" -eq "$MAX_ATTEMPTS" ]; then
         error "Redis not ready after ${MAX_ATTEMPTS} attempts"
         exit 1
     fi
     info "  Attempt ${ATTEMPT}/${MAX_ATTEMPTS} - waiting..."
     sleep 2
-    ((ATTEMPT++))
+    ATTEMPT=$((ATTEMPT + 1))
 done
 
 # Run database migrations
