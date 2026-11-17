@@ -50,65 +50,68 @@ The deployment system uses:
 - **Ports**: 80, 443, 22 (SSH) open
 
 ### Required Secrets (GitHub)
-Configure these in GitHub repository settings → Secrets and variables → Actions:
 
-| Secret | Description |
-|--------|-------------|
-| `DOCKER_PAT_BACKEND` | Docker Hub PAT for backend images |
-| `DOCKER_PAT_FRONTEND` | Docker Hub PAT for frontend images |
-| `DB_PASSWORD` | PostgreSQL password |
-| `REDIS_PASSWORD` | Redis password |
-| `SECRET_KEY` | JWT secret (32+ chars) |
-| `CORS_ORIGINS_PROD` | Production CORS origins |
-| `CORS_ORIGINS_STAGING` | Staging CORS origins |
-| `API_URL_PROD` | Production API URL |
-| `API_URL_STAGING` | Staging API URL |
-| `WS_URL_PROD` | Production WebSocket URL |
-| `WS_URL_STAGING` | Staging WebSocket URL |
-| `SSH_PRIVATE_KEY_PROD` | SSH private key for production |
-| `SSH_PRIVATE_KEY_STAGING` | SSH private key for staging |
-| `SSH_HOST_PROD` | Production server hostname/IP |
-| `SSH_HOST_STAGING` | Staging server hostname/IP |
-| `SSH_USER_PROD` | Production SSH user |
-| `SSH_USER_STAGING` | Staging SSH user |
+The exact names are consumed by .github/workflows/ci.yml. Configure repository-level
+Actions secrets with scripts/configure-github-actions.sh:
+
+| Secret | Scope |
+|---|---|
+| DOCKER_PAT_BACKEND / DOCKER_PAT_FRONTEND | Separate image-scoped Docker Hub push tokens |
+| STAGING_SSH_PRIVATE_KEY / PRODUCTION_SSH_PRIVATE_KEY | Separate, dedicated, unencrypted deploy keys |
+| STAGING_KNOWN_HOSTS / PRODUCTION_KNOWN_HOSTS | Out-of-band verified pinned host keys |
+| STAGING_HOST / STAGING_USER | Staging host and non-root deploy account |
+| PRODUCTION_HOST / PRODUCTION_USER | Production host and non-root deploy account |
 
 ### Required Variables (GitHub)
-Configure these in GitHub repository settings → Variables:
 
-| Variable | Description |
-|----------|-------------|
-| `DOCKER_USER` | Docker Hub username |
-| `STAGING_DOMAIN` | Staging domain (e.g., staging.yourdomain.com) |
-| `PRODUCTION_DOMAIN` | Production domain (e.g., api.yourdomain.com) |
+| Variable | Purpose |
+|---|---|
+| DOCKER_USER | Docker Hub namespace |
+| STAGING_DOMAIN | Staging deployment URL hostname |
+| PRODUCTION_DOMAIN | Production deployment URL hostname |
+
+Database, Redis, JWT and integration credentials are runtime host configuration,
+not GitHub Actions secrets. Keep independent .env.staging and .env.production
+files on their respective hosts, mode 0600.
+
+DOCKER_USER is mandatory. Compose and deployment scripts do not silently fall
+back to a personal Docker Hub namespace.
 
 ## Initial Server Setup
 
-Run once on new servers:
+Provision staging and production on **separate hosts**. The current Compose
+stack uses fixed container names and must not share one host between these
+environments.
+
+### Production host
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/yourorg/erp-solution.git /opt/erp-solution
+git clone git@github.com:nyeinpyaesone-ui/ERP.git /opt/erp-solution
 cd /opt/erp-solution
-
-# 2. Create environment file
-cp .env.example .env.production
-# Edit .env.production with all required values
-
-# 3. Create SSL directory
-mkdir -p /opt/erp-solution/ssl /opt/erp-solution/logs/nginx /opt/erp-solution/backups
-
-# 4. Run initial SSL setup (first time only)
-./scripts/setup-ssl.sh api.yourdomain.com admin@yourdomain.com
-
-# 5. Start production stack
-docker compose -f docker-compose.prod.yml up -d
-
-# 6. Verify deployment
-# /health and /ready are served by the API, so they carry the /api/v1 prefix
-# once they pass through nginx
-curl https://api.yourdomain.com/api/v1/health
-curl https://api.yourdomain.com/api/v1/ready
+sudo ./install.sh erp.example.com ops@example.com
 ```
+
+The installer generates unique DB, Redis and application secrets, prompts for
+the Docker Hub namespace, and writes /opt/erp-solution/.env.production with
+mode 0600. Use the real production domain and contact email. Configure a
+read-only Docker Hub credential on the host using its credential helper.
+
+### Staging host
+
+```bash
+git clone git@github.com:nyeinpyaesone-ui/ERP.git /opt/erp-solution
+cd /opt/erp-solution
+install -m 0600 .env.staging.template /opt/erp-solution/.env.staging
+```
+
+Replace every CHANGE_ME value with unique staging-only values, set the real
+staging CORS origin and the configured Docker Hub namespace, then confirm
+permissions remain 0600. Configure a separate read-only Docker Hub credential.
+Never copy production secrets into staging.
+
+The GitHub Actions bootstrapper configures repository variables/secrets and
+Environment ref policies; it does not create host files or deploy. See
+docs/GITHUB_SECRETS.md before the first deployment.
 
 ## Deployment Commands
 
@@ -141,20 +144,25 @@ There is no `deploy-*`, `rollback` or `logs-*` target — deployment runs from
 
 ### Using GitHub Actions
 
-There is no standalone deploy workflow. `.github/workflows/` holds `ci.yml`
-(gates + blue-green deploy jobs, skipped until the SSH/Docker secrets exist),
-`codeql.yml` and `release.yml` — deploys run from `ci.yml` when configured,
-otherwise deployment is manual via `./scripts/deploy-blue-green.sh`.
+The CI workflow builds and tests on pushes; pushes do not deploy automatically.
+Staging requires a manual CI dispatch on main with deploy_staging=true.
+Production requires a manual CI dispatch on a v* tag with
+deploy_production=true. The Release workflow publishes a GitHub Release after
+the tag's CI run succeeds and both immutable Docker images are verified.
+
+Run bash scripts/configure-github-actions.sh to provision repository
+variables/secrets and GitHub Environment ref policies. Actual host runtime env
+files and read-only Docker Hub pull credentials are configured separately.
 
 ## Blue-Green Deployment Details
 
 ### How It Works
 
-1. **Two Environments**: Blue (active) and Green (staging)
+1. **Two Colors per Host**: Blue (active) and Green (inactive); staging and production are separate hosts
 2. **Shared Database**: Both environments use the same PostgreSQL/Redis
-3. **Traffic Switch**: Nginx upstream symlink swap (< 1 second)
+3. **Traffic Switch**: Nginx upstream file is updated in place, validated, and reloaded; the previous file is retained for rollback
 4. **Health Verification**: Comprehensive checks before switch
-5. **Instant Rollback**: Swap symlink back if issues detected
+5. **Rollback**: Restore the exact previous Nginx upstream file if validation or post-switch checks fail
 
 ### Container Naming
 
@@ -178,7 +186,7 @@ otherwise deployment is manual via `./scripts/deploy-blue-green.sh`.
 4. Run smoke tests (health, ready, API root)
         │
         ▼
-5. Switch Nginx upstream (atomic symlink)
+5. Update and validate the Nginx upstream file, then reload Nginx
         │
         ▼
 6. Verify post-switch with external checks
@@ -383,8 +391,10 @@ echo "blue" > /opt/erp-solution/.active_color
 - [ ] Redis password set
 - [ ] JWT secret 32+ characters
 - [ ] CORS origins restricted to known domains
-- [ ] SSH keys for deployment are dedicated (not personal)
-- [ ] GitHub Environments configured for production approval
+- [ ] Separate non-root SSH deploy users and distinct keys for staging/production
+- [ ] Pinned known_hosts verified out-of-band
+- [ ] GitHub Environments restricted to main and v* refs
+- [ ] Production required reviewer configured when independent approval is required
 - [ ] Dependabot alerts enabled and monitored
 
 ## Performance Tuning
