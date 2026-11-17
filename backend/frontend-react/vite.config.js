@@ -21,25 +21,24 @@ export default defineConfig(async ({ command }) => {
     }),
   ]
 
-  // The interceptor is development-only and lives outside the frontend
-  // Docker build context. Load it only for the Vite dev server so production
-  // image builds remain self-contained.
-  if (command === 'serve') {
-    // Keep this import out of esbuild's static dependency graph: the plugin
-    // lives at the repository root, outside this package's Docker context.
-    // Resolve both common working directories used by local development.
+  // The Jev-Intercept plugin is optional and lives outside the normal frontend
+  // build context. CI/test runners do not have this repo-root helper installed,
+  // so Vitest and build validation should never fail just because it is absent.
+  const isVitestRun = !!process.env.VITEST
+
+  if (command === 'serve' && !isVitestRun) {
     const interceptorPath = [
       resolve(process.cwd(), '../../.opencode/skills/jev-intercept/scripts/frontend_intercept.js'),
       resolve(process.cwd(), '.opencode/skills/jev-intercept/scripts/frontend_intercept.js'),
     ].find(existsSync)
 
-    if (!interceptorPath) {
-      throw new Error('Jev-Intercept dev plugin not found from the current working directory')
+    if (interceptorPath) {
+      const interceptorUrl = pathToFileURL(interceptorPath).href
+      const { jevInterceptPlugin } = await import(interceptorUrl)
+      plugins.push(jevInterceptPlugin())
+    } else {
+      console.warn('Skipping Jev-Intercept dev plugin: not found in the current workspace.')
     }
-
-    const interceptorUrl = pathToFileURL(interceptorPath).href
-    const { jevInterceptPlugin } = await import(interceptorUrl)
-    plugins.push(jevInterceptPlugin())
   }
 
   return {
