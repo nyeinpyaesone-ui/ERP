@@ -35,6 +35,8 @@ This guide covers zero-downtime production deployments using the `deploy-blue-gr
 ## Prerequisites
 
 - ✅ Initial installation complete (`install.sh` run successfully)
+- ✅ Separate `/opt/erp-solution/.env.staging` and `.env.production` files populated with environment-specific credentials (mode `0600`)
+- ✅ Staging and production use separate hosts; the Compose stack has fixed container names
 - ✅ Blue environment running and healthy
 - ✅ Docker images built/pushed for new version (or using `latest`)
 - ✅ Access to production server via SSH
@@ -54,7 +56,7 @@ cd /opt/erp-solution  # or wherever repo is cloned
 
 | Step | Action | Duration | Failure Behavior |
 |------|--------|----------|------------------|
-| 1 | Load `/opt/erp-solution/.env.production` | <1s | Exit if missing |
+| 1 | Load `.env.staging` or `.env.production` for the target environment | <1s | Exit if missing; never fall back across environments |
 | 2 | Validate environment | <1s | Exit on invalid config |
 | 3 | Pull images for **inactive** color | 30-120s | Retry/pull error → exit |
 | 4 | Start inactive backend + frontend | 10-30s | Container start error → exit |
@@ -94,20 +96,32 @@ If smoke tests fail **after** traffic switch, the script automatically:
 3. Exits with error
 
 ### Manual Rollback
+
+Redeploy the exact immutable image tag you want to restore:
+
 ```bash
-# Rollback to previous version (stored in .previous_version)
 ./scripts/deploy-blue-green.sh production v1.2.2 --rollback
 ```
 
+The `--rollback` flag requires an explicit tag; `latest` is rejected.
+Both backend and frontend images must exist under the selected tag, and the
+target host must be authenticated to the registry.
+
 **What happens:**
-1. Reads `.previous_version` file (e.g., `v1.2.2`)
-2. Identifies current active color (e.g., `green`)
-3. Switches traffic to inactive color (e.g., `blue`) which runs `v1.2.2`
-4. Stops the failed environment (`green` running `v1.2.3`)
 
-> **Note:** Rollback only works if the previous version's containers still exist (they're stopped, not removed). After a successful deploy, the old environment is stopped but preserved for rollback.
+1. Validate the requested tag.
+2. Pull both backend and frontend images using that same tag.
+3. Start the inactive color with the selected version.
+4. Wait for health checks and run smoke tests.
+5. Switch traffic only after the inactive color is healthy.
+6. Record the active color and version in `.active_color` and
+   `.active_version`.
 
----
+This is a blue-green redeployment of the selected release, not a retag of the
+backend image as the frontend image and not an implicit lookup of a
+`.previous_version` file. If checks fail before traffic switches, the
+current active color remains live. If post-switch smoke tests fail, traffic is
+switched back and the prior active-version record is restored.
 
 ## Smoke Tests Explained
 
