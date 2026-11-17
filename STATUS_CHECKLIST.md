@@ -1,94 +1,60 @@
-# ERP SOLUTION v1.0.0 — Final Status Checklist
+# ERP SOLUTION — Deployment Configuration Status
 
-## ✅ COMPLETED
+Verified: 2026-11-08
+Active deployment path: GitHub Actions → Docker Hub → Docker Compose blue-green
+Kubernetes: separate scaffold; not connected to the current CI/CD pipeline.
 
-### Repository
-- [x] 274 files at tag `v1.0.0` pushed to GitHub
-- [x] 3 commits at tag `v1.0.0` (current tree: `git ls-files | wc -l`)
-- [x] v1.0.0 tag
-- [x] README with badges and architecture
-- [x] All documentation complete
+## Completed
 
-### Code & Modules
-- [x] 12 core modules (backend, frontend, mobile, infra)
-- [x] Dockerfiles for backend and frontend
-- [x] docker-compose.yml (dev)
-- [x] docker-compose.prod.yml (production)
-- [x] nginx.conf (reverse proxy)
+- [x] PR #154 merged to main: secret manifest removed, Kustomize secret references documented, staging rollback and release workflow hardening completed.
+- [x] Main CI after merge passed: run 42465025608.
+- [x] Gitleaks, CodeQL, Ruff, Black, ESLint, backend tests, frontend build and Compose/shell validation passed in the merged PR CI.
+- [x] Separate staging and production deployment gates exist.
+- [x] Deployment requires explicit manual workflow-dispatch inputs; main/tag pushes do not deploy automatically.
+- [x] No deployment was triggered by this configuration work.
 
-### CI/CD
-- [x] GitHub Actions workflow (.github/workflows/ci.yml)
-- [x] Automatic build on tag push
-- [x] Docker Hub push configured
+## Current blockers verified from the main CI runner
 
-### Documentation
-- [x] README.md
-- [x] CONTRIBUTING.md
-- [x] CHANGELOG.md
-- [x] SECURITY.md
-- [x] CODE_OF_CONDUCT.md
-- [x] ROADMAP.md
-- [x] Production deployment guide
-- [x] API documentation
-- [x] FAQ
-- [x] Troubleshooting guide
+| Setting | State | Evidence / action |
+|---|---|---|
+| DOCKER_PAT_BACKEND | Present | Masked environment value in Deploy Configuration run |
+| DOCKER_PAT_FRONTEND | Present | Masked environment value in Deploy Configuration run |
+| DOCKER_USER repository variable | Missing | Set through scripts/configure-github-actions.sh |
+| STAGING_SSH_PRIVATE_KEY | Missing | Provide dedicated staging deploy key |
+| PRODUCTION_SSH_PRIVATE_KEY | Missing | Provide separate production deploy key |
+| STAGING_KNOWN_HOSTS / PRODUCTION_KNOWN_HOSTS | Missing | Supply out-of-band verified pinned host keys |
+| STAGING_HOST / STAGING_USER | Missing | Supply actual staging target and non-root deploy account |
+| PRODUCTION_HOST / PRODUCTION_USER | Missing | Supply actual production target and non-root deploy account |
+| STAGING_DOMAIN / PRODUCTION_DOMAIN | Not verified by the latest config job (it does not read these variables) | Set and verify through scripts/configure-github-actions.sh |
+| Host runtime env files | Not verified | Create separate .env.staging and .env.production on their respective hosts |
+| Host Docker Hub pull access | Not verified | Configure read-only credentials on each host |
+| Production required reviewer | Not verified | Set explicitly in GitHub Environment if policy requires it |
 
-## ⏳ PENDING (You need to do this)
+## Follow-up PR
 
-### GitHub Secrets
-- [ ] Add DOCKER_USER = powerrangeranikg
-- [ ] Add DOCKER_PAT_BACKEND = (your backend token)
-- [ ] Add DOCKER_PAT_FRONTEND = (your frontend token)
+PR #155 — https://github.com/nyeinpyaesone-ui/ERP/pull/155
 
-### Docker Hub
-- [ ] Push backend image (erp-solution-backend)
-- [ ] Push frontend image (erp-solution-frontend)
-- [ ] Verify images show "latest" tag
+Adds:
+- Interactive GitHub Actions configuration bootstrapper.
+- Staging runtime env template.
+- Explicit Docker namespace requirement (removes personal namespace fallbacks).
+- Installer validation and CI validation for both Compose templates.
 
-### Production Deployment
-- [ ] Get server (cloud or local)
-- [ ] Install Docker on server
-- [ ] Copy docker-compose.prod.yml
-- [ ] Configure .env.production
-- [ ] Start services
+PR #155 must pass its latest CI checks and be reviewed before merge.
 
-## 🚀 NEXT ACTIONS
+## Operator sequence after PR #155 is approved and merged
 
-### To Get Images Live (Option 1: GitHub Actions)
-1. Go to https://github.com/nyeinpyaesone-ui/ERP/settings/secrets/actions
-2. Add the 3 secrets (use your actual tokens, not these placeholders)
-3. Push a tag: git tag v1.0.0 && git push origin v1.0.0
-4. Watch build at https://github.com/nyeinpyaesone-ui/ERP/actions
-5. Check Docker Hub after 10 minutes
+1. From a trusted workstation, run:
+   bash scripts/configure-github-actions.sh
+2. Provide actual hostnames, domains, SSH users, dedicated private keys and pinned known_hosts files. The script preserves existing Docker Hub tokens unless replacement is explicitly requested.
+3. On each host, provision the matching runtime env file with mode 0600 and configure read-only Docker Hub pull credentials.
+4. Verify both images exist for the intended immutable tag.
+5. Dispatch CI on main with deploy_staging=true for staging.
+6. After staging validation and independent approval, dispatch CI on the v* tag with deploy_production=true for production.
 
-### To Get Images Live (Option 2: Local Build)
-1. On your computer with Docker:
-   git clone https://github.com/nyeinpyaesone-ui/ERP.git
-   cd ERP
-   docker login -u powerrangeranikg
-   docker build -t powerrangeranikg/erp-solution-backend:v1.0.0 ./backend
-   docker build -t powerrangeranikg/erp-solution-frontend:v1.0.0 ./backend/frontend-react
-   docker push powerrangeranikg/erp-solution-backend:v1.0.0
-   docker push powerrangeranikg/erp-solution-frontend:v1.0.0
+## Safety boundaries
 
-## 📊 Current Status
-
-| Component | Status | URL |
-|-----------|--------|-----|
-| GitHub Repo | ✅ Live | https://github.com/nyeinpyaesone-ui/ERP |
-| Docker Hub Backend | ⏳ Empty | https://hub.docker.com/r/powerrangeranikg/erp-solution-backend |
-| Docker Hub Frontend | ⏳ Empty | https://hub.docker.com/r/powerrangeranikg/erp-solution-frontend |
-| GitHub Actions | ✅ Ready | https://github.com/nyeinpyaesone-ui/ERP/actions |
-
-## 📞 Support
-
-| Contact | Details |
-|---------|---------|
-| Email | nyeinpyaesone273@gmail.com |
-| LinkedIn | linkedin.com/in/nyein-pyae-sone-3250501ba |
-| GitHub | github.com/nyeinpyaesone-ui/ERP |
-| Phone | +959699795380 |
-
----
-
-ERP SOLUTION v1.0.0 — Code is complete, images need to be pushed! 🚀
+- Staging and production must use separate hosts for the current fixed-name Compose stack.
+- Do not use production secrets on staging.
+- Do not store runtime secrets in Git, issue comments, chat, or CI logs.
+- Do not apply infra/k8s overlays as the production path; GHCR image publishing and cluster deployment are not implemented.

@@ -196,7 +196,9 @@ jobs:
           set -euo pipefail
           bash -n scripts/lib.sh
           bash -n scripts/deploy-blue-green.sh
-          docker compose --env-file .env.production.template -f docker-compose.prod.yml config --quiet
+          bash -n scripts/configure-github-actions.sh
+          DOCKER_USER=ci-validation docker compose --env-file .env.production.template -f docker-compose.prod.yml config --quiet
+          DOCKER_USER=ci-validation docker compose --env-file .env.staging.template -f docker-compose.prod.yml config --quiet
 
   test:
     name: Tests
@@ -554,7 +556,7 @@ jobs:
           auto_inactive: true
 
       - name: Set deployment status to in_progress
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.STAGING_DOMAIN }}
@@ -642,7 +644,7 @@ jobs:
           REMOTE
       - name: Set deployment status to success
         if: success()
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.STAGING_DOMAIN }}
@@ -651,7 +653,7 @@ jobs:
 
       - name: Set deployment status to failure
         if: failure()
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.STAGING_DOMAIN }}
@@ -684,7 +686,7 @@ jobs:
           ref: ${{ github.sha }}
           auto_inactive: true
       - name: Set deployment status to in_progress
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.PRODUCTION_DOMAIN }}
@@ -754,7 +756,7 @@ jobs:
           REMOTE
       - name: Set deployment status to success
         if: success()
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.PRODUCTION_DOMAIN }}
@@ -762,7 +764,7 @@ jobs:
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
       - name: Set deployment status to failure
         if: failure()
-        uses: chrnorm/deployment-status@598d987f3a8dec3817b995f810e6de7c06c92106 # releases/v1
+        uses: chrnorm/deployment-status@6df8d036fd2fee9eb82936733953da1f8382b41e # releases/v1
         with:
           token: ${{ github.token }}
           target_url: https://${{ vars.PRODUCTION_DOMAIN }}

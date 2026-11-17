@@ -39,7 +39,7 @@ services:
 
   # Backend API (Blue - Primary)
   backend:
-    image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION:-latest}
+    image: ${DOCKER_USER:?Set DOCKER_USER in the environment file}/erp-solution-backend:${VERSION:-latest}
     container_name: erp-blue-backend
     restart: unless-stopped
     entrypoint: ["/app/entrypoint.sh"]
@@ -70,7 +70,7 @@ services:
 
   # Backend API (Green - Staging/Blue-Green)
   backend-green:
-    image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION:-latest}
+    image: ${DOCKER_USER:?Set DOCKER_USER in the environment file}/erp-solution-backend:${VERSION:-latest}
     container_name: erp-green-backend
     restart: unless-stopped
     entrypoint: ["/app/entrypoint.sh"]
@@ -103,7 +103,7 @@ services:
 
   # Frontend Web App (Blue - Primary)
   frontend:
-    image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION:-latest}
+    image: ${DOCKER_USER:?Set DOCKER_USER in the environment file}/erp-solution-frontend:${VERSION:-latest}
     container_name: erp-blue-frontend
     restart: unless-stopped
     # Frontend image contains built dist/ from build; no volume needed
@@ -114,7 +114,7 @@ services:
 
   # Frontend Web App (Green - Staging/Blue-Green)
   frontend-green:
-    image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION:-latest}
+    image: ${DOCKER_USER:?Set DOCKER_USER in the environment file}/erp-solution-frontend:${VERSION:-latest}
     container_name: erp-green-frontend
     restart: unless-stopped
     networks:
