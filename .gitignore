@@ -80,6 +80,7 @@ ssl/
 .env.*
 !.env.example
 !.env.production.template
+!.env.staging.template
 !backend/.env.example
 
 # Jev-Intercept runtime events
