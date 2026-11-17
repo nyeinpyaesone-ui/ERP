@@ -1,0 +1,54 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md", "AGENTS PROFILE/MEMORY.md"],
+  "watcher": {
+    "ignore": [
+      "**/__pycache__/**",
+      "**/*.pyc",
+      "backend/venv/**",
+      "**/node_modules/**",
+      "backend/frontend-react/dist/**",
+      "scripts/backups/**",
+      ".git/**"
+    ]
+  },
+  "permissions": [
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "glob", "resource": "*", "effect": "allow" },
+    { "action": "grep", "resource": "*", "effect": "allow" },
+    { "action": "edit", "resource": "*", "effect": "allow" },
+    { "action": "webfetch", "resource": "*", "effect": "allow" },
+    { "action": "websearch", "resource": "*", "effect": "allow" },
+    { "action": "shell", "resource": "*", "effect": "allow" },
+    { "action": "shell", "resource": "git push *", "effect": "ask" },
+    { "action": "shell", "resource": "rm -rf *", "effect": "ask" },
+    { "action": "shell", "resource": ".opencode/skills/jev-intercept/scripts/run_backend_intercept.sh", "effect": "allow" },
+    { "action": "shell", "resource": ".opencode/skills/jev-dynamic-detect/scripts/jev-detect.sh", "effect": "allow" },
+    { "action": "shell", "resource": ".opencode/skills/jev-intercept/scripts/jev-intercept.sh", "effect": "allow" }
+  ],
+  "mcp": {
+    "servers": {
+      "postgres": {
+        "type": "local",
+        "command": ["bash", "scripts/mcp-postgres.sh"]
+      },
+      "filesystem": {
+        "type": "local",
+        "command": [
+          "npx",
+          "-y",
+          "@modelcontextprotocol/server-filesystem",
+          "/home/admin/ERP/backend"
+        ]
+      },
+      "playwright": {
+        "type": "local",
+        "command": ["npx", "-y", "@playwright/mcp"]
+      },
+      "sequential-thinking": {
+        "type": "local",
+        "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+      }
+    }
+  }
+}
