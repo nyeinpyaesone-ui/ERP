@@ -128,7 +128,7 @@ validate_compose_config() {
 
     local missing=()
     local key value
-    for key in DB_PASSWORD REDIS_PASSWORD SECRET_KEY CORS_ORIGINS; do
+    for key in DB_PASSWORD REDIS_PASSWORD SECRET_KEY CORS_ORIGINS DOCKER_USER; do
         value="$(erp_env_value "${key}" || true)"
         if [ -z "${value}" ] || [ "${value}" = "CHANGE_ME_GENERATE_WITH_OPENSSL_RAND_BASE64_24" ] \
            || [ "${value}" = "CHANGE_ME_GENERATE_WITH_OPENSSL_RAND_HEX_32" ] \
@@ -139,6 +139,11 @@ validate_compose_config() {
     if [ "${#missing[@]}" -gt 0 ]; then
         erp_error "Unset or placeholder values in ${ERP_ENV_FILE}: ${missing[*]}"
         erp_die "Fix them, or delete the env file to have one generated."
+    fi
+    local docker_user
+    docker_user="$(erp_env_value DOCKER_USER)"
+    if [[ ! "${docker_user}" =~ ^[a-z0-9][a-z0-9_-]{0,127}$ ]]; then
+        erp_die "DOCKER_USER in ${ERP_ENV_FILE} is not a valid lowercase Docker Hub namespace."
     fi
 }
 
@@ -192,6 +197,13 @@ generate_env_file() {
     fi
     local api_domain="api.${domain}"
     local app_domain="app.${domain}"
+    local docker_user="${DOCKER_USER:-}"
+    if [ -z "${docker_user}" ]; then
+        prompt_input "Docker Hub namespace (repository owner)" docker_user
+    fi
+    if [[ ! "${docker_user}" =~ ^[a-z0-9][a-z0-9_-]{0,127}$ ]]; then
+        erp_die "Docker Hub namespace must be lowercase and contain only letters, digits, '_' or '-'."
+    fi
 
     local db_password redis_password secret_key
     db_password="$(erp_random_secret)"
@@ -244,7 +256,7 @@ MAX_UPLOAD_SIZE=52428800
 WS_HEARTBEAT_INTERVAL=30
 
 # Image coordinates, read by compose and deploy-blue-green.sh
-DOCKER_USER=$(erp_detect_docker_user)
+DOCKER_USER=${docker_user}
 VERSION=$(erp_detect_version "${VERSION:-}")
 EOF
     chmod 600 "${ERP_ENV_FILE}"
