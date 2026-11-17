@@ -30,8 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Runtime stage
-FROM python:3.11-slim AS runtime
+# Runtime stage: keep compilers and development headers out of production.
+FROM python:3.15-alpine3.24 AS runtime
 
 WORKDIR /app
 
@@ -43,8 +43,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /install /usr/local
 COPY --chown=app:app . .
 
-RUN chmod +x /app/entrypoint.sh
-RUN mkdir -p uploads static && chown -R app:app uploads static
+RUN chmod +x /app/entrypoint.sh \
+    && mkdir -p uploads static \
+    && chown -R app:app uploads static
 
 USER app
 
