@@ -1,45 +1,46 @@
-# Build stage: Alpine 3.24 carries patched packages for the Debian 13
-# advisories that remain unresolved in the current slim base image.
-FROM python:3.15-alpine3.24 AS builder
+# syntax=docker/dockerfile:1
+###############################################################################
+# ERP SOLUTION — backend image
+#
+# Multi-arch: python:3.11-slim is a manifest list covering linux/amd64 and
+# linux/arm64 (and ppc64le/s390x), so this Dockerfile builds natively on both
+# without any architecture-specific layer. Build for several platforms with:
+#   docker buildx build --platform linux/amd64,linux/arm64 --push ...
+# or locally via ./docker-build.sh --platform=linux/amd64,linux/arm64 --push
+#
+# Builder note: `pip install --prefix=/install` (not --user) is used because
+# the --user site lives under /root/.local in the builder; copying it into a
+# non-root home made the interpreter skip it unless PYTHONNOUSERSITE happened
+# to be unset. The prefix has no such dependency.
+###############################################################################
+
+# Build stage
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Build native Python wheels for both amd64 and arm64. matplotlib and
-# uvloop may need source builds on musl/aarch64.
-RUN apk add --no-cache \
-    build-base \
-    linux-headers \
-    postgresql-dev \
-    pkgconf \
-    freetype-dev \
-    libpng-dev \
-    qhull-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libc6-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
+# Pip's wheel cache resolves manylinux wheels per-interpreter; installing into
+# an isolated prefix keeps the runtime stage free of build tooling.
 COPY requirements.txt .
-RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" \
-    && pip install --no-cache-dir --user -r requirements.txt \
-    && pip install --no-cache-dir --user --upgrade --ignore-installed \
-        "setuptools>=78.1.1" \
-        "wheel>=0.46.2" \
-        "jaraco.context>=6.1.0"
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Runtime stage: keep compilers and development headers out of production.
 FROM python:3.15-alpine3.24 AS runtime
 
 WORKDIR /app
 
-RUN apk add --no-cache \
-    bash \
-    ca-certificates \
-    freetype \
-    libgcc \
-    libpng \
-    libpq \
-    libstdc++ \
-    && adduser -D -h /home/app -s /bin/bash app \
-    && python -m pip install --no-cache-dir --upgrade "pip>=26.1.2"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 postgresql-client redis-tools curl wget ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /bin/bash app
 
-COPY --from=builder --chown=app:app /root/.local /home/app/.local
+COPY --from=builder /install /usr/local
 COPY --chown=app:app . .
 
 RUN chmod +x /app/entrypoint.sh \
@@ -48,7 +49,8 @@ RUN chmod +x /app/entrypoint.sh \
 
 USER app
 
-ENV PATH="/home/app/.local/bin:${PATH}"
+# With --prefix=/install the console scripts land in /usr/local/bin, already
+# on PATH; PYTHONPATH only points at the application code.
 ENV PYTHONPATH=/app
 
 EXPOSE 8000

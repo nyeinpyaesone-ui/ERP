@@ -125,8 +125,10 @@ services:
       - blue-green
 
   # Ollama AI Service (internal only)
+  # Pinned for reproducibility; ollama/ollama ships linux/amd64 + linux/arm64
+  # manifests so ARM Linux production hosts pull the right variant.
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.9.6
     container_name: erp-ollama
     restart: unless-stopped
     # No ports published - internal access only

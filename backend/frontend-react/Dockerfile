@@ -1,7 +1,13 @@
-# node:20 is EOL (April 2026) and its runtime advisories are what Trivy
-# flags in the image; node 24 matches the version local dev and CI build
-# with (v24.21.0), so the image stops drifting from the test environment.
-FROM node:26-alpine AS builder
+# syntax=docker/dockerfile:1
+###############################################################################
+# ERP SOLUTION — frontend image (static Vite build served by nginx)
+#
+# Multi-arch: node:20-alpine and nginx:alpine are manifest lists covering
+# linux/amd64 and linux/arm64, so this image builds natively on both. The
+# produced bundle is architecture-neutral JS/CSS; only the nginx runtime
+# differs per platform, which the manifest list resolves at pull time.
+###############################################################################
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 # Copy the lockfile alongside the manifest so `npm ci` installs exactly the
