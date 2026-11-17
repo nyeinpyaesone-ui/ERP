@@ -1,6 +1,6 @@
 # Build stage: Alpine 3.24 carries patched packages for the Debian 13
 # advisories that remain unresolved in the current slim base image.
-FROM python:3.11-alpine3.24 AS builder
+FROM python:3.15-alpine3.24 AS builder
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" \
         "jaraco.context>=6.1.0"
 
 # Runtime stage: keep compilers and development headers out of production.
-FROM python:3.11-alpine3.24 AS runtime
+FROM python:3.15-alpine3.24 AS runtime
 
 WORKDIR /app
 
