@@ -49,6 +49,37 @@ A valid email for Let's Encrypt certificate notifications (expiry alerts, renewa
 
 ---
 
+## Termux / proot-distro (Android arm64)
+
+The compose stack **cannot run on Android**, including inside a proot-distro
+Ubuntu container: proot fakes root but has no real user namespaces and no
+systemd, so `dockerd` has nowhere to live. The installer detects this class
+automatically (`install.sh --preflight` prints `runtime-class: proot-termux`)
+and refuses to attempt a Docker install — it reports native components instead.
+
+What **does** work on Termux/proot-distro arm64 (verified on Ubuntu 26.04
+aarch64):
+
+| Component | How |
+|-----------|-----|
+| Backend + tests | `python3 -m venv venv && . venv/bin/activate && pip install -r backend/requirements.txt && pytest` (all 285 tests pass; psycopg2-binary and bcrypt ship aarch64 wheels) |
+| Frontend build | `cd backend/frontend-react && npm ci && npm run build` |
+| PostgreSQL / Redis | Native binaries (`apt install postgresql redis-server` inside proot-distro, or Termux packages) — point `DATABASE_URL` / `REDIS_URL` at them |
+| API server | `uvicorn app.main:app --reload` against the native DB/Redis |
+
+What **cannot** run here: `docker compose up`, image builds, blue-green
+deploys, certbot/nginx as packaged. Those need a Docker-capable host (VPS,
+CI runner, laptop).
+
+To produce **arm64 container images** for a real server, build on any
+Docker-capable machine (CI publishes amd64 only):
+
+```bash
+./docker-build.sh --version=v1.1.1 --platform=linux/arm64 --push
+```
+
+---
+
 ## One-Command Installation
 
 ```bash
@@ -342,16 +373,16 @@ If using **Cloudflare**:
 
 | Task | Command |
 |------|---------|
-| View logs (all) | `docker-compose -f docker-compose.prod.yml logs -f` |
-| View backend logs | `docker-compose -f docker-compose.prod.yml logs -f backend` |
+| View logs (all) | `docker compose -f docker-compose.prod.yml logs -f` |
+| View backend logs | `docker compose -f docker-compose.prod.yml logs -f backend` |
 | Deploy update | `./scripts/deploy-blue-green.sh production v1.2.3` |
 | Rollback | `./scripts/deploy-blue-green.sh production v1.2.3 --rollback` |
 | Backup database | `./scripts/backup.sh` |
-| Scale backend | `docker-compose -f docker-compose.prod.yml up -d --scale backend=2` |
-| Restart all | `docker-compose -f docker-compose.prod.yml restart` |
-| Stop all | `docker-compose -f docker-compose.prod.yml down` |
-| Run migrations | `docker-compose -f docker-compose.prod.yml run --rm backend alembic upgrade head` |
-| Create admin user | `docker-compose -f docker-compose.prod.yml run --rm backend python -c "..."` |
+| Scale backend | `docker compose -f docker-compose.prod.yml up -d --scale backend=2` |
+| Restart all | `docker compose -f docker-compose.prod.yml restart` |
+| Stop all | `docker compose -f docker-compose.prod.yml down` |
+| Run migrations | `docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head` |
+| Create admin user | `docker compose -f docker-compose.prod.yml run --rm backend python -c "..."` |
 
 ---
 
@@ -373,10 +404,10 @@ sudo certbot certonly --standalone -d api.yourcompany.com -d app.yourcompany.com
 ### Database Migration Failed
 ```bash
 # Check logs
-docker-compose -f docker-compose.prod.yml logs backend
+docker compose -f docker-compose.prod.yml logs backend
 
 # Re-run migration manually
-docker-compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
 ```
 
 ### Backend Unhealthy
@@ -421,7 +452,7 @@ To completely remove ERP SOLUTION:
 ```bash
 # 1. Stop and remove containers, networks, volumes
 cd /path/to/ERP
-docker-compose -f docker-compose.prod.yml down -v
+docker compose -f docker-compose.prod.yml down -v
 
 # 2. Remove Docker images (optional)
 docker rmi $(docker images 'powerrangeranikg/erp-solution-*' -q)

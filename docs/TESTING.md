@@ -40,11 +40,11 @@ CI enforces a floor of 58% declared once in `backend/pyproject.toml`
 `--cov-fail-under` — the earlier duplicate flag is gone, so the two cannot
 drift apart. That number is a ratchet: it is the measured floor, raised as
 coverage grows — it was never a goal of 80, which the suite could not reach.
-Measured on the current suite: **58.21%**.
+Measured on the current suite: **58.89%**.
 
 | Module | Measured | Aspiration |
 |--------|----------|------------|
-| Backend API | 58.21% | 85% |
+| Backend API | 58.89% | 85% |
 | Frontend Components | (no threshold) | 80% |
 | Mobile Screens | (untested) | 75% |
 

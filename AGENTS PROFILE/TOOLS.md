@@ -54,7 +54,7 @@ docker-compose up -d postgres redis
 # Backend
 cd backend && source venv/bin/activate && uvicorn app.main:app --reload
 cd backend && source venv/bin/activate && pytest           # pytest.ini supplies pythonpath
-cd backend && source venv/bin/activate && alembic upgrade head   # chain is 001–006
+cd backend && source venv/bin/activate && alembic upgrade head   # chain is 001–008
 
 # Frontend (canonical: backend/frontend-react)
 cd backend/frontend-react && npm run dev      # npm 10.9.2 now on PATH

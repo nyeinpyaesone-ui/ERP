@@ -1,0 +1,52 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "name": "jev-intercept",
+  "backend": {
+    "enabled": true,
+    "modules": [
+      "app.routers",
+      "app.services",
+      "app.models"
+    ],
+    "trace_depth": 1,
+    "middleware": true,
+    "sqlalchemy_events": true
+  },
+  "frontend": {
+    "enabled": true,
+    "instrument_fetch": true,
+    "instrument_axios": true,
+    "react_devtools_hook": true,
+    "collector_endpoint": "/api/v1/jev/intercept"
+  },
+  "redaction": {
+    "keys": [
+      "password",
+      "secret",
+      "token",
+      "key",
+      "authorization",
+      "ssn",
+      "credit_card"
+    ],
+    "max_body_length": 2000
+  },
+  "jev": {
+    "simulation_mode": true,
+    "auto_judge_on_flush": false,
+    "question_map": "scripts/jev_judge.py"
+  },
+  "output": {
+    "events_file": ".opencode/intercept/events.jsonl",
+    "decisions_file": ".opencode/intercept/decisions.jsonl",
+    "pretty_print": true
+  },
+  "standards": {
+    "compliance": [
+      "ISO/IEC 27001",
+      "SOC 2",
+      "OWASP Top 10"
+    ],
+    "audit_retention_days": 90
+  }
+}
