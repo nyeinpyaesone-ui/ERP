@@ -250,14 +250,20 @@ switch_traffic() {
     fi
 
     if ! docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"; then
+        local failed_active_host="${active_upstream_host}.failed.$$"
+        cp "${active_upstream_host}" "${failed_active_host}" 2>/dev/null || true
         if cat "${backup_upstream_host}" > "${active_upstream_host}" &&
            docker exec erp-nginx nginx -t 2>&1 | tee -a "${LOG_FILE}" &&
            docker exec erp-nginx nginx -s reload 2>&1 | tee -a "${LOG_FILE}"; then
             warn "Previous nginx upstream restored after reload failure."
-        else
-            error "Could not restore and reload the previous nginx upstream config."
+            rm -f "${failed_active_host}" "${backup_upstream_host}"
+            return 1
         fi
-        rm -f "${backup_upstream_host}"
+        if [ -f "${failed_active_host}" ]; then
+            cat "${failed_active_host}" > "${active_upstream_host}" || true
+        fi
+        error "Could not restore and reload the previous nginx upstream config; inspect live nginx config and ${active_upstream_host}."
+        rm -f "${failed_active_host}" "${backup_upstream_host}"
         return 1
     fi
 
