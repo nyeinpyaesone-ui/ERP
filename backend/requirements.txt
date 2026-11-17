@@ -1,6 +1,6 @@
-# Runtime dependencies.
-# Pinned to the versions installed in backend/venv so local runs match the
-# Docker image (python:3.11-slim) and CI.  Run `make venv` after changing.
+# Production runtime dependencies only.
+# Development and test tooling lives in requirements-dev.txt and is not copied
+# into the production container image.
 
 # ── Core ─────────────────────────────────────────────────────────────────────
 fastapi==0.142.2
@@ -38,14 +38,3 @@ stripe==8.0.0
 # Used by app/routers/reports.py:/chart/revenue (lazy import, graceful
 # fallback when absent).
 matplotlib==3.11.2
-
-# ── Local dev / test (CI installs these separately) ──────────────────────────
-# httpx2: starlette>=1.6 testclient imports `httpx2 as httpx`; without it
-# TestClient falls back to httpx with a deprecation warning. httpx itself
-# stays (app code: llm_service, webhooks).
-httpx2==2.13.1
-pytest==9.1.1
-pytest-asyncio==1.4.0
-pytest-cov==7.1.0
-black==26.10.0
-ruff==0.16.10
