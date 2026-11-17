@@ -3,22 +3,22 @@
 # into the production container image.
 
 # ── Core ─────────────────────────────────────────────────────────────────────
-fastapi==0.142.2
+fastapi==0.162.7
 # starlette pinned explicitly for local == Docker == CI parity (transitive
 # via fastapi; 1.7.0 drops the anyio.abc testclient deprecation).
-starlette==1.7.0
-uvicorn[standard]==0.52.4
+starlette==1.10.0
+uvicorn[standard]==0.54.0
 # SQLAlchemy 2.1.x NOT yet: its postgresql:// default now imports psycopg3,
 # which we cannot verify without a live PostgreSQL (docker daemon down).
-SQLAlchemy==2.0.52
+SQLAlchemy==2.1.8
 psycopg2-binary==2.9.13
-alembic==1.20.0
+alembic==1.20.1
 
 # ── Validation / settings ────────────────────────────────────────────────────
-pydantic==2.13.5
-pydantic-settings==2.15.0
+pydantic==2.14.3
+pydantic-settings==2.16.3
 email-validator==2.3.0
-python-multipart==0.0.32
+python-multipart==0.0.33
 python-dotenv==1.2.4
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
@@ -33,7 +33,7 @@ bcrypt==5.0.0
 # ── Integrations / clients ───────────────────────────────────────────────────
 httpx==0.28.1
 redis==8.1.0
-stripe==8.0.0
+stripe==16.0.0
 
 # Used by app/routers/reports.py:/chart/revenue (lazy import, graceful
 # fallback when absent).

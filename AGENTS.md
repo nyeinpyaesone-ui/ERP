@@ -74,12 +74,14 @@ Numbers above are the verified baseline (re-verified 2026-10-14). If a count or 
 
 ## CI & deploy contract
 
-`ci.yml`: gitleaks → quality (ruff+black enforced, mypy advisory) → tests → {frontend-build, docker-backend, docker-frontend} → security (Trivy, advisory SARIF) → deploy-staging / deploy-production.
+ci.yml: Gitleaks → quality (Ruff + Black enforced, MyPy advisory) → tests → frontend build / image build → Trivy → gated deploy jobs.
 
-- The `config` job publishes `can_push` (DOCKER_USER var + both `DOCKER_PAT_*` secrets) and `can_deploy` (additionally SSH key, both hosts, both `*_KNOWN_HOSTS`). **Deploy jobs skip when these are false — fail-closed by design, not a bug.**
-- Trivy consumes the **first line only** of `needs.docker-*.outputs.image_tag` (metadata-action emits one ref per line); `exit-code` is unset, so findings are advisory.
-- Deploys SSH to `scripts/deploy-blue-green.sh <env> <version> [--rollback]` (sources `scripts/lib.sh`); root `deploy.sh` is legacy. Staging = pushes to `main`, production = `v*` tags; both require their GitHub environment.
-- Pushing needs retry loops here (intermittent GnuTLS failures to github.com); `gh api` usually still works. Commits: Conventional Commits.
+- config publishes independent outputs: can_push requires the DOCKER_USER repository variable plus both DOCKER_PAT_* secrets; can_deploy_staging and can_deploy_production additionally require their own SSH key, pinned known_hosts, host and user. Missing values cause a fail-closed skip.
+- Neither a push to main nor a v* tag deploys automatically. Staging requires a manual CI dispatch on main with deploy_staging=true; production requires a manual CI dispatch on a v* tag with deploy_production=true. The staging and production GitHub Environments constrain refs.
+- Docker Compose requires an explicit DOCKER_USER; no personal-account fallback is permitted. The Kubernetes Kustomize tree is a separate, currently non-CI-integrated deployment scaffold using different GHCR image names.
+- Trivy consumes the first image-ref line from metadata-action; its SARIF findings are advisory unless the workflow policy changes.
+- Deploys use scripts/deploy-blue-green.sh <env> <version> [--rollback] (sources scripts/lib.sh); root deploy.sh is legacy. Keep staging and production on separate hosts, with separate non-root deploy users and distinct SSH keys.
+- Pushing needs retry loops here (intermittent GnuTLS failures to github.com); gh api usually still works. Commits: Conventional Commits.
 
 ## Conventions
 
