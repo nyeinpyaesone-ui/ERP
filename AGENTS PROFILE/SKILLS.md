@@ -22,11 +22,11 @@ values → [SOUL.md](SOUL.md) · backlog → [IMPROVEMENTS.md](IMPROVEMENTS.md).
 | 2 | Understand code / find "where is X" | explore-first; read `main.py`, `models.py`, routers | `task(explore)` ∥ glob/grep | Claims cite `file:line` |
 | 3 | Backend feature/bug (FastAPI/SQLAlchemy) | Follow existing router/service patterns; PEP 8 + type hints; no comments unless asked | read/edit → bash | `backend/venv … pytest` (targeted) + Beat B |
 | 4 | RBAC / permissions change | Edit `permissions_catalogue.py` **first**, then router; keep `has_permission` only in `services/permissions.py` | edit → bash | `test_permission_consistency.py`, `test_route_permissions.py` |
-| 5 | DB migration | `alembic revision --autogenerate -m "desc"`; keep chain linear (001–006) | bash | `alembic upgrade head` on running PG; chain `ls versions/` |
-| 6 | Frontend change (React/Vite) | Only in `backend/frontend-react`; React 18 + strict TS conventions; no lint config exists — don't invent compliance | edit → bash | `npm run build` + `npm run test` |
+| 5 | DB migration | `alembic revision --autogenerate -m "desc"`; keep chain linear (001–008) | bash | `alembic upgrade head` on running PG; chain `ls versions/` |
+| 6 | Frontend change (React/Vite) | Only in `backend/frontend-react`; React 18 (JSX, no tsconfig); eslint 10 flat config — `npm run lint` must pass | edit → bash | `npm run build` + `npm run test` + `npm run lint` |
 | 7 | Frontend dependency/install | npm 10.9.2 on PATH; fallback `node /tmp/opencode/npm10/package/bin/npm-cli.js` | bash | `npm --version`; lockfile diff sane |
-| 8 | Tests (add/fix) | Place under `backend/app/tests/`; pytest config comes from `pytest.ini` | edit → bash | `pytest -q`; coverage intent 80% (CONTRIBUTING) |
-| 9 | Docker image change | Multi-stage preferred (current backend Dockerfile is single-stage → IMP-P1-1) | edit → bash | `docker build` / `docker-compose config` |
+| 8 | Tests (add/fix) | Place under `backend/app/tests/`; pytest config comes from `pytest.ini` | edit → bash | `pytest -q`; coverage floor 58% (pyproject `fail_under`) |
+| 9 | Docker image change | Keep Dockerfiles multi-stage (backend already builder + runtime) | edit → bash | CI `docker-*` jobs build; `docker compose config` validates compose (local build impossible on proot hosts) |
 | 10 | Deploy / release | Blue-green `scripts/deploy-blue-green.sh`; legacy `deploy.sh` deprecated (IMP-P1-2) | bash | `health-check.sh`; rollback rehearsed |
 | 11 | Postgres data queries | MCP `postgres` (export `POSTGRES_MCP_URL` + container up) | mcp postgres | Query returns rows, no traceback |
 | 12 | Browser/E2E (portal flows) | Playwright MCP or `playwright_browser_*`; target dev server URL from `npm run dev` | playwright | Screenshot/snapshot evidence |

@@ -32,5 +32,5 @@ alembic history --verbose
 
 ## Docker Migration
 ```bash
-docker-compose exec backend alembic upgrade head
+docker compose exec backend alembic upgrade head
 ```

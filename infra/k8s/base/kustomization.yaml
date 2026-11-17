@@ -6,7 +6,6 @@ namespace: erp_solution
 resources:
   - namespace.yaml
   - configmap.yaml
-  - secrets.yaml
   - rbac.yaml
   - network-policy.yaml
   - pvc.yaml

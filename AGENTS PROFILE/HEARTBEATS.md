@@ -34,7 +34,7 @@ context compaction or long silence.
       (and `test_route_permissions.py`); every `require_permission()` must map to
       `permissions_catalogue.py`.
 - [ ] Changed migrations → confirm chain still linear (`alembic upgrade head`
-      when DB up; chain is 001–006).
+      when DB up; chain is 001–008).
 - [ ] Touched `opencode.json`/skills → `customize-opencode` skill was loaded first.
 - [ ] Diff review: `git diff --stat` — no secrets, no `venv/`, `node_modules/`,
       `dist/`, `*.heapsnapshot`, session files, `.env*`.

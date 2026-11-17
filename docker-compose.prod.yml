@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # PostgreSQL Database
   postgres:
@@ -41,7 +39,7 @@ services:
 
   # Backend API (Blue - Primary)
   backend:
-    image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION:-latest}
+    image: ${DOCKER_USER:?Set DOCKER_USER in the environment file}/erp-solution-backend:${VERSION:-latest}
     container_name: erp-blue-backend
     restart: unless-stopped
     entrypoint: ["/app/entrypoint.sh"]
@@ -50,7 +48,7 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-erp}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-erp_solution}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
-      ENVIRONMENT: production
+      ENVIRONMENT: prod
       OLLAMA_BASE_URL: http://ollama:11434
       CORS_ORIGINS: ${CORS_ORIGINS}
     volumes:
@@ -72,7 +70,7 @@ services:
 
   # Backend API (Green - Staging/Blue-Green)
   backend-green:
-    image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-backend:${VERSION:-latest}
+    image: ${DOCKER_USER:?Set DOCKER_USER in the environment file}/erp-solution-backend:${VERSION:-latest}
     container_name: erp-green-backend
     restart: unless-stopped
     entrypoint: ["/app/entrypoint.sh"]
@@ -81,7 +79,7 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-erp}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-erp_solution}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
-      ENVIRONMENT: production
+      ENVIRONMENT: prod
       OLLAMA_BASE_URL: http://ollama:11434
       CORS_ORIGINS: ${CORS_ORIGINS}
     volumes:
@@ -105,7 +103,7 @@ services:
 
   # Frontend Web App (Blue - Primary)
   frontend:
-    image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION:-latest}
+    image: ${DOCKER_USER:?Set DOCKER_USER in the environment file}/erp-solution-frontend:${VERSION:-latest}
     container_name: erp-blue-frontend
     restart: unless-stopped
     # Frontend image contains built dist/ from build; no volume needed
@@ -116,7 +114,7 @@ services:
 
   # Frontend Web App (Green - Staging/Blue-Green)
   frontend-green:
-    image: ${DOCKER_USER:-powerrangeranikg}/erp-solution-frontend:${VERSION:-latest}
+    image: ${DOCKER_USER:?Set DOCKER_USER in the environment file}/erp-solution-frontend:${VERSION:-latest}
     container_name: erp-green-frontend
     restart: unless-stopped
     networks:
@@ -147,6 +145,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # Keep file bind mounts stable; the deploy script updates upstream-active.conf
+      # in place and reloads nginx only after validating the complete file.
       - ./nginx/upstream-blue.conf:/etc/nginx/conf.d/upstream-blue.conf:ro
       - ./nginx/upstream-green.conf:/etc/nginx/conf.d/upstream-green.conf:ro
       - ./nginx/upstream-active.conf:/etc/nginx/conf.d/upstream-active.conf:ro

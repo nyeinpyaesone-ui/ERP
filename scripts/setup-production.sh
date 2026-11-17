@@ -148,7 +148,7 @@ STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY:-}
 # MONITORING
 # ============================================
 SENTRY_DSN=${SENTRY_DSN:-}
-ENVIRONMENT=production
+ENVIRONMENT=prod
 
 # ============================================
 # FILE UPLOAD

@@ -1,0 +1,260 @@
+name: PR Map-Reduce Orchestrator
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Plan only, or merge the selected safe batch"
+        required: true
+        default: plan
+        type: choice
+        options: [plan, merge]
+      max_prs:
+        description: "Maximum open PRs to inspect in this run (1-100)"
+        required: true
+        default: 50
+        type: number
+      max_merges:
+        description: "Maximum serial merges in this batch (1-5)"
+        required: true
+        default: 5
+        type: number
+      ci_wait_minutes:
+        description: "Maximum wait for main CI after each merge (1-30)"
+        required: true
+        default: 20
+        type: number
+      deploy_staging:
+        description: "Dispatch the existing staging deployment only after the full batch passes main CI"
+        required: true
+        default: false
+        type: boolean
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/pr-map-reduce-orchestrator.yml"
+      - ".github/workflows/ci.yml"
+      - "scripts/pr-orchestrator/**"
+      - ".opencode/agents/**"
+      - ".opencode/skills/pr-map-reduce/**"
+      - "docs/PR_MAP_REDUCE_ORCHESTRATION.md"
+
+concurrency:
+  group: pr-map-reduce-${{ github.repository }}-${{ github.ref }}
+  # PR validation is supersedable; preserve manual plan/merge runs.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: Validate orchestrator implementation
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate workflow YAML syntax
+        run: |
+          ruby -e 'require "yaml"; YAML.load_file(ARGV.fetch(0), aliases: true); puts "Workflow YAML syntax passed"' \
+            .github/workflows/pr-map-reduce-orchestrator.yml
+      - name: Compile orchestration scripts
+        run: python -m compileall -q scripts/pr-orchestrator
+      - name: Install pinned Python lint tools
+        run: python -m pip install --disable-pip-version-check "ruff==0.16.10" "black==26.10.0"
+      - name: Lint and format-check orchestration scripts
+        run: |
+          ruff check scripts/pr-orchestrator
+          black --check --diff scripts/pr-orchestrator
+      - name: Run orchestrator unit tests
+        env:
+          PYTHONPATH: scripts/pr-orchestrator
+        run: python -m unittest discover -s scripts/pr-orchestrator/tests -v
+
+  discover:
+    name: Discover open PRs
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+      statuses: read
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.discovery.outputs.matrix }}
+      count: ${{ steps.discovery.outputs.count }}
+      pr_numbers: ${{ steps.discovery.outputs.pr_numbers }}
+      truncated: ${{ steps.discovery.outputs.truncated }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Snapshot open PRs targeting main
+        id: discovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MAX_PRS: ${{ inputs.max_prs }}
+        run: python scripts/pr-orchestrator/discover.py
+      - name: Upload discovery snapshot
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pr-discovery-snapshot
+          path: discovery.json
+          if-no-files-found: error
+          retention-days: 30
+
+  map-prs:
+    name: Map PR #${{ matrix.number }}
+    needs: discover
+    if: needs.discover.result == 'success' && needs.discover.outputs.count != '0'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+      statuses: read
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Map current PR evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/pr-orchestrator/map_pr.py \
+            --number "${{ matrix.number }}" \
+            --expected-head "${{ matrix.head_sha }}" \
+            --expected-base "${{ matrix.base_sha }}" \
+            --output "map-report-${{ matrix.number }}.json"
+      - name: Upload per-PR map report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pr-map-${{ matrix.number }}
+          path: map-report-${{ matrix.number }}.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  reduce:
+    name: Reduce evidence into a safe merge batch
+    needs: [discover, map-prs]
+    if: >-
+      always()
+      && needs.discover.result == 'success'
+      && needs.map-prs.result != 'cancelled'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    timeout-minutes: 10
+    outputs:
+      selected_prs: ${{ steps.reduce.outputs.selected_prs }}
+      selected_count: ${{ steps.reduce.outputs.selected_count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Download all PR map reports
+        if: needs.discover.outputs.count != '0'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: pr-map-*
+          path: map-reports
+          merge-multiple: true
+      - name: Reduce, order, and detect changed-file overlaps
+        id: reduce
+        env:
+          EXPECTED_PRS: ${{ needs.discover.outputs.pr_numbers }}
+          MAX_MERGES: ${{ inputs.max_merges }}
+          TRUNCATED: ${{ needs.discover.outputs.truncated }}
+          ORCHESTRATOR_MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          args=(
+            --expected-prs "${EXPECTED_PRS:-[]}"
+            --max-merges "${MAX_MERGES:-5}"
+          )
+          if [ "${TRUNCATED:-false}" = "true" ]; then
+            args+=(--truncated)
+          fi
+          python scripts/pr-orchestrator/reduce.py "${args[@]}"
+      - name: Upload immutable orchestration plan
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: orchestration-plan
+          path: orchestration-plan.json
+          if-no-files-found: error
+          retention-days: 30
+
+  merge:
+    name: Serial merge with main-CI barrier
+    needs: [discover, map-prs, reduce]
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && github.ref == 'refs/heads/main'
+      && inputs.mode == 'merge'
+      && needs.reduce.result == 'success'
+      && needs.reduce.outputs.selected_count != '0'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+      statuses: read
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Download reduced merge plan
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: orchestration-plan
+          path: .
+      - name: Execute bounded serial merge loop
+        env:
+          PR_ORCHESTRATOR_TOKEN: ${{ secrets.PR_ORCHESTRATOR_TOKEN }}
+          CI_WAIT_MINUTES: ${{ inputs.ci_wait_minutes }}
+          DEPLOY_STAGING: ${{ inputs.deploy_staging }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PR_ORCHESTRATOR_TOKEN}" ]; then
+            echo "::error::PR_ORCHESTRATOR_TOKEN is required for merge mode."
+            echo "Use a narrowly scoped PAT or GitHub App token; do not grant ruleset bypass."
+            exit 1
+          fi
+          args=(
+            --plan orchestration-plan.json
+            --timeout-minutes "${CI_WAIT_MINUTES:-20}"
+          )
+          if [ "${DEPLOY_STAGING:-false}" = "true" ]; then
+            args+=(--deploy-staging)
+          fi
+          python scripts/pr-orchestrator/merge.py "${args[@]}"
+      - name: Upload merge execution results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: merge-execution-results
+          path: merge-results.json
+          if-no-files-found: warn
+          retention-days: 30
