@@ -2,168 +2,140 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish a GitHub Release for"
+        required: true
+        type: string
 
 permissions:
   contents: write
-  packages: write
-  id-token: write
 
-env:
-  REGISTRY: docker.io
-  BACKEND_IMAGE: ${{ vars.DOCKER_USER }}/erp-solution-backend
-  FRONTEND_IMAGE: ${{ vars.DOCKER_USER }}/erp-solution-frontend
+# Serialize releases: a second tag push while one is publishing would race the
+# `gh release create` for the same tag.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build-and-release:
+  release:
+    name: Publish GitHub Release
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
+    timeout-minutes: 15
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Full history so the previous tag can be found for comparison notes.
           fetch-depth: 0
 
-      - name: Get version from tag
-        id: get_version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Generate changelog
-        id: changelog
-        uses: mikepenz/release-changelog-builder-action@v4
-        with:
-          configurationJson: |
-            {
-              "categories": [
-                {
-                  "title": "## 🚀 Features",
-                  "labels": ["feature", "enhancement"]
-                },
-                {
-                  "title": "## 🐛 Bug Fixes",
-                  "labels": ["fix", "bug"]
-                },
-                {
-                  "title": "## 🔒 Security",
-                  "labels": ["security"]
-                },
-                {
-                  "title": "## 📝 Documentation",
-                  "labels": ["documentation"]
-                },
-                {
-                  "title": "## 🧪 Tests",
-                  "labels": ["test"]
-                },
-                {
-                  "title": "## 🔄 Other Changes",
-                  "labels": []
-                }
-              ],
-              "ignore_labels": ["ignore", "skip-changelog"],
-              "pr_template": "- #{{TITLE}} by @#{{AUTHOR}} in ##{{NUMBER}}",
-              "empty_template": "- No changes"
-            }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKER_USER }}
-          password: ${{ secrets.DOCKER_PAT_BACKEND }}
-
-      - name: Extract metadata (backend)
-        id: meta-backend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.BACKEND_IMAGE }}
-          tags: |
-            type=raw,value=${{ steps.get_version.outputs.version }}
-            type=raw,value=latest
-
-      - name: Build and push backend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          push: true
-          tags: ${{ steps.meta-backend.outputs.tags }}
-          labels: ${{ steps.meta-backend.outputs.labels }}
-          build-args: |
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-            VCS_REF=${{ github.sha }}
-            VERSION=${{ steps.get_version.outputs.version }}
-          cache-from: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache
-          cache-to: type=inline
-
-      - name: Log in to Docker Hub (frontend)
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKER_USER }}
-          password: ${{ secrets.DOCKER_PAT_FRONTEND }}
-
-      - name: Extract metadata (frontend)
-        id: meta-frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.FRONTEND_IMAGE }}
-          tags: |
-            type=raw,value=${{ steps.get_version.outputs.version }}
-            type=raw,value=latest
-
-      - name: Build and push frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          push: true
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
-          build-args: |
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-            VCS_REF=${{ github.sha }}
-            VERSION=${{ steps.get_version.outputs.version }}
-          cache-from: type=registry,ref=${{ env.FRONTEND_IMAGE }}:buildcache
-          cache-to: type=inline
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          body: |
-            ## Release v${{ steps.get_version.outputs.version }}
-            
-            ${{ steps.changelog.outputs.changelog }}
-            
-            ### 🐳 Docker Images
-            - Backend: `${{ env.BACKEND_IMAGE }}:${{ steps.get_version.outputs.version }}`
-            - Frontend: `${{ env.FRONTEND_IMAGE }}:${{ steps.get_version.outputs.version }}`
-            
-            ### 📦 Installation
-            ```bash
-            docker pull ${{ env.BACKEND_IMAGE }}:${{ steps.get_version.outputs.version }}
-            docker pull ${{ env.FRONTEND_IMAGE }}:${{ steps.get_version.outputs.version }}
-            ```
-          draft: false
-          generate_release_notes: true
-          files: |
-            LICENSE
-            README.md
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy-production:
-    runs-on: ubuntu-latest
-    needs: build-and-release
-    environment: production
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - name: Deploy to production
+      # CI already built and pushed the tag images on this same ref
+      # (docker-backend / docker-frontend, `type=ref,event=tag`). This job only
+      # publishes the GitHub Release record — it must not rebuild or redeploy,
+      # so production deploys stay owned by ci.yml's deploy-production job.
+      - name: Determine tag
+        id: tag
         run: |
-          echo "🚀 Deploying v${{ needs.build-and-release.outputs.version }} to production..."
-          echo "Backend: ${{ env.BACKEND_IMAGE }}:${{ needs.build-and-release.outputs.version }}"
-          echo "Frontend: ${{ env.FRONTEND_IMAGE }}:${{ needs.build-and-release.outputs.version }}"
-          # Add actual deployment commands here (kubectl, helm, etc.)
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="${GITHUB_REF#refs/tags/}"; fi
+          if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} not found in the repository"
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "name=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify referenced images exist
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+        run: |
+          set -euo pipefail
+          for image in erp-solution-backend erp-solution-frontend; do
+            ref="${DOCKER_USER}/${image}:${TAG}"
+            echo "Checking ${ref}"
+            if ! docker manifest inspect "$ref" >/dev/null 2>&1; then
+              echo "::error::Image ${ref} not found in the registry — CI image build must succeed before releasing"
+              exit 1
+            fi
+          done
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          : > release-notes.md
+          if [ -f CHANGELOG.md ]; then
+            # Section headings are `## [<version>]` or `## <version>`; stop at
+            # the next level-2 heading. Falls through to a commit list when the
+            # changelog has no entry for this tag yet.
+            awk -v tag="${TAG#v}" '
+              BEGIN { found = 0 }
+              /^## / {
+                if (found) exit
+                line = $0
+                gsub(/^##[[:space:]]*\[?/, "", line)
+                gsub(/\]?[[:space:]]*$/, "", line)
+                gsub(/^[^0-9]*/, "", line)
+                if (index(line, tag) > 0) { found = 1; print; next }
+              }
+              found { print }
+            ' CHANGELOG.md > changelog-section.md || true
+
+            if [ -s changelog-section.md ]; then
+              cp changelog-section.md release-notes.md
+            fi
+          fi
+
+          if [ ! -s release-notes.md ]; then
+            echo "::warning::No CHANGELOG.md section for ${TAG}; using commit list"
+            PREV="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)"
+            {
+              echo "## Changes in ${TAG}"
+              echo
+              if [ -n "$PREV" ]; then
+                git log --pretty=format:'- %s (%h)' "$PREV..${TAG}"
+              else
+                git log --pretty=format:'- %s (%h)' --max-count=50 "$TAG"
+              fi
+            } > release-notes.md
+            echo >> release-notes.md
+          fi
+          echo "Notes: $(wc -l < release-notes.md) lines"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          NAME: ${{ steps.tag.outputs.name }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "ERP SOLUTION $TAG" \
+            --notes-file release-notes.md \
+            --verify-tag
+
+      - name: Attach image references to the release body
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          DOCKER_USER: ${{ vars.DOCKER_USER }}
+        run: |
+          set -euo pipefail
+          {
+            echo
+            echo "## Container images"
+            echo
+            echo '```'
+            echo "${DOCKER_USER}/erp-solution-backend:${TAG}"
+            echo "${DOCKER_USER}/erp-solution-frontend:${TAG}"
+            echo '```'
+          } >> release-notes.md
+          gh release edit "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --notes-file release-notes.md

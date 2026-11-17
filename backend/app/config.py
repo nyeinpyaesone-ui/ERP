@@ -1,53 +1,82 @@
-import os
-from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+import json
 from functools import lru_cache
+from typing import Literal
 
-# Resolve .env location explicitly so the app works from any CWD
-# (backend/, repo root, or inside /app container). First existing wins.
-_ENV_CANDIDATES = [
-    p for p in (
-        os.path.join(os.getcwd(), ".env"),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".env")),      # backend/.env
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env")), # repo /.env
-    )
-    if os.path.exists(p)
-]
+from pydantic import SecretStr, field_validator, model_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=_ENV_CANDIDATES or (".env",),
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="ignore"  # Ignore extra environment variables
-    )
-
     APP_NAME: str = "ERP SOLUTION System"
     APP_VERSION: str = "1.8.0"
-    ENVIRONMENT: str = "development"
     DEBUG: bool = False
+    ENVIRONMENT: str = "dev"
 
-    # Database (explicit psycopg2 driver to match SQLAlchemy sync engine)
-    DATABASE_URL: str = "postgresql+psycopg2://erp_user:erp_password@localhost:5432/erp_db"
+    @field_validator("ENVIRONMENT", mode="before")
+    @classmethod
+    def _normalize_environment(cls, v):
+        """Accept common aliases; canonical values are dev/test/prod."""
+        if not isinstance(v, str):
+            return v
+        aliases = {
+            "development": "dev", "dev": "dev", "local": "dev",
+            "testing": "test", "test": "test", "ci": "test",
+            "production": "prod", "prod": "prod",
+        }
+        norm = aliases.get(v.strip().lower())
+        if norm is None:
+            raise ValueError(
+                f"ENVIRONMENT must be one of dev/test/prod (got {v!r})"
+            )
+        return norm
+
+    # Database
+    DATABASE_URL: str = "postgresql://erp_user:erp_password@localhost:5432/erp_db"
+
+    # SQLAlchemy pool (honored by app.database.get_engine)
+    POOL_SIZE: int = 10
+    POOL_MAX_OVERFLOW: int = 20
+    POOL_RECYCLE: int = 1800
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # Security
-    SECRET_KEY: str = "your-super-secret-key-change-in-production"
+    # Security: SecretStr so the value never leaks via repr/logs.
+    # Dev/test default is intentionally weak but flagged; prod refuses to boot
+    # with it (see model validator below) — Twelve-Factor III, fail-closed.
+    SECRET_KEY: SecretStr = SecretStr("your-super-secret-key-change-in-production")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    @field_validator("SECRET_KEY")
-    @classmethod
-    def _reject_default_secret_in_prod(cls, v: str) -> str:
-        if os.getenv("ENVIRONMENT", "development").lower() == "production" and \
-           v == "your-super-secret-key-change-in-production":
-            raise ValueError(
-                "SECRET_KEY must be overridden via environment when ENVIRONMENT=production"
-            )
-        return v
+    # CORS: plain string in env (comma-separated or JSON array) so that
+    # pydantic-settings never attempts JSON decoding at the source layer.
+    # Use cors_origins_list to get the parsed list.
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse CORS_ORIGINS as a JSON array, a comma-separated string,
+        or a single origin. Never raises: falls back to splitting on commas.
+        Empty input falls back to local-dev defaults so allow_credentials
+        does not block every origin.
+        """
+        default = ["http://localhost:3000", "http://localhost:5173"]
+        raw = (self.CORS_ORIGINS or "").strip()
+        if not raw:
+            return default
+        if raw.startswith("["):
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, list):
+                items = [str(item).strip() for item in parsed if str(item).strip()]
+                if items:
+                    return items
+                return ["http://localhost:3000", "http://localhost:5173"]
+        parsed = [origin.strip() for origin in raw.split(",") if origin.strip()]
+        return parsed or ["http://localhost:3000", "http://localhost:5173"]
 
     # Email
     SMTP_HOST: str = "smtp.gmail.com"
@@ -59,9 +88,6 @@ class Settings(BaseSettings):
     # AI / Ollama
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.1"
-
-    # Frontend URL
-    FRONTEND_URL: str = "http://localhost:3000"
 
     # Stripe
     STRIPE_SECRET_KEY: str = ""
@@ -75,9 +101,34 @@ class Settings(BaseSettings):
     # WebSocket
     WS_HEARTBEAT_INTERVAL: int = 30
 
-@lru_cache()
+    model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore"}
+
+    @model_validator(mode="after")
+    def _fail_closed_in_prod(self) -> "Settings":
+        """Prod must boot with real secrets — refuse the well-known defaults."""
+        if self.ENVIRONMENT == "prod":
+            placeholder = "your-super-secret-key-change-in-production"
+            if self.SECRET_KEY.get_secret_value() == placeholder:
+                raise ValueError(
+                    "SECRET_KEY must be set to a unique value when ENVIRONMENT=prod"
+                )
+            if len(self.SECRET_KEY.get_secret_value()) < 32:
+                raise ValueError("SECRET_KEY must be at least 32 characters in prod")
+            if self.DATABASE_URL.startswith("postgresql://erp_user:erp_password"):
+                raise ValueError("DATABASE_URL must not use the example credentials")
+        return self
+
+    @field_validator("ACCESS_TOKEN_EXPIRE_MINUTES")
+    @classmethod
+    def _positive_ttl(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES must be positive")
+        return v
+
+
+@lru_cache
 def get_settings() -> Settings:
     return Settings()
 
-settings = get_settings()
 
+settings = get_settings()

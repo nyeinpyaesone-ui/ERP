@@ -1,172 +1,83 @@
-```
 # Dependencies
 node_modules/
 backend/venv/
-backend/.venv/
-frontend/node_modules/
-mobile/node_modules/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# Build outputs
+backend/frontend-react/dist/
+backend/frontend-react/build/
+mobile/dist/
+mobile/.expo/
 
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv/
-.env/
-env.bak/
-venv.bak/
+# Environment files
+.env
+.env.local
+.env.*.local
+backend/.env
 
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
-*~
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Logs
 *.log
 logs/
+backend/logs/
 
-# Environment variables
-.env
-.env.local
-.env.*
+# Database
+*.db
+*.sqlite
+backend/test.db
 
-# Coverage
+# Docker (.dockerignore files are intentionally tracked)
+
+# Test
 .coverage
 htmlcov/
-.coverage.*
+.pytest_cache/
+.venv/
 
-# Alembic
-alembic/versions/*.py
+# Heap dumps
+*.heapsnapshot
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# Opencode session dumps
+session-*.md
+.opencode/session*
 
-# PyInstaller
-*.manifest
-*.spec
+# Backup artifacts
+scripts/backups/
+*.tar.gz
+.env.production
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
+# Python tool caches (explicit)
+.ruff_cache/
+.mypy_cache/
+
+# Virtualenvs at any location
+venv/
+
+# Coverage extras
 coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
 
-# Translations
-*.mo
-*.pot
+# Packaging
+*.egg-info/
 
-# Django
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask
-instance/
-.webassets-cache
-
-# Scrapy
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# PEP 582
-__pypackages__/
-
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# Sage
-.dvcs.log
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-fseventsd
-
-# Testing
-.pytest_cache/
-.hypothesis/
-
-# Docker
-.dockerenv
-
-# Kubernetes
-.kube/
-
-# Temporary folders
-tmp/
-temp/
-```
+# TLS material & runtime secrets
+ssl/
+*.pem
+*.key
+*.crt
+*.p12
+.env.*
+!.env.example
+!.env.production.template
+!backend/.env.example

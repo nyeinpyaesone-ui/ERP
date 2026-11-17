@@ -13,7 +13,7 @@ cd ERP
 
 ### 2. Start Infrastructure
 ```bash
-docker-compose up -d postgres redis ollama
+docker compose up -d postgres redis ollama
 ```
 
 ### 3. Verify Setup

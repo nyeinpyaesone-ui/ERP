@@ -1,141 +1,100 @@
 version: 2
 updates:
-  # Python dependencies - Backend
+  # Python dependencies
   - package-ecosystem: "pip"
     directory: "/backend"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "04:00"
-      timezone: "UTC"
     open-pull-requests-limit: 10
-    reviewers:
-      - "maintainers"
     labels:
       - "dependencies"
       - "python"
-      - "security"
-    commit-message:
-      prefix: "chore(deps)"
-      include: "scope"
     groups:
-      python-security:
-        patterns:
-          - "*"
+      # Batches minor/patch bumps into one PR. Without grouping every minor
+      # lands separately — the backlog reached 37 open branches.
+      python-dependencies:
         update-types:
           - "minor"
           - "patch"
 
-  # Node.js dependencies - Frontend
+  # Node.js dependencies (Frontend)
   - package-ecosystem: "npm"
-    directory: "/frontend"
+    directory: "/backend/frontend-react"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "04:00"
-      timezone: "UTC"
     open-pull-requests-limit: 10
-    reviewers:
-      - "maintainers"
     labels:
       - "dependencies"
       - "javascript"
-      - "security"
-    commit-message:
-      prefix: "chore(deps)"
-      include: "scope"
     groups:
-      frontend-security:
-        patterns:
-          - "*"
+      frontend-dependencies:
         update-types:
           - "minor"
           - "patch"
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
 
-  # Node.js dependencies - Mobile
+  # Node.js dependencies (Mobile)
+  # Note: /mobile has no lockfile, so Dependabot resolves from package.json only.
   - package-ecosystem: "npm"
     directory: "/mobile"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "04:00"
-      timezone: "UTC"
     open-pull-requests-limit: 10
-    reviewers:
-      - "maintainers"
     labels:
       - "dependencies"
       - "mobile"
-      - "security"
-    commit-message:
-      prefix: "chore(deps-mobile)"
-      include: "scope"
     groups:
-      mobile-security:
-        patterns:
-          - "*"
+      # Expo/React Native majors are a coordinated upgrade; batching keeps the
+      # combined PR reviewable instead of ~20 interdependent ones.
+      mobile-dependencies:
         update-types:
           - "minor"
           - "patch"
 
-  # GitHub Actions
+  # GitHub Actions — workflows pin every `uses:` to a commit SHA with a
+  # `# vX.Y.Z` comment, which Dependabot updates natively.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "04:00"
-      timezone: "UTC"
     open-pull-requests-limit: 10
-    reviewers:
-      - "maintainers"
     labels:
       - "dependencies"
       - "github-actions"
-      - "ci-cd"
-    commit-message:
-      prefix: "chore(ci)"
-      include: "scope"
     groups:
+      # Workflows pin every `uses:` to a commit SHA with a `# vX.Y.Z` comment,
+      # which Dependabot updates natively — so one grouped PR covers all of them.
       github-actions:
-        patterns:
-          - "*"
         update-types:
           - "minor"
           - "patch"
 
-  # Docker dependencies
+  # ── Docker base images ─────────────────────────────────────────────────────
+  # Previously unmonitored: python:3.11-slim, node:20-alpine and
+  # postgres:15-alpine could go months without a patch PR.
   - package-ecosystem: "docker"
     directory: "/backend"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "04:00"
-      timezone: "UTC"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "docker"
-      - "security"
-    commit-message:
-      prefix: "chore(docker)"
-      include: "scope"
+    groups:
+      docker-base-images:
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "docker"
-    directory: "/frontend"
+    directory: "/backend/frontend-react"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "04:00"
-      timezone: "UTC"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "docker"
-      - "security"
-    commit-message:
-      prefix: "chore(docker)"
-      include: "scope"
+    groups:
+      docker-base-images:
+        update-types:
+          - "minor"
+          - "patch"

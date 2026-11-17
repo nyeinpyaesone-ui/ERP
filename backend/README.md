@@ -99,7 +99,7 @@ erp_solution-system/
 
 ```bash
 # 1. Start PostgreSQL and Redis
-docker-compose up -d db redis
+docker-compose up -d postgres redis
 
 # 2. Backend
 cd backend

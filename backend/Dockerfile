@@ -1,64 +1,43 @@
-# Multi-stage Dockerfile for ERP Backend (Production-Ready)
-FROM python:3.11-slim as base
+# Build stage
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser
-
-# Copy requirements first for better caching
 COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Runtime stage
+FROM python:3.11-slim AS runtime
 
-# Development stage
-FROM base as development
+WORKDIR /app
 
-RUN chown -R appuser:appuser /app
+# Refresh the base interpreter tooling — the slim image ships pip 24.0 /
+# setuptools 79, which carry known advisories that Trivy flags as image
+# alerts (code-scanning "usr/local/lib/python3.11/..." findings).
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-USER appuser
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 postgresql-client redis-tools curl wget ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /bin/bash app
 
-COPY --chown=appuser:appuser . .
+COPY --from=builder /root/.local /home/app/.local
+COPY --chown=app:app . .
 
-RUN mkdir -p uploads static && chown -R appuser:appuser /app
+RUN chmod +x /app/entrypoint.sh
+RUN mkdir -p uploads static && chown -R app:app uploads static
 
-EXPOSE 8000
+USER app
 
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-
-# Production stage
-FROM base as production
-
-# Copy application code
-COPY --chown=appuser:appuser . .
-
-# Create necessary directories including all static subdirectories
-RUN mkdir -p uploads static/{uploads,documents,images,avatars,reports,temp} logs && \
-    chown -R appuser:appuser /app
-
-USER appuser
+ENV PATH="/home/app/.local/bin:${PATH}"
+ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV WORKERS=4
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
-
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,147 +1,186 @@
-# ERP Solution - Enterprise Resource Planning System
+# ERP SOLUTION
 
-A comprehensive, production-ready ERP system built with FastAPI backend and React frontend, featuring modular architecture, AI integration, and complete DevOps automation.
+[![GitHub Actions](https://github.com/nyeinpyaesone-ui/ERP/actions/workflows/ci.yml/badge.svg)](https://github.com/nyeinpyaesone-ui/ERP/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Node 20+](https://img.shields.io/badge/node-20+-green.svg)](https://nodejs.org/)
+[![React Native](https://img.shields.io/badge/react--native-0.74+-blue.svg)](https://reactnative.dev/)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
+[![Kubernetes](https://img.shields.io/badge/kubernetes-ready-blue.svg)](https://kubernetes.io/)
+
+> Enterprise-grade AI-powered ERP system with 12 modules and a full CI/CD pipeline.
+
+## 🏗️ Platform Overview
+
+| Module | Version | Files | Status |
+|--------|---------|-------|--------|
+| Core System | v2.2 | 91 | ✅ |
+| BI Dashboard | v3.2 | 20 | ✅ |
+| Retail POS | v2.9 | 9 | ✅ |
+| Manufacturing/MRP | v2.7 | 10 | ✅ |
+| E-commerce | v3.0 | 12 | ✅ |
+| Mobile App | v2.5 | 17 | ✅ |
+| Kubernetes | v3.1 | 22 | ✅ |
+| DevOps/CI/CD | — | 10 | ✅ |
+| Knowledge System | — | 21 | ✅ |
+| Integration | — | 7 | ✅ |
+| Legacy v2.1 | v2.1 | 31 | ✅ |
+| Legacy v1.8 | v1.8 | 29 | ✅ |
+
+**Tag `v1.0.0`: 274 tracked files, 3 commits — production-ready** (current tree size: `git ls-files | wc -l`)
+
+> Note: the module-file column above sums to 279; `274` is the total tracked-file count at tag `v1.0.0`, not the column sum.
 
 ## 🚀 Quick Start
 
-### Development Setup
-```bash
-# Clone and configure
-cp .env.example .env
-docker-compose up -d
+### Prerequisites
+- Docker & Docker Compose
+- Node.js 20+
+- Python 3.11+
 
-# Access services
-# Frontend: http://localhost:3000
-# API: http://localhost:8000
-# API Docs: http://localhost:8000/docs
-# pgAdmin: http://localhost:5050
-# RedisInsight: http://localhost:8081
+> **Termux / proot-distro (Android arm64)?** Docker cannot run there — use
+> the native mode (venv + native PostgreSQL/Redis) described in
+> [docs/END_USER_INSTALL.md](docs/END_USER_INSTALL.md#termux--proot-distro-android-arm64).
+> The backend's full test suite is verified to pass natively on aarch64.
+
+### One-Command Setup
+```bash
+git clone https://github.com/nyeinpyaesone-ui/ERP.git
+cd ERP
+./scripts/setup.sh        # Install dependencies
+docker compose up -d      # Start services
 ```
 
-### Production Deployment
+### Development
 ```bash
-# Configure environment
-cp .env.production .env
+# Terminal 1 — Backend
+cd backend && source venv/bin/activate && uvicorn app.main:app --reload
 
-# Deploy with Docker Compose
-docker-compose -f docker-compose.prod.yml up -d
+# Terminal 2 — Frontend
+cd backend/frontend-react && npm run dev
 
-# Or deploy to Kubernetes
-kubectl apply -k infra/k8s/overlays/production/
+# Terminal 3 — Mobile
+cd mobile && npx expo start
 ```
 
-## 🏗️ Architecture
+## 📦 Architecture
 
-### Core Services
-- **Backend**: FastAPI (Python) - 101 API endpoints across 15 modules
-- **Frontend**: React 18 with TypeScript - Multi-module SPA
-- **Database**: PostgreSQL 15 with full-text search
-- **Cache**: Redis 7 for sessions and caching
-- **AI**: Ollama for local LLM integration
-- **Reverse Proxy**: Nginx with SSL termination
+```
+┌─────────────────────────────────────────────────────────┐
+│                      Frontend Layer                      │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │  React   │ │  Mobile  │ │  Admin   │ │ Customer │  │
+│  │  Web App │ │  App     │ │  Portal  │ │  Portal  │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+├─────────────────────────────────────────────────────────┤
+│                      API Gateway                         │
+│              FastAPI + OpenAPI + WebSocket               │
+├─────────────────────────────────────────────────────────┤
+│                    AI Intelligence Layer                 │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │  RAG     │ │  Agent   │ │  LLM     │ │ Forecast │  │
+│  │  Engine  │ │  Orchestr│ │  Service │ │  Engine  │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+├─────────────────────────────────────────────────────────┤
+│                   Core ERP Modules                       │
+│  CRM │ HR │ Inventory │ Finance │ Manufacturing │ POS  │
+├─────────────────────────────────────────────────────────┤
+│                   Data & Infrastructure                  │
+│  PostgreSQL │ Redis │ Ollama │ Docker │ GitHub Actions │
+└─────────────────────────────────────────────────────────┘
+```
 
-### Modules
-- Authentication & Authorization (JWT + RBAC)
-- CRM (Customer Relationship Management)
-- HR (Human Resources)
-- Inventory & Supply Chain
-- Finance & Accounting
-- Projects & Tasks
-- Documents & Knowledge Base
-- Analytics & BI Dashboard
-- POS (Point of Sale)
-- MRP (Material Requirements Planning)
-- E-commerce Integration
-- Workflows & Automation
-- WebSocket Real-time Features
-- AI-Powered Insights
+## 📚 Documentation
 
-## 🛠️ Technology Stack
+### Production Operations
+| Document | Description |
+|----------|-------------|
+| [docs/END_USER_INSTALL.md](docs/END_USER_INSTALL.md) | **One-command production install** (domain, SSL, deploy) |
+| [docs/BLUE_GREEN_DEPLOYMENT.md](docs/BLUE_GREEN_DEPLOYMENT.md) | Zero-downtime deploy & rollback procedures |
+| [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) | Automated backup, restore, disaster recovery |
+| [docs/SSL_CERTIFICATES.md](docs/SSL_CERTIFICATES.md) | Let's Encrypt cert management & auto-renewal |
+| [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) | Full production deployment guide (Docker/K8s) |
+| [docs/PRODUCTION_SETUP.md](docs/PRODUCTION_SETUP.md) | Server provisioning & configuration |
 
-| Layer | Technology |
-|-------|------------|
-| Backend | FastAPI, Python 3.11, SQLAlchemy, Pydantic |
-| Frontend | React 18, TypeScript, TailwindCSS, Redux Toolkit |
-| Database | PostgreSQL 15, Redis 7 |
-| AI/ML | Ollama, LangChain |
-| DevOps | Docker, Kubernetes, GitHub Actions |
-| Monitoring | Prometheus, Grafana (optional) |
+### Development
+| Document | Description |
+|----------|-------------|
+| [docs/ONBOARDING.md](docs/ONBOARDING.md) | 30-minute developer onboarding |
+| [docs/API_SUMMARY.md](docs/API_SUMMARY.md) | API endpoints and authentication |
+| [docs/DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md) | Alembic migration guide |
+| [docs/TESTING.md](docs/TESTING.md) | Testing strategy guide |
+| [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | CI/CD secrets setup |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & fixes |
+| [docs/FAQ.md](docs/FAQ.md) | Frequently asked questions |
 
-## 📦 Infrastructure
+### Architecture & Governance
+| Document | Description |
+|----------|-------------|
+| [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md) | ADR records |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development workflow, commit conventions |
+| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
 
-### Docker Compose
-- `docker-compose.yml` - Development environment with devtools
-- `docker-compose.prod.yml` - Production-ready with scaling
+## 🛠️ Management Commands
 
-### Kubernetes
-- Base configurations in `infra/k8s/base/`
-- Environment overlays: development, staging, production
-- Auto-scaling (HPA), network policies, RBAC
+```bash
+# Repository management
+./scripts/gh-manager.sh status     # Show status
+./scripts/gh-manager.sh verify     # Full verification
+./scripts/gh-manager.sh tag v1.1.0 # Create release
 
-### CI/CD
-- Automated testing on PR
-- Security scanning (CodeQL, Snyk)
-- Container builds and pushes
-- Automated deployments
+# Development
+make dev        # Start dev environment
+make test       # Run tests
+make push       # Quick push to GitHub
+make clean      # Clean build artifacts
+```
 
-## 🔐 Security Features
+## 🛡️ Security
 
-- JWT authentication with refresh tokens
-- Role-Based Access Control (RBAC)
-- Rate limiting (configurable per environment)
+- JWT-based authentication
+- Role-based access control (RBAC)
+- Row-level security (RLS) for multi-tenancy
+- API rate limiting
+- Input validation and sanitization
 - CORS protection
-- SQL injection prevention
-- XSS protection
-- Container security scanning
-- Secret management via environment variables
+- Secrets management via GitHub Actions
 
-## 📊 Monitoring & Observability
+## 🌍 Internationalization
 
-- Health check endpoints on all services
-- Prometheus metrics exposure
-- Structured JSON logging
-- Request tracing support
-- Database query logging (dev)
+- English (en) — Primary
+- Myanmar (my) — Burmese with Pyidaungsu font
+- Extensible for additional languages
 
-## 🚀 Deployment Options
+## 📊 Monitoring
 
-1. **Local Development**: Docker Compose
-2. **Single Server**: Docker Compose Production
-3. **Cloud Native**: Kubernetes cluster
-4. **Hybrid**: K3s/K3d for edge deployments
-
-## 📝 Documentation
-
-- [Architecture Decisions](docs/ARCHITECTURE_DECISIONS.md)
-- [API Summary](docs/API_SUMMARY.md)
-- [Database Migrations](docs/DATABASE_MIGRATIONS.md)
-- [Production Setup](docs/PRODUCTION_SETUP.md)
-- [Testing Guide](docs/TESTING.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-
-## 🔧 Configuration
-
-See `.env.example` for all available configuration options:
-- Database connection
-- Redis settings
-- JWT secrets
-- Feature flags
-- AI model configuration
-- Rate limiting
+- Prometheus metrics at `/metrics`
+- Health checks at `/health`, `/health/db`, `/health/redis`
+- Structured logging with correlation IDs
+- Sentry error tracking integration
 
 ## 🤝 Contributing
 
-1. Create feature branch from `main`
-2. Make changes with tests
-3. Ensure CI passes
-4. Submit pull request
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit with convention: `feat:`, `fix:`, `docs:`, etc.
+4. Push and open a Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## 📄 License
 
-MIT License - see LICENSE file for details.
+[MIT License](LICENSE) — ERP SOLUTION Contributors
+
+## 🆘 Support
+
+| Contact | Details |
+|---------|---------|
+| **Email** | nyeinpyaesone273@gmail.com |
+| **LinkedIn** | [linkedin.com/in/nyein-pyae-sone-3250501ba](https://linkedin.com/in/nyein-pyae-sone-3250501ba) |
+| **GitHub** | [github.com/nyeinpyaesone-ui/ERP](https://github.com/nyeinpyaesone-ui/ERP) |
+| **Phone** | +959699795380 |
+| **Issues** | [GitHub Issues](https://github.com/nyeinpyaesone-ui/ERP/issues) |
 
 ---
 
-**Status**: ✅ Production Ready
-**Version**: 2.1.0
-**Last Updated**: 2024
+Built with ❤️ by the ERP SOLUTION Team
