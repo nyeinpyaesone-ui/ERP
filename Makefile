@@ -1,4 +1,4 @@
-.PHONY: help install dev build test clean docker-up docker-down push
+.PHONY: help install dev build test clean docker-up docker-down push status lint guard jev-detect jev-intercept-start jev-intercept-judge jev-validate
 
 help:
 	@echo "ERP SOLUTION — Available Commands"
@@ -10,26 +10,38 @@ help:
 	@echo "  make clean        Clean build artifacts"
 	@echo "  make docker-up    Start Docker services"
 	@echo "  make docker-down  Stop Docker services"
+	@echo "  make lint         Run linters"
 	@echo "  make push         Push to GitHub"
 	@echo "  make status       Show repository status"
 
+# Portable npm: prefer npm on PATH (10.9.2 here), fall back to the volatile npm10 bootstrap
+NPM ?= $(shell command -v npm >/dev/null 2>&1 && echo npm || echo node /tmp/opencode/npm10/package/bin/npm-cli.js)
+
 install:
-	cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
-	cd frontend && npm install
+	cd backend && python3 -m venv venv && . venv/bin/activate && pip install -r requirements-dev.txt
+	cd backend/frontend-react && $(NPM) install
 	cd mobile && npm install
 
 dev:
-	docker-compose up -d postgres redis
-	@echo "Start backend:  cd backend && source venv/bin/activate && uvicorn app.main:app --reload"
-	@echo "Start frontend: cd frontend && npm run dev"
+	docker compose up -d postgres redis
+	@echo "Start backend:  cd backend && . venv/bin/activate && uvicorn app.main:app --reload"
+	@echo "Start frontend: cd backend/frontend-react && $(NPM) run dev"
 	@echo "Start mobile:   cd mobile && npx expo start"
 
 build:
-	docker-compose build
+	docker compose build
 
 test:
-	cd backend && source venv/bin/activate && pytest
-	cd frontend && npm test
+	cd backend && . venv/bin/activate && pytest
+	cd backend/frontend-react && $(NPM) test
+
+lint:
+	cd backend && . venv/bin/activate && ruff check . && black --check .
+	cd backend && . venv/bin/activate && mypy app/ --ignore-missing-imports || true
+	cd backend/frontend-react && $(NPM) run lint
+
+guard:
+	./scripts/repo-guard.sh
 
 clean:
 	find . -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
@@ -37,10 +49,10 @@ clean:
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 
 docker-up:
-	docker-compose up -d
+	docker compose up -d
 
 docker-down:
-	docker-compose down
+	docker compose down
 
 push:
 	git add -A
@@ -51,3 +63,20 @@ status:
 	git status -sb
 	@echo "Commits: $$(git rev-list --count HEAD)"
 	@echo "Files:   $$(git ls-files | wc -l)"
+
+# Jev skills integration
+jev-detect:
+	@python3 .opencode/skills/jev-dynamic-detect/scripts/detect_optimized.py "$(task)"
+
+jev-intercept-start:
+	@cd backend && . venv/bin/activate && JEV_INTERCEPT=1 uvicorn app.main:app --reload
+
+jev-intercept-judge:
+	@cd backend && . venv/bin/activate && python ../.opencode/skills/jev-intercept/scripts/jev_judge.py
+
+jev-validate:
+	@python3 /home/admin/.opencode/skills/jev/scripts/jev.py decide /home/admin/.opencode/skills/jev-devops/assets/1-triage.json --dry-run
+	@python3 /home/admin/.opencode/skills/jev/scripts/jev.py decide /home/admin/.opencode/skills/jev-devops/assets/2-code-review.json --dry-run
+	@python3 /home/admin/.opencode/skills/jev/scripts/jev.py decide /home/admin/.opencode/skills/jev-devops/assets/3-route.json --dry-run
+	@python3 /home/admin/.opencode/skills/jev/scripts/jev.py decide /home/admin/.opencode/skills/jev-devops/assets/4-documents.json --dry-run
+	@python3 /home/admin/.opencode/skills/jev/scripts/jev.py decide /home/admin/.opencode/skills/jev-devops/assets/5-context.json --dry-run

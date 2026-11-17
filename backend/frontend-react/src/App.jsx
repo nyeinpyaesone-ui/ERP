@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -21,47 +22,100 @@ import Permissions from './pages/Permissions';
 import LLMManager from './pages/LLMManager';
 import Search from './pages/Search';
 
-function App() {
-  const [token, setToken] = useState(localStorage.getItem('token'));
+// Role-based route guard
+/**
+ * Render children for an authenticated user whose legacy role is allowed.
+ * Empty allowedRoles or '*' allows any authenticated role; matching ignores case.
+ * Show a spinner while loading, redirect signed-out users to /login, and send
+ * users with a disallowed role to /.
+ */
+function RequireRole({ children, allowedRoles = [] }) {
+  const { user, loading } = useAuth();
 
-  useEffect(() => {
-    const handleStorage = () => {
-      setToken(localStorage.getItem('token'));
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div
+          role="status"
+          aria-label="Loading"
+          className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"
+        />
+      </div>
+    );
+  }
 
-  if (!token) {
-    return <Login onLogin={(t) => { localStorage.setItem('token', t); setToken(t); }} />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // If no specific roles required, just check authenticated
+  if (allowedRoles.length === 0) {
+    return children;
+  }
+
+  // Check if user has one of the allowed roles
+  const userRole = user?.role?.toLowerCase() || 'user';
+  const hasAccess = allowedRoles.some(role => role.toLowerCase() === userRole || role === '*');
+
+  if (!hasAccess) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+/** Render a loading state, login form, or the authenticated application routes. */
+function AppRoutes() {
+  const { user, loading, login, logout } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div
+          role="status"
+          aria-label="Loading"
+          className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"
+        />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login onLogin={login} />;
   }
 
   return (
-    <Layout onLogout={() => { localStorage.removeItem('token'); setToken(null); }}>
+    <Layout onLogout={logout}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/crm" element={<CRM />} />
-        <Route path="/hr" element={<HR />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route path="/finance" element={<Finance />} />
-        <Route path="/projects" element={<Projects />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/ai-chat" element={<AIChat />} />
-        <Route path="/documents" element={<Documents />} />
-        <Route path="/workflows" element={<Workflows />} />
-        <Route path="/integrations" element={<Integrations />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/bulk-import" element={<BulkImportExport />} />
-        <Route path="/migrations" element={<MigrationManager />} />
-        <Route path="/permissions" element={<Permissions />} />
-        <Route path="/llm-manager" element={<LLMManager />} />
-        <Route path="/search" element={<Search />} />
+        <Route path="/login" element={<Login onLogin={login} />} />
+        <Route path="/crm" element={<RequireRole><CRM /></RequireRole>} />
+        <Route path="/hr" element={<RequireRole allowedRoles={['admin', 'superadmin', 'manager']}><HR /></RequireRole>} />
+        <Route path="/inventory" element={<RequireRole><Inventory /></RequireRole>} />
+        <Route path="/finance" element={<RequireRole allowedRoles={['admin', 'superadmin', 'manager']}><Finance /></RequireRole>} />
+        <Route path="/projects" element={<RequireRole><Projects /></RequireRole>} />
+        <Route path="/reports" element={<RequireRole allowedRoles={['admin', 'superadmin', 'manager']}><Reports /></RequireRole>} />
+        <Route path="/analytics" element={<RequireRole allowedRoles={['admin', 'superadmin', 'manager']}><Analytics /></RequireRole>} />
+        <Route path="/ai-chat" element={<RequireRole><AIChat /></RequireRole>} />
+        <Route path="/documents" element={<RequireRole><Documents /></RequireRole>} />
+        <Route path="/workflows" element={<RequireRole allowedRoles={['admin', 'superadmin', 'manager']}><Workflows /></RequireRole>} />
+        <Route path="/integrations" element={<RequireRole allowedRoles={['admin', 'superadmin']}><Integrations /></RequireRole>} />
+        <Route path="/settings" element={<RequireRole allowedRoles={['admin', 'superadmin']}><Settings /></RequireRole>} />
+        <Route path="/bulk-import" element={<RequireRole allowedRoles={['admin', 'superadmin']}><BulkImportExport /></RequireRole>} />
+        <Route path="/migrations" element={<RequireRole allowedRoles={['admin', 'superadmin']}><MigrationManager /></RequireRole>} />
+        <Route path="/permissions" element={<RequireRole allowedRoles={['admin', 'superadmin']}><Permissions /></RequireRole>} />
+        <Route path="/llm-manager" element={<RequireRole allowedRoles={['admin', 'superadmin']}><LLMManager /></RequireRole>} />
+        <Route path="/search" element={<RequireRole><Search /></RequireRole>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
   );
 }
 
-export default App;
-
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
+  );
+}

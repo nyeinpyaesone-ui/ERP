@@ -1,24 +1,40 @@
+from collections.abc import Callable
 from functools import wraps
-from typing import List, Optional, Dict, Any, Callable
+from typing import Any
+
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User, Role, Permission, FieldPermission, DataPolicy
-from app.auth import get_current_user
+from app.models import DataPolicy, User
+
+
+# Lazy import to avoid circular dependency
+def _get_current_user():
+    from app.auth import get_current_user
+
+    return get_current_user
+
 
 class PermissionDenied(Exception):
     pass
+
 
 def has_permission(user: User, resource: str, action: str, db: Session) -> bool:
     """Check if user has a specific permission through any of their roles."""
     if not user or not user.is_active:
         return False
 
-    # Superadmin bypass
-    if any(r.name == "superadmin" for r in user.roles):
+    # Superadmin bypass: legacy string column OR join-table role.
+    # Covers users created before seed_defaults backfilled user_roles.
+    if getattr(user, "role", None) == "superadmin":
         return True
+    try:
+        if any(r.name == "superadmin" for r in user.roles):
+            return True
+    except Exception:
+        pass
 
     # Check all user roles for the permission
     for role in user.roles:
@@ -28,30 +44,38 @@ def has_permission(user: User, resource: str, action: str, db: Session) -> bool:
 
     return False
 
+
 def require_permission(resource: str, action: str):
     """Dependency factory to require a specific permission."""
+
     def checker(
         request: Request,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+        current_user: User = Depends(_get_current_user()),
+        db: Session = Depends(get_db),
     ) -> User:
         if not has_permission(current_user, resource, action, db):
             raise HTTPException(
-                status_code=403,
-                detail=f"Permission denied: {resource}.{action}"
+                status_code=403, detail=f"Permission denied: {resource}:{action}"
             )
         return current_user
+
     return checker
 
-def get_user_permissions(user: User, db: Session) -> List[str]:
-    """Get all permission names for a user."""
+
+def get_user_permissions(user: User, db: Session) -> list[str]:
+    """Get all permission names for a user in resource:action format."""
+    if getattr(user, "role", None) == "superadmin":
+        from app.permissions_catalogue import ALL_PERMISSIONS
+
+        return list(ALL_PERMISSIONS)
     permissions = set()
     for role in user.roles:
         for perm in role.permissions:
-            permissions.add(f"{perm.resource}.{perm.action}")
+            permissions.add(f"{perm.resource}:{perm.action}")
     return list(permissions)
 
-def get_field_permissions(user: User, resource: str, db: Session) -> Dict[str, str]:
+
+def get_field_permissions(user: User, resource: str, db: Session) -> dict[str, str]:
     """Get field-level access map for a user on a resource."""
     field_map = {}
     for role in user.roles:
@@ -64,6 +88,7 @@ def get_field_permissions(user: User, resource: str, db: Session) -> Dict[str, s
                     field_map[fp.field_name] = fp.access_level
     return field_map
 
+
 def filter_fields(data: Any, user: User, resource: str, db: Session) -> Any:
     """Filter out hidden fields from data based on user's field permissions."""
     field_map = get_field_permissions(user, resource, db)
@@ -72,7 +97,7 @@ def filter_fields(data: Any, user: User, resource: str, db: Session) -> Any:
         return {k: v for k, v in data.items() if field_map.get(k) != "hidden"}
     elif isinstance(data, list):
         return [filter_fields(item, user, resource, db) for item in data]
-    elif hasattr(data, '__dict__'):
+    elif hasattr(data, "__dict__"):
         # SQLAlchemy model
         result = {}
         for col in data.__table__.columns:
@@ -82,16 +107,22 @@ def filter_fields(data: Any, user: User, resource: str, db: Session) -> Any:
         return result
     return data
 
+
 def check_data_policy(user: User, resource: str, record: Any, db: Session) -> bool:
     """Check if user can access a specific record based on data policies."""
     for role in user.roles:
-        policies = db.query(DataPolicy).filter(
-            and_(
-                DataPolicy.role_id == role.id,
-                DataPolicy.resource == resource,
-                DataPolicy.is_active == True
+        policies = (
+            db.query(DataPolicy)
+            .filter(
+                and_(
+                    DataPolicy.role_id == role.id,
+                    DataPolicy.resource == resource,
+                    DataPolicy.is_active.is_(True),
+                )
             )
-        ).order_by(DataPolicy.priority).all()
+            .order_by(DataPolicy.priority)
+            .all()
+        )
 
         for policy in policies:
             if policy.effect == "deny":
@@ -104,14 +135,17 @@ def check_data_policy(user: User, resource: str, record: Any, db: Session) -> bo
 
     return True  # Default allow if no policies match
 
-def matches_condition(record: Any, condition: Dict[str, Any]) -> bool:
+
+def matches_condition(record: Any, condition: dict[str, Any]) -> bool:
     """Simple condition matcher for data policies."""
     if not condition:
         return True
 
     record_dict = record
-    if hasattr(record, '__dict__'):
-        record_dict = {c.name: getattr(record, c.name) for c in record.__table__.columns}
+    if hasattr(record, "__dict__"):
+        record_dict = {
+            c.name: getattr(record, c.name) for c in record.__table__.columns
+        }
 
     for key, value in condition.items():
         if key == "_and":
@@ -123,7 +157,11 @@ def matches_condition(record: Any, condition: Dict[str, Any]) -> bool:
         elif key.startswith("_"):
             continue
         else:
-            record_val = record_dict.get(key) if isinstance(record_dict, dict) else getattr(record, key, None)
+            record_val = (
+                record_dict.get(key)
+                if isinstance(record_dict, dict)
+                else getattr(record, key, None)
+            )
             if isinstance(value, dict):
                 # Operator conditions: {"eq": 5}, {"gt": 10}, etc.
                 for op, op_val in value.items():
@@ -147,19 +185,26 @@ def matches_condition(record: Any, condition: Dict[str, Any]) -> bool:
 
     return True
 
+
 def permission_required(resource: str, action: str):
     """Decorator for permission checking on route handlers."""
+
     def decorator(func: Callable):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             # Extract current_user and db from kwargs
-            current_user = kwargs.get('current_user')
-            db = kwargs.get('db')
+            current_user = kwargs.get("current_user")
+            db = kwargs.get("db")
 
-            if not current_user or not has_permission(current_user, resource, action, db):
-                raise HTTPException(status_code=403, detail=f"Permission denied: {resource}.{action}")
+            if not current_user or not has_permission(
+                current_user, resource, action, db
+            ):
+                raise HTTPException(
+                    status_code=403, detail=f"Permission denied: {resource}:{action}"
+                )
 
             return await func(*args, **kwargs)
-        return wrapper
-    return decorator
 
+        return wrapper
+
+    return decorator

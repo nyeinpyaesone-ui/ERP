@@ -19,7 +19,7 @@
 | **Profile** | User info, stats, settings, dark mode toggle, logout |
 
 ### Technical Stack
-- **React Native** 0.73 with Expo SDK 50
+- **React Native** 0.86.0 with Expo SDK 50
 - **TypeScript** for type safety
 - **React Navigation** (Stack + Bottom Tabs)
 - **React Native Paper** for Material Design components

@@ -1,52 +1,94 @@
-```
 # Dependencies
-.venv/
-venv/
-__pycache__/
+node_modules/
+backend/venv/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# Build artifacts
-dist/
-build/
-*.egg-info/
+# Build outputs
+backend/frontend-react/dist/
+backend/frontend-react/build/
+mobile/dist/
+mobile/.expo/
 
-# Logs
-*.log
-
-# Environment variables
+# Environment files
 .env
 .env.local
-*.env.*
+.env.*.local
+backend/.env
 
-# Editors
-.vscode/
+# IDE
 .idea/
+.vscode/
 *.swp
 *.swo
 
-# OS generated files
+# OS
 .DS_Store
 Thumbs.db
 
-# Testing
-.coverage
-coverage/
-htmlcov/
-.pytest_cache/
-.mypy_cache/
+# Logs
+*.log
+logs/
+backend/logs/
 
 # Database
 *.db
 *.sqlite
-*.sqlite3
+backend/test.db
 
-# Alembic
-alembic/versions/alembic_version.*
+# Docker (.dockerignore files are intentionally tracked)
 
-# Python specific
-*.py[cod]
-*$py.class
-*$pycache$*
-```
+# Test
+.coverage
+htmlcov/
+.pytest_cache/
+.venv/
+
+# Heap dumps
+*.heapsnapshot
+
+# Opencode session dumps
+session-*.md
+.opencode/session*
+
+# Backup artifacts
+scripts/backups/
+*.tar.gz
+.env.production
+
+# Python tool caches (explicit)
+.ruff_cache/
+.mypy_cache/
+
+# Virtualenvs at any location
+venv/
+
+# Coverage extras
+coverage.xml
+
+# Packaging
+*.egg-info/
+
+# TLS material & runtime secrets
+ssl/
+*.pem
+*.key
+*.crt
+*.p12
+.env.*
+!.env.example
+!.env.production.template
+!.env.staging.template
+!backend/.env.example
+
+# Jev-Intercept runtime events
+.opencode/intercept/
+
+# Blue-green deployment state (runtime-only)
+.active_color
+.active_version
+
+# Kubernetes runtime secrets (provision out-of-band)
+infra/k8s/**/secrets*.env

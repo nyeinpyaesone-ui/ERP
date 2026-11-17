@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Receipt, DollarSign, Plus, CheckCircle, Clock, AlertCircle } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function Finance() {
   const [invoices, setInvoices] = useState([]);
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/v1/finance/invoices`, axiosConfig).then(r => setInvoices(r.data));
+    api.get(`/finance/invoices`).then(r => setInvoices(r.data));
   }, []);
 
   const statusColors = {

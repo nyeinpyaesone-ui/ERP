@@ -1,84 +1,141 @@
+import os
+from collections.abc import Iterable
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from contextlib import asynccontextmanager
 
-from app.database import engine, Base
+from app.config import Settings
+from app.config import settings as default_settings
 from app.routers import (
-    auth, crm, hr, inventory, finance, projects,
-    ai, documents, reports, workflows, payments,
-    integrations, analytics, admin, websocket,
-    purchase_orders
+    admin,
+    ai,
+    analytics,
+    auth,
+    crm,
+    documents,
+    finance,
+    health,
+    health_root,
+    hr,
+    integrations,
+    inventory,
+    jev_intercept,
+    llm,
+    payments,
+    permissions,
+    projects,
+    reports,
+    search,
+    websocket,
+    workflows,
 )
-from app.middleware.tenancy import TenancyMiddleware
-from app.config import settings
+
+# (module, prefix, tags) — single table so the factory and the module-level
+# app below cannot drift apart.
+ROUTER_MOUNTS: tuple[tuple[object, str, list[str]], ...] = (
+    (auth.router, "/api/v1/auth", ["Authentication"]),
+    (crm.router, "/api/v1/crm", ["CRM"]),
+    (hr.router, "/api/v1/hr", ["HR"]),
+    (inventory.router, "/api/v1/inventory", ["Inventory"]),
+    (finance.router, "/api/v1/finance", ["Finance"]),
+    (projects.router, "/api/v1/projects", ["Projects"]),
+    (ai.router, "/api/v1/ai", ["AI"]),
+    (documents.router, "/api/v1/documents", ["Documents"]),
+    (reports.router, "/api/v1/reports", ["Reports"]),
+    (workflows.router, "/api/v1/workflows", ["Workflows"]),
+    (payments.router, "/api/v1/payments", ["Payments"]),
+    (integrations.router, "/api/v1/integrations", ["Integrations"]),
+    (analytics.router, "/api/v1/analytics", ["Analytics"]),
+    (admin.router, "/api/v1/admin", ["Admin"]),
+    (websocket.router, "/api/v1/ws", ["WebSocket"]),
+    (search.router, "/api/v1/search", ["Search"]),
+    (permissions.router, "/api/v1/permissions", ["Permissions"]),
+    (llm.router, "/api/v1/llm", ["LLM"]),
+    (jev_intercept.router, "/api/v1/jev", ["Jev-Intercept"]),
+    (health.router, "/api/v1", ["Health"]),
+    (health_root.router, "", ["Health"]),
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    """Yield control for the application lifetime; dispose pools on shutdown."""
     yield
+    from app.database import engine
 
-app = FastAPI(
-    title=settings.APP_NAME,
-    description="Enterprise Resource Planning with AI-powered features",
-    version=settings.APP_VERSION,
-    lifespan=lifespan
-)
+    engine.dispose()
 
-# Add tenancy middleware for tenant isolation
-app.add_middleware(TenancyMiddleware)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def create_app(
+    settings_override: Settings | dict | None = None,
+    mounts: Iterable[tuple[object, str, list[str]]] | None = None,
+) -> FastAPI:
+    """Application factory (Twelve-Factor friendly).
 
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
-app.include_router(crm.router, prefix="/api/v1/crm", tags=["CRM"])
-app.include_router(hr.router, prefix="/api/v1/hr", tags=["HR"])
-app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventory"])
-app.include_router(finance.router, prefix="/api/v1/finance", tags=["Finance"])
-app.include_router(projects.router, prefix="/api/v1/projects", tags=["Projects"])
-app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI"])
-app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
-app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
-app.include_router(workflows.router, prefix="/api/v1/workflows", tags=["Workflows"])
-app.include_router(payments.router, prefix="/api/v1/payments", tags=["Payments"])
-app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["Integrations"])
-app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
-app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
-app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSocket"])
-app.include_router(purchase_orders.router, tags=["Purchase Orders"])
+    - settings_override: a Settings instance or dict of field overrides,
+      e.g. create_app({"ENVIRONMENT": "test"}). Lets tests boot a fully
+      isolated app without monkeypatching the module-level singleton.
+    - mounts: replace the router table (narrow boots for focused tests).
+    """
+    if isinstance(settings_override, Settings):
+        cfg = settings_override
+    elif settings_override:
+        cfg = Settings(**settings_override)
+    else:
+        cfg = default_settings
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+    app = FastAPI(
+        title=cfg.APP_NAME,
+        description="Enterprise Resource Planning with AI-powered features",
+        version=cfg.APP_VERSION,
+        lifespan=lifespan,
+    )
 
-@app.get("/")
-async def root():
-    return {
-        "name": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "status": "running",
-        "features": [
-            "Core ERP (CRM, HR, Inventory, Finance, Projects)",
-            "AI Chat & RAG",
-            "Document Management",
-            "Reports & Analytics",
-            "Workflow Automation",
-            "Stripe Payments",
-            "WebSocket Real-time",
-            "PWA with Offline Support",
-            "AI Forecasting",
-            "Bulk Import/Export",
-            "Alembic Migrations",
-            "Multi-Tenancy Support",
-            "Purchase Order Management"
-        ]
-    }
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cfg.cors_origins_list,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+    for router, prefix, tags in mounts if mounts is not None else ROUTER_MOUNTS:
+        app.include_router(router, prefix=prefix, tags=tags)
 
+    # Opt-in runtime interception; a no-op unless JEV_INTERCEPT=1.
+    from app.services.jev_intercept import install_interceptor
+
+    install_interceptor(app)
+
+    os.makedirs("static", exist_ok=True)
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
+    @app.get("/")
+    async def root():
+        return {
+            "name": cfg.APP_NAME,
+            "version": cfg.APP_VERSION,
+            "status": "running",
+            "features": [
+                "Core ERP (CRM, HR, Inventory, Finance, Projects)",
+                "AI Chat & RAG",
+                "Document Management",
+                "Reports & Analytics",
+                "Workflow Automation",
+                "Stripe Payments",
+                "WebSocket Real-time",
+                "PWA with Offline Support",
+                "AI Forecasting",
+                "Bulk Import/Export",
+                "Alembic Migrations",
+            ],
+        }
+
+    return app
+
+
+# Uvicorn entrypoint (app.main:app) and tests keep a concrete instance;
+# create_app() is the sanctioned way to boot variants.
+app = create_app(settings_override=default_settings)

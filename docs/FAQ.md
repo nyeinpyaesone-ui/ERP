@@ -22,7 +22,7 @@ Yes! v1.0.0 is production-ready with full CI/CD, Docker support, and Kubernetes 
 git clone https://github.com/nyeinpyaesone-ui/ERP.git
 cd ERP
 ./scripts/setup.sh
-docker-compose up -d
+docker compose up -d
 ```
 
 ### How do I contribute?
@@ -48,7 +48,7 @@ Yes! Configure DNS and SSL as described in the deployment guide.
 ### How do I update?
 ```bash
 git pull origin main
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 ## AI Features
