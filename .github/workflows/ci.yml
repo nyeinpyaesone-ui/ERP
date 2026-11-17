@@ -196,7 +196,9 @@ jobs:
           set -euo pipefail
           bash -n scripts/lib.sh
           bash -n scripts/deploy-blue-green.sh
-          docker compose --env-file .env.production.template -f docker-compose.prod.yml config --quiet
+          bash -n scripts/configure-github-actions.sh
+          DOCKER_USER=ci-validation docker compose --env-file .env.production.template -f docker-compose.prod.yml config --quiet
+          DOCKER_USER=ci-validation docker compose --env-file .env.staging.template -f docker-compose.prod.yml config --quiet
 
   test:
     name: Tests
