@@ -1,23 +1,26 @@
 # API Routers
+# All API endpoint modules
+
 from app.routers import (
+    admin,
+    ai,
+    analytics,
     auth,
     crm,
-    hr,
-    inventory,
-    finance,
-    projects,
-    ai,
     documents,
-    reports,
-    workflows,
-    payments,
+    finance,
+    hr,
     integrations,
-    analytics,
-    admin,
-    websocket,
+    inventory,
+    jev_intercept,
     llm,
-    search,
+    payments,
     permissions,
+    projects,
+    reports,
+    search,
+    websocket,
+    workflows,
 )
 
 __all__ = [
@@ -36,7 +39,8 @@ __all__ = [
     "analytics",
     "admin",
     "websocket",
-    "llm",
     "search",
     "permissions",
+    "llm",
+    "jev_intercept",
 ]

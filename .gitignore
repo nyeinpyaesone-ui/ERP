@@ -1,58 +1,94 @@
-```
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# Dependencies
+node_modules/
+backend/venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# Virtual environments
-venv/
-env/
-ENV/
-.venv/
-.env/
+# Build outputs
+backend/frontend-react/dist/
+backend/frontend-react/build/
+mobile/dist/
+mobile/.expo/
 
-# IDE and editor files
-.vscode/
+# Environment files
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# IDE
 .idea/
+.vscode/
 *.swp
 *.swo
-*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Logs
 *.log
+logs/
+backend/logs/
 
-# Environment variables
-.env
-.env.local
-*.env.*
+# Database
+*.db
+*.sqlite
+backend/test.db
 
-# Coverage reports
+# Docker (.dockerignore files are intentionally tracked)
+
+# Test
 .coverage
 htmlcov/
-.coverage.*
-
-# Testing
 .pytest_cache/
+.venv/
+
+# Heap dumps
+*.heapsnapshot
+
+# Opencode session dumps
+session-*.md
+.opencode/session*
+
+# Backup artifacts
+scripts/backups/
+*.tar.gz
+.env.production
+
+# Python tool caches (explicit)
+.ruff_cache/
 .mypy_cache/
 
-# Distribution / packaging
-.DS_Store
-Thumbs.db
-```
+# Virtualenvs at any location
+venv/
+
+# Coverage extras
+coverage.xml
+
+# Packaging
+*.egg-info/
+
+# TLS material & runtime secrets
+ssl/
+*.pem
+*.key
+*.crt
+*.p12
+.env.*
+!.env.example
+!.env.production.template
+!.env.staging.template
+!backend/.env.example
+
+# Jev-Intercept runtime events
+.opencode/intercept/
+
+# Blue-green deployment state (runtime-only)
+.active_color
+.active_version
+
+# Kubernetes runtime secrets (provision out-of-band)
+infra/k8s/**/secrets*.env

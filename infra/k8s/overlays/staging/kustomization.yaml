@@ -4,7 +4,7 @@ kind: Kustomization
 namespace: erp_solution-staging
 
 resources:
-  - ../base
+  - ../../base
 
 namePrefix: staging-
 

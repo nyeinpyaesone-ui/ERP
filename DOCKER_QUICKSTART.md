@@ -8,7 +8,7 @@
 ```bash
 docker login -u powerrangeranikg
 docker build -t powerrangeranikg/erp-solution-backend:v1.0.0 ./backend
-docker build -t powerrangeranikg/erp-solution-frontend:v1.0.0 ./frontend
+docker build -t powerrangeranikg/erp-solution-frontend:v1.0.0 ./backend/frontend-react
 docker push powerrangeranikg/erp-solution-backend:v1.0.0
 docker push powerrangeranikg/erp-solution-frontend:v1.0.0
 ```

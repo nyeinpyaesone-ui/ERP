@@ -51,9 +51,9 @@ if [ -d "backend" ]; then
 fi
 
 # Setup frontend
-if [ -d "frontend" ]; then
+if [ -d "backend/frontend-react" ]; then
     info "Setting up frontend..."
-    cd frontend
+    cd backend/frontend-react
 
     if [ -f "package.json" ]; then
         npm install
@@ -106,7 +106,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Start services:  docker-compose up -d"
 echo "  2. Run backend:     cd backend && source venv/bin/activate && uvicorn app.main:app --reload"
-echo "  3. Run frontend:    cd frontend && npm run dev"
+echo "  3. Run frontend:    cd backend/frontend-react && npm run dev"
 echo "  4. Run mobile:      cd mobile && npx expo start"
 echo ""
 echo "API docs: http://localhost:8000/docs"

@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { FolderKanban, CheckCircle, Clock, AlertCircle, Plus, Calendar, BarChart3 } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/v1/projects/projects`, axiosConfig).then(r => setProjects(r.data));
+    api.get(`/projects/projects`).then(r => setProjects(r.data));
   }, []);
 
   const statusColors = {

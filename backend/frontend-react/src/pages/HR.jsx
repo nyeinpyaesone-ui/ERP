@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Building, Briefcase, DollarSign, Plus } from 'lucide-react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../api/axios';
 
 export default function HR() {
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [activeTab, setActiveTab] = useState('employees');
-  const token = localStorage.getItem('token');
-  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/v1/hr/employees`, axiosConfig).then(r => setEmployees(r.data));
-    axios.get(`${API_URL}/api/v1/hr/departments`, axiosConfig).then(r => setDepartments(r.data));
+    api.get(`/hr/employees`).then(r => setEmployees(r.data));
+    api.get(`/hr/departments`).then(r => setDepartments(r.data));
   }, []);
 
   return (
@@ -20,7 +17,7 @@ export default function HR() {
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Human Resources</h1>
       <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
         {[{id:'employees',label:'Employees',icon:Users},{id:'departments',label:'Departments',icon:Building}].map(t => (
-          <button key={t.id} onClick={()=>setActiveTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${activeTab===t.id?'bg-white text-indigo-600 shadow-sm':'text-gray-600'}`}><t.icon className="w-4 h-4"/>{t.label}</button>
+          <button key={t.id} onClick={()=>setActiveTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all ${activeTab===t.id?'bg-white text-indigo-600 shadow-xs':'text-gray-600'}`}><t.icon className="w-4 h-4"/>{t.label}</button>
         ))}
       </div>
       {activeTab === 'employees' && (

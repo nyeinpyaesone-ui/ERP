@@ -19,7 +19,7 @@ source venv/bin/activate
 uvicorn app.main:app --reload --port 8000
 
 # Terminal 2 — Frontend
-cd frontend
+cd backend/frontend-react
 npm run dev
 
 # Terminal 3 — Mobile (optional)
@@ -50,7 +50,10 @@ Example: `feat: add inventory forecasting module`
 
 - Python: PEP 8, type hints, docstrings
 - TypeScript: Strict mode, functional components
-- Tests: 80%+ coverage target
+- Tests: coverage floor is enforced at 58% by `fail_under` in
+  `backend/pyproject.toml` (the single source of truth; CI no longer passes a
+  conflicting `--cov-fail-under`). Actual is ~58.2%. Raise the floor as coverage
+  grows — do not quote aspirational targets.
 
 
 ## Contact

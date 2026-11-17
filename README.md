@@ -8,7 +8,7 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-ready-blue.svg)](https://kubernetes.io/)
 
-> Enterprise-grade AI-powered ERP system with 12 modules, 295+ files, and full CI/CD pipeline.
+> Enterprise-grade AI-powered ERP system with 12 modules and a full CI/CD pipeline.
 
 ## 🏗️ Platform Overview
 
@@ -27,7 +27,9 @@
 | Legacy v2.1 | v2.1 | 31 | ✅ |
 | Legacy v1.8 | v1.8 | 29 | ✅ |
 
-**Total: 295 files, 15 commits, production-ready**
+**Tag `v1.0.0`: 274 tracked files, 3 commits — production-ready** (current tree size: `git ls-files | wc -l`)
+
+> Note: the module-file column above sums to 279; `274` is the total tracked-file count at tag `v1.0.0`, not the column sum.
 
 ## 🚀 Quick Start
 
@@ -36,12 +38,17 @@
 - Node.js 20+
 - Python 3.11+
 
+> **Termux / proot-distro (Android arm64)?** Docker cannot run there — use
+> the native mode (venv + native PostgreSQL/Redis) described in
+> [docs/END_USER_INSTALL.md](docs/END_USER_INSTALL.md#termux--proot-distro-android-arm64).
+> The backend's full test suite is verified to pass natively on aarch64.
+
 ### One-Command Setup
 ```bash
 git clone https://github.com/nyeinpyaesone-ui/ERP.git
 cd ERP
 ./scripts/setup.sh        # Install dependencies
-docker-compose up -d      # Start services
+docker compose up -d      # Start services
 ```
 
 ### Development
@@ -50,7 +57,7 @@ docker-compose up -d      # Start services
 cd backend && source venv/bin/activate && uvicorn app.main:app --reload
 
 # Terminal 2 — Frontend
-cd frontend && npm run dev
+cd backend/frontend-react && npm run dev
 
 # Terminal 3 — Mobile
 cd mobile && npx expo start
@@ -79,25 +86,39 @@ cd mobile && npx expo start
 │  CRM │ HR │ Inventory │ Finance │ Manufacturing │ POS  │
 ├─────────────────────────────────────────────────────────┤
 │                   Data & Infrastructure                  │
-│  PostgreSQL │ Redis │ Elasticsearch │ S3/MinIO │ K8s   │
+│  PostgreSQL │ Redis │ Ollama │ Docker │ GitHub Actions │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ## 📚 Documentation
 
+### Production Operations
 | Document | Description |
 |----------|-------------|
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Development workflow, commit conventions |
-| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
-| [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) | Full production deployment guide |
+| [docs/END_USER_INSTALL.md](docs/END_USER_INSTALL.md) | **One-command production install** (domain, SSL, deploy) |
+| [docs/BLUE_GREEN_DEPLOYMENT.md](docs/BLUE_GREEN_DEPLOYMENT.md) | Zero-downtime deploy & rollback procedures |
+| [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) | Automated backup, restore, disaster recovery |
+| [docs/SSL_CERTIFICATES.md](docs/SSL_CERTIFICATES.md) | Let's Encrypt cert management & auto-renewal |
+| [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) | Full production deployment guide (Docker/K8s) |
+| [docs/PRODUCTION_SETUP.md](docs/PRODUCTION_SETUP.md) | Server provisioning & configuration |
+
+### Development
+| Document | Description |
+|----------|-------------|
+| [docs/ONBOARDING.md](docs/ONBOARDING.md) | 30-minute developer onboarding |
 | [docs/API_SUMMARY.md](docs/API_SUMMARY.md) | API endpoints and authentication |
-| [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | CI/CD secrets setup |
-| [docs/TESTING.md](docs/TESTING.md) | Testing strategy guide |
 | [docs/DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md) | Alembic migration guide |
+| [docs/TESTING.md](docs/TESTING.md) | Testing strategy guide |
+| [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | CI/CD secrets setup |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & fixes |
 | [docs/FAQ.md](docs/FAQ.md) | Frequently asked questions |
+
+### Architecture & Governance
+| Document | Description |
+|----------|-------------|
 | [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md) | ADR records |
-| [docs/ONBOARDING.md](docs/ONBOARDING.md) | 30-minute developer onboarding |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development workflow, commit conventions |
+| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
 
 ## 🛠️ Management Commands
 

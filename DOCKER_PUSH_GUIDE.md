@@ -21,7 +21,7 @@ docker login -u powerrangeranikg
 docker build -t powerrangeranikg/erp-solution-backend:v1.0.0 ./backend
 
 # 4. Build frontend image (this takes 2-5 minutes)
-docker build -t powerrangeranikg/erp-solution-frontend:v1.0.0 ./frontend
+docker build -t powerrangeranikg/erp-solution-frontend:v1.0.0 ./backend/frontend-react
 
 # 5. Tag as latest
 docker tag powerrangeranikg/erp-solution-backend:v1.0.0 powerrangeranikg/erp-solution-backend:latest

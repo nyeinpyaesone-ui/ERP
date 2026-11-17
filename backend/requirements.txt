@@ -1,0 +1,40 @@
+# Production runtime dependencies only.
+# Development and test tooling lives in requirements-dev.txt and is not copied
+# into the production container image.
+
+# ── Core ─────────────────────────────────────────────────────────────────────
+fastapi==0.162.7
+# starlette pinned explicitly for local == Docker == CI parity (transitive
+# via fastapi; 1.7.0 drops the anyio.abc testclient deprecation).
+starlette==1.10.0
+uvicorn[standard]==0.54.0
+# SQLAlchemy 2.1.x NOT yet: its postgresql:// default now imports psycopg3,
+# which we cannot verify without a live PostgreSQL (docker daemon down).
+SQLAlchemy==2.1.8
+psycopg2-binary==2.9.13
+alembic==1.20.1
+
+# ── Validation / settings ────────────────────────────────────────────────────
+pydantic==2.14.3
+pydantic-settings==2.16.3
+email-validator==2.3.0
+python-multipart==0.0.33
+python-dotenv==1.2.4
+
+# ── Auth ─────────────────────────────────────────────────────────────────────
+# PyJWT replaces python-jose (unmaintained; pulled ecdsa with an unfixable
+# Minerva timing CVE). HS256-only usage keeps the swap API-compatible.
+PyJWT==2.15.1
+passlib[bcrypt]==1.7.4
+# passlib 1.7.4 breaks on bcrypt 5.x's removed __about__ module, hence the
+# upper bound. Exact-pinned (not just "<5") so the image is reproducible.
+bcrypt==5.0.0
+
+# ── Integrations / clients ───────────────────────────────────────────────────
+httpx==0.28.1
+redis==8.1.0
+stripe==16.0.0
+
+# Used by app/routers/reports.py:/chart/revenue (lazy import, graceful
+# fallback when absent).
+matplotlib==3.11.2
