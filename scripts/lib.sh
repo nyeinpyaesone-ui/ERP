@@ -24,6 +24,7 @@ ERP_NGINX_DIR="${ERP_NGINX_DIR:-${ERP_DIR}/nginx}"
 ERP_SSL_DIR="${ERP_SSL_DIR:-${ERP_DIR}/ssl}"
 
 # Fallback image namespace when neither the environment nor the env file says.
+ERP_DEFAULT_DOCKER_USER="${ERP_DEFAULT_DOCKER_USER:-powerrangeranikg}"
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
     ERP_RED='\033[0;31m'; ERP_GREEN='\033[0;32m'; ERP_YELLOW='\033[1;33m'
@@ -201,36 +202,19 @@ erp_detect_env_file() {
         [ -f "${ERP_ENV_FILE}" ] || erp_die "ERP_ENV_FILE set but missing: ${ERP_ENV_FILE}"
         return 0
     fi
-
-    # Never let a staging deployment fall back to production credentials.
-    local target="${DEPLOY_TARGET_ENVIRONMENT:-${ENVIRONMENT:-production}}"
     local candidate
-    case "${target}" in
-        staging)
-            for candidate in "${ERP_DIR}/.env.staging" "${ERP_PROJECT_ROOT}/.env.staging"; do
-                if [ -f "${candidate}" ]; then
-                    ERP_ENV_FILE="${candidate}"
-                    return 0
-                fi
-            done
-            erp_error "Staging environment file missing; expected .env.staging."
-            return 1
-            ;;
-        production)
-            for candidate in "${ERP_DIR}/.env.production" "${ERP_PROJECT_ROOT}/.env.production"; do
-                if [ -f "${candidate}" ]; then
-                    ERP_ENV_FILE="${candidate}"
-                    return 0
-                fi
-            done
-            erp_error "Production environment file missing; expected .env.production."
-            return 1
-            ;;
-        *)
-            erp_error "Unsupported deployment environment for env-file selection: ${target}"
-            return 1
-            ;;
-    esac
+    for candidate in \
+        "${ERP_DIR}/.env.production" \
+        "${ERP_PROJECT_ROOT}/.env.production" \
+        "${ERP_PROJECT_ROOT}/.env" \
+        "${ERP_DIR}/.env"
+    do
+        if [ -f "${candidate}" ]; then
+            ERP_ENV_FILE="${candidate}"
+            return 0
+        fi
+    done
+    return 1
 }
 
 # Line parser instead of `source`: a .env file is data, not shell, and a value
@@ -274,16 +258,13 @@ erp_env_value() {
 
 erp_detect_docker_user() {
     if [ -n "${DOCKER_USER:-}" ]; then
-        printf '%s\n' "${DOCKER_USER}"
-        return 0
+        echo "${DOCKER_USER}"; return 0
     fi
-    local value=""
-    if value="$(erp_env_value DOCKER_USER 2>/dev/null)" && [ -n "${value}" ]; then
-        printf '%s\n' "${value}"
-        return 0
+    local value
+    if value="$(erp_env_value DOCKER_USER)"; then
+        [ -n "${value}" ] && { echo "${value}"; return 0; }
     fi
-    erp_error "DOCKER_USER is required. Set it in ${ERP_ENV_FILE:-.env.production} or export it before running deployment commands."
-    return 1
+    echo "${ERP_DEFAULT_DOCKER_USER}"
 }
 
 # Release resolution: explicit argument, then VERSION from the environment,

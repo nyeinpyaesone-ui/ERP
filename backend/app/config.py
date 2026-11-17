@@ -10,7 +10,25 @@ class Settings(BaseSettings):
     APP_NAME: str = "ERP SOLUTION System"
     APP_VERSION: str = "1.8.0"
     DEBUG: bool = False
-    ENVIRONMENT: Literal["dev", "test", "prod"] = "dev"
+    ENVIRONMENT: str = "dev"
+
+    @field_validator("ENVIRONMENT", mode="before")
+    @classmethod
+    def _normalize_environment(cls, v):
+        """Accept common aliases; canonical values are dev/test/prod."""
+        if not isinstance(v, str):
+            return v
+        aliases = {
+            "development": "dev", "dev": "dev", "local": "dev",
+            "testing": "test", "test": "test", "ci": "test",
+            "production": "prod", "prod": "prod",
+        }
+        norm = aliases.get(v.strip().lower())
+        if norm is None:
+            raise ValueError(
+                f"ENVIRONMENT must be one of dev/test/prod (got {v!r})"
+            )
+        return norm
 
     # Database
     DATABASE_URL: str = "postgresql://erp_user:erp_password@localhost:5432/erp_db"

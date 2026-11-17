@@ -8,8 +8,8 @@ metadata:
     app.kubernetes.io/component: config
 data:
   # Application
-  APP_ENV: "production"
-  APP_PORT: "3000"
+  ENVIRONMENT: "prod"
+  APP_PORT: "8000"
   APP_LOG_LEVEL: "info"
 
   # Database

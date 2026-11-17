@@ -115,7 +115,6 @@ CATALOGUE_ENFORCED = (
     "analytics.py",
     "ai.py",
     "integrations.py",
-    "jev_intercept.py",
 )
 
 

@@ -25,20 +25,13 @@ Generate a token at <https://hub.docker.com/settings/access/tokens>.
 
 | Secret | Used by | Notes |
 |--------|---------|-------|
-| `STAGING_SSH_PRIVATE_KEY` | `deploy-staging` | Staging-only deploy key |
-| `PRODUCTION_SSH_PRIVATE_KEY` | `deploy-production` | Production-only deploy key |
+| `SSH_PRIVATE_KEY` | `deploy-staging`, `deploy-production` | Deploy key, not your personal key |
 | `STAGING_USER` | `deploy-staging` | SSH user on the staging host |
 | `STAGING_HOST` | `deploy-staging` | Staging hostname or IP |
 | `STAGING_KNOWN_HOSTS` | `deploy-staging` | **Required.** Pinned host keys |
 | `PRODUCTION_USER` | `deploy-production` | SSH user on the production host |
 | `PRODUCTION_HOST` | `deploy-production` | Production hostname or IP |
 | `PRODUCTION_KNOWN_HOSTS` | `deploy-production` | **Required.** Pinned host keys |
-
-Environment isolation — use separate staging and production SSH keys. **These secrets must currently be repository-level Actions secrets** because the `config` job detects their presence before either deploy job starts; environment-scoped secrets are not visible to that detector. The deploy jobs still use the `staging` and `production` GitHub Environments for branch/tag policies and any configured approval rules. Neither a main push nor a release-tag push deploys automatically: operators must manually dispatch `CI` with `deploy_staging=true` on `main` or `deploy_production=true` on a `v*` tag.
-
-Remote registry access — the deploy workflow pulls both Docker Hub images on the target host over SSH. Provision a read-only Docker Hub credential on each host (`docker login` for the configured namespace) and verify it can pull both `erp-solution-backend` and `erp-solution-frontend`. CI push tokens are not sent to the servers.
-
-Target host runtime — each host needs its own `/opt/erp-solution/.env.staging` or `.env.production` file (mode `0600`), created from `.env.production.template` but populated with that environment's independent database, Redis, and application secrets. Keep the application setting `ENVIRONMENT=prod` (the backend accepts `dev|test|prod`); staging is selected by the deployment target and its separate `.env.staging` values. The deploy script selects `.env.staging` for staging and `.env.production` for production; it fails closed if the matching file is absent. Never use production credentials on staging. The two environments must use separate hosts because the Compose stack has fixed container names. The workflow syncs the deployment script, Compose file, and static blue/green upstream templates from the exact CI revision. It preserves env files, TLS material, the runtime-managed `nginx/ssl.conf`, persistent data, and `nginx/upstream-active.conf`.
 
 Host-key note — the workflows previously ran `ssh-keyscan` at deploy time.
 `ssh-keyscan` performs **no authentication**: whatever answers the TCP
@@ -82,7 +75,8 @@ Variables are not secret — they are safe to read in logs and to use in
 | `STAGING_DOMAIN` | `deploy-staging` | Staging hostname for deployment links |
 | `PRODUCTION_DOMAIN` | `deploy-production` | Production hostname for deployment links |
 
-If `DOCKER_USER` or either Docker Hub push token is unset, images are built locally under the non-published `local` namespace and are not pushed; deploy jobs are skipped. `DOCKER_USER` must be a lowercase Docker Hub namespace. Staging deploys the immutable `sha-*` tag from that build by default. Production deploys the version tag (`v*`).
+If `DOCKER_USER` is unset, `docker/metadata-action` receives an empty `images`
+value and the `docker-*` jobs fail at the push step.
 
 ## 3. Optional — runtime only, not referenced by CI
 
@@ -103,89 +97,43 @@ Frontend: the browser bundle reads `VITE_API_URL` at build time
 (see `backend/frontend-react/.env.example`); unset means same-origin
 `/api/v1`, which is correct for the packaged nginx setup.
 
-## 4. Provisioning repository settings
-
-The repository includes an interactive bootstrapper that validates host/key
-inputs, sets the variables and secrets listed above, and creates the `staging`
-and `production` GitHub Environments with `main` and `v*` deployment-ref
-policies. It reads secret values from local files/stdin; it does not print them. It refuses to proceed if either Environment already has additional deployment-ref policies, because GitHub policies are additive and an extra broad rule could weaken the intended restriction.
-Run it from a trusted operator workstation after authenticating `gh` with
-repository administration and Actions secret/variable permissions:
+## 4. Setting secrets
 
 ```bash
 gh auth login
-bash scripts/configure-github-actions.sh
+
+gh secret set DOCKER_PAT_BACKEND < token.txt
+gh secret set STAGING_KNOWN_HOSTS < /tmp/staging_known_hosts
+gh variable set DOCKER_USER --body "powerrangeranikg"
 ```
 
-The script requires `gh`, `jq`, and `ssh-keygen`, and asks for the actual domains, hostnames, SSH users, token-file paths,
-private-key paths, and pinned `known_hosts` paths. It defaults the Docker Hub
-namespace to `powerrangeranikg` (confirm it at the prompt). It refuses shared
-staging/production hosts and requires unencrypted dedicated SSH keys because
-the current ssh-agent workflow has no passphrase input. It also rejects the `root` SSH account; create dedicated deploy users with only the directory and Docker permissions required by the deployment. Verify host key
-fingerprints out-of-band before providing the `known_hosts` files.
-
-For manual or non-interactive setup, the equivalent commands are:
-
-```bash
-
-gh secret set DOCKER_PAT_BACKEND < /secure/path/docker-backend-push-token.txt
-gh secret set DOCKER_PAT_FRONTEND < /secure/path/docker-frontend-push-token.txt
-gh secret set STAGING_SSH_PRIVATE_KEY < /secure/path/staging_deploy_key
-gh secret set PRODUCTION_SSH_PRIVATE_KEY < /secure/path/production_deploy_key
-gh secret set STAGING_KNOWN_HOSTS < /secure/path/staging_known_hosts
-gh secret set PRODUCTION_KNOWN_HOSTS < /secure/path/production_known_hosts
-gh secret set STAGING_HOST --body "<staging-host>"
-gh secret set STAGING_USER --body "<staging-user>"
-gh secret set PRODUCTION_HOST --body "<production-host>"
-gh secret set PRODUCTION_USER --body "<production-user>"
-gh variable set DOCKER_USER --body "<docker-hub-namespace>"
-```
-
-## 5. Target-host runtime configuration
-
-The GitHub bootstrapper does not log in to servers or create runtime files.
-On each isolated host, create the matching environment file with mode `0600`.
-Production is generated by `sudo ./install.sh <domain> <email>`; the installer
-prompts for the Docker Hub namespace and generates unique database, Redis, and
-application secrets. For staging, copy `.env.staging.template` to
-`/opt/erp-solution/.env.staging`, replace every `CHANGE_ME_*` value using the
-approved secret manager or `openssl rand`, set the real staging CORS origin and
-Docker namespace, and enforce `chmod 600`. Never copy production values into
-staging.
-
-Each target host also needs a Docker Hub **read-only** token for the two image
-repositories so the remote deploy script can pull images. Store it using the
-host's configured Docker credential helper; do not put it in the runtime env
-file or CI logs. The CI push tokens are not transferred to hosts.
-
-## 6. Verification
+## 5. Verification
 
 ```bash
 gh secret list          # names + updated timestamps (values are never shown)
 gh variable list
 ```
 
-If a required deploy secret is missing, the `Deploy Configuration` job reports
-that capability as unavailable and skips the corresponding deploy job. The
-SSH step also fails closed if a pinned known-hosts value is unexpectedly empty.
-A failed image push almost always means `DOCKER_USER` or one of the
-`DOCKER_PAT_*` tokens.
+For a missing secret, the deploy jobs now fail with an explicit
+`::error::STAGING_KNOWN_HOSTS secret is empty` message rather than a
+cryptic SSH error. A failed image push almost always means `DOCKER_USER` or one
+of the `DOCKER_PAT_*` tokens.
 
-## 7. GitHub Environments (Settings → Environments)
+## 6. GitHub Environments (Settings → Environments)
 
 `ci.yml`'s deploy jobs declare `environment: staging` / `environment: production`.
 Both environments must exist, otherwise the jobs fail at the deployment-record
-step. The bootstrapper ensures these deployment-ref policies:
+step. Configured policy (created 2026-10-11):
 
 | Environment | Deployment branch policy | Rationale |
 |-------------|--------------------------|-----------|
-| `staging` | selected branches → `main` only | staging deploy is an explicit workflow dispatch on main |
-| `production` | selected tags → `v*` only | production deploy is an explicit workflow dispatch on a release tag |
+| `staging` | selected branches → `main` only | staging deploys on every push to main |
+| `production` | selected tags → `v*` only | production deploys only from release tags |
 
-The policies are fail-closed: no other ref can create a deployment. No required reviewers are configured by the bootstrapper because reviewer
-identities must be selected by a repository administrator. Add at least one
-required reviewer to the `production` environment before enabling production
-deploys if your release policy requires independent approval.
+The policies are fail-closed: no other ref can create a deployment. No
+required reviewers are configured — deploys are automated blue-green; add a
+reviewer rule here if human approval is ever wanted (the job will pause
+waiting for it).
 
 The `copilot` environment is auto-created by GitHub Copilot's coding agent —
 leave it alone. Do not create environments named after tools (`Docker` etc.);

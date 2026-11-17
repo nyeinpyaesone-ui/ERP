@@ -29,8 +29,8 @@ const navigation = [
   { name: 'Search', href: '/search', icon: Search },
 ];
 
-/** Render navigation, the current user's menu, and the supplied route content. */
-export default function Layout({ children }) {
+/** Render navigation, the current user's menu, and the nested route outlet. */
+export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { user, logout } = useAuth();
@@ -47,9 +47,7 @@ export default function Layout({ children }) {
     <div className="min-h-screen bg-gray-50">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
-        <button
-          type="button"
-          aria-label="Close navigation menu"
+        <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -57,8 +55,6 @@ export default function Layout({ children }) {
 
       {/* Sidebar */}
       <aside
-        id="primary-navigation"
-        aria-label="Primary navigation"
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
@@ -68,17 +64,15 @@ export default function Layout({ children }) {
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
             <h1 className="text-xl font-bold text-blue-600">ERP SOLUTION</h1>
             <button
-              type="button"
-              aria-label="Dismiss navigation drawer"
               className="lg:hidden p-2 rounded text-gray-500 hover:text-gray-700"
               onClick={() => setSidebarOpen(false)}
             >
-              <X className="w-6 h-6" aria-hidden="true" />
+              <X className="w-6 h-6" />
             </button>
           </div>
 
           {/* Navigation */}
-          <nav aria-label="Main menu" className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
             {navigation.map((item) => (
               <NavLink
                 key={item.name}
@@ -92,7 +86,7 @@ export default function Layout({ children }) {
                 }
                 onClick={() => setSidebarOpen(false)}
               >
-                <item.icon className="w-5 h-5 mr-3 shrink-0" aria-hidden="true" />
+                <item.icon className="w-5 h-5 mr-3 shrink-0" />
                 {item.name}
               </NavLink>
             ))}
@@ -111,14 +105,10 @@ export default function Layout({ children }) {
         <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
           <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
             <button
-              type="button"
-              aria-label="Open navigation menu"
-              aria-expanded={sidebarOpen}
-              aria-controls="primary-navigation"
               className="lg:hidden p-2 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100"
               onClick={() => setSidebarOpen(true)}
             >
-              <Menu className="w-6 h-6" aria-hidden="true" />
+              <Menu className="w-6 h-6" />
             </button>
 
             <div className="flex-1 lg:flex-none" />
@@ -127,14 +117,10 @@ export default function Layout({ children }) {
               {/* User menu */}
               <div className="relative">
                 <button
-                  type="button"
-                  aria-label={`Open user menu for ${user?.name || 'User'}`}
-                  aria-expanded={userMenuOpen}
-                  aria-controls="user-menu"
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100"
                 >
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center" aria-hidden="true">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
                     <span className="text-sm font-medium text-blue-700">
                       {user?.name?.[0] || 'U'}
                     </span>
@@ -142,33 +128,22 @@ export default function Layout({ children }) {
                   <span className="hidden sm:block text-sm font-medium text-gray-700">
                     {user?.name || 'User'}
                   </span>
-                  <ChevronDown className="w-4 h-4 text-gray-500" aria-hidden="true" />
+                  <ChevronDown className="w-4 h-4 text-gray-500" />
                 </button>
 
                 {userMenuOpen && (
                   <>
-                    <button
-                      type="button"
-                      aria-label="Close user menu"
-                      className="fixed inset-0 z-40 cursor-default"
-                      onClick={() => setUserMenuOpen(false)}
-                    />
-                    <div
-                      id="user-menu"
-                      role="region"
-                      aria-label="User account options"
-                      className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
-                    >
+                    <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                       <div className="px-4 py-2 border-b border-gray-200">
                         <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
                         <p className="text-xs text-gray-500">{user?.email || 'user@example.com'}</p>
                       </div>
                       <button
-                        type="button"
                         onClick={handleLogout}
                         className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                       >
-                        <LogOut className="w-4 h-4" aria-hidden="true" />
+                        <LogOut className="w-4 h-4" />
                         Sign out
                       </button>
                     </div>
@@ -179,9 +154,9 @@ export default function Layout({ children }) {
           </div>
         </header>
 
-        {/* Keep route content supplied by App; retain Outlet for nested-route consumers. */}
+        {/* Page content */}
         <main className="p-4 sm:p-6 lg:p-8">
-          {children ?? <Outlet />}
+          <Outlet />
         </main>
       </div>
     </div>

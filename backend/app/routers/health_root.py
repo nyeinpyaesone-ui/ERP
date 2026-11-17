@@ -15,7 +15,20 @@ async def health_check():
     return {"status": "healthy"}
 
 
+@router.get("/health/live")
+async def health_live():
+    """Alias for Kubernetes livenessProbe (path: /health/live)."""
+    return {"status": "healthy"}
+
+
+@router.get("/health/startup")
+async def health_startup():
+    """Alias for Kubernetes startupProbe (path: /health/startup)."""
+    return {"status": "started"}
+
+
 @router.get("/ready")
+@router.get("/health/ready")
 async def readiness_check(db: Session = Depends(get_db)):
     """Return database and Redis check results with ``ready`` or ``not_ready`` status.
 
