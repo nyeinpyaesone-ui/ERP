@@ -202,19 +202,36 @@ erp_detect_env_file() {
         [ -f "${ERP_ENV_FILE}" ] || erp_die "ERP_ENV_FILE set but missing: ${ERP_ENV_FILE}"
         return 0
     fi
+
+    # Never let a staging deployment fall back to production credentials.
+    local target="${DEPLOY_TARGET_ENVIRONMENT:-${ENVIRONMENT:-production}}"
     local candidate
-    for candidate in \
-        "${ERP_DIR}/.env.production" \
-        "${ERP_PROJECT_ROOT}/.env.production" \
-        "${ERP_PROJECT_ROOT}/.env" \
-        "${ERP_DIR}/.env"
-    do
-        if [ -f "${candidate}" ]; then
-            ERP_ENV_FILE="${candidate}"
-            return 0
-        fi
-    done
-    return 1
+    case "${target}" in
+        staging)
+            for candidate in "${ERP_DIR}/.env.staging" "${ERP_PROJECT_ROOT}/.env.staging"; do
+                if [ -f "${candidate}" ]; then
+                    ERP_ENV_FILE="${candidate}"
+                    return 0
+                fi
+            done
+            erp_error "Staging environment file missing; expected .env.staging."
+            return 1
+            ;;
+        production)
+            for candidate in "${ERP_DIR}/.env.production" "${ERP_PROJECT_ROOT}/.env.production"; do
+                if [ -f "${candidate}" ]; then
+                    ERP_ENV_FILE="${candidate}"
+                    return 0
+                fi
+            done
+            erp_error "Production environment file missing; expected .env.production."
+            return 1
+            ;;
+        *)
+            erp_error "Unsupported deployment environment for env-file selection: ${target}"
+            return 1
+            ;;
+    esac
 }
 
 # Line parser instead of `source`: a .env file is data, not shell, and a value
