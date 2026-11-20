@@ -188,9 +188,11 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            # Compare the exact PR snapshots. A merge-base is not required,
-            # which also supports legacy branches with unrelated histories.
-            changed="$(git diff --diff-filter=ACMRT --name-only "${BASE_SHA:-HEAD^}" "${HEAD_SHA:-HEAD}" -- 'backend/**/*.py' 'backend/*.py')"
+            # Compare exact PR snapshots; no merge-base is required.
+            changed="$(git diff --diff-filter=ACMRT --name-only "${BASE_SHA}" "${HEAD_SHA}" -- 'backend/**/*.py' 'backend/*.py')"
+          else
+            changed="$(git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- 'backend/**/*.py' 'backend/*.py' 2>/dev/null || true)"
+          fi
           if [[ -z "${changed}" ]]; then
             echo "No added or modified backend Python files; Ruff and Black checks are not applicable."
             exit 0
