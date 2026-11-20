@@ -190,18 +190,26 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             # Compare the exact PR snapshots. A merge-base is not required,
             # which also supports legacy branches with unrelated histories.
-            changed="$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" -- 'backend/**/*.py' 'backend/*.py')"
-          else
-            changed="$(git diff --name-only HEAD^ HEAD -- 'backend/**/*.py' 'backend/*.py' 2>/dev/null || true)"
-          fi
+            changed="$(git diff --diff-filter=ACMRT --name-only "${BASE_SHA:-HEAD^}" "${HEAD_SHA:-HEAD}" -- 'backend/**/*.py' 'backend/*.py')"
           if [[ -z "${changed}" ]]; then
-            echo "No backend Python files changed; Ruff and Black checks are not applicable."
+            echo "No added or modified backend Python files; Ruff and Black checks are not applicable."
             exit 0
           fi
           mapfile -t files <<< "${changed}"
+          python_files=()
+          for file in "${files[@]}"; do
+            relative="${file#backend/}"
+            if [[ -f "backend/${relative}" ]]; then
+              python_files+=("${relative}")
+            fi
+          done
+          if (( ${#python_files[@]} == 0 )); then
+            echo "No existing backend Python files to lint."
+            exit 0
+          fi
           cd backend
-          ruff check "${files[@]}"
-          black --check "${files[@]}"
+          ruff check "${python_files[@]}"
+          black --check "${python_files[@]}"
 
       - name: Run MyPy (advisory — does not gate the pipeline)
         continue-on-error: true
