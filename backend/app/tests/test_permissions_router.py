@@ -90,7 +90,7 @@ def test_update_role_rejects_missing_and_system_roles(role_db, admin):
     assert missing.value.status_code == 404
 
     system_role = models.Role(name="system", display_name="System", is_system=True)
-    custom_role = models.Role(name="custom", display_name="Custom")
+    custom_role = models.Role(name="custom", display_name="Custom", is_system=False)
     role_db.add_all([system_role, custom_role])
     role_db.commit()
 
@@ -105,7 +105,9 @@ def test_update_role_rejects_missing_and_system_roles(role_db, admin):
 
     updated = permissions.update_role(
         custom_role.id,
-        permissions.RoleUpdate(display_name="Updated", description="Updated details"),
+        permissions.RoleUpdate(
+            display_name="Updated", description="Updated details"
+        ),
         role_db,
         admin,
     )
