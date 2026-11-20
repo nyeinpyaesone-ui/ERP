@@ -1,10 +1,11 @@
 """Focused unit tests for role-management route behavior."""
 
+from types import SimpleNamespace
+
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from types import SimpleNamespace
 
 from app import models
 from app.routers import permissions
@@ -88,9 +89,7 @@ def test_update_role_rejects_missing_and_system_roles(role_db, admin):
         )
     assert missing.value.status_code == 404
 
-    system_role = models.Role(
-        name="system", display_name="System", is_system=True
-    )
+    system_role = models.Role(name="system", display_name="System", is_system=True)
     custom_role = models.Role(name="custom", display_name="Custom")
     role_db.add_all([system_role, custom_role])
     role_db.commit()
@@ -121,9 +120,7 @@ def test_delete_role_rejects_missing_and_system_roles(role_db, admin, monkeypatc
         permissions.delete_role(999, role_db, admin)
     assert missing.value.status_code == 404
 
-    system_role = models.Role(
-        name="system", display_name="System", is_system=True
-    )
+    system_role = models.Role(name="system", display_name="System", is_system=True)
     custom_role = models.Role(name="custom", display_name="Custom")
     role_db.add_all([system_role, custom_role])
     role_db.commit()
