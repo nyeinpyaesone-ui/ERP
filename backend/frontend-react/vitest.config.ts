@@ -11,10 +11,8 @@ export default defineConfig({
     // runners, especially when jsdom boots many test files concurrently.
     // Run tests in a single thread to avoid worker startup errors.
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: true,
-      },
-    },
+    fileParallelism: false,
+    maxWorkers: 1,
+    minWorkers: 1,
   },
 })
