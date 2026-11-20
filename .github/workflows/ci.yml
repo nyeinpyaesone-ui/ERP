@@ -162,6 +162,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -180,11 +182,15 @@ jobs:
 
       - name: Check changed Python files (Ruff and Black)
         shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            git fetch --no-tags origin "${GITHUB_BASE_REF}"
-            changed="$(git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- 'backend/**/*.py' 'backend/*.py')"
+            # Compare the exact PR snapshots. A merge-base is not required,
+            # which also supports legacy branches with unrelated histories.
+            changed="$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" -- 'backend/**/*.py' 'backend/*.py')"
           else
             changed="$(git diff --name-only HEAD^ HEAD -- 'backend/**/*.py' 'backend/*.py' 2>/dev/null || true)"
           fi
