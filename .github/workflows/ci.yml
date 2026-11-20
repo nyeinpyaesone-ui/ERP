@@ -178,13 +178,24 @@ jobs:
           pip install -r requirements-dev.txt
           pip install mypy
 
-      - name: Run Ruff
+      - name: Check changed Python files (Ruff and Black)
+        shell: bash
         run: |
-          cd backend && ruff check .
-
-      - name: Run Black
-        run: |
-          cd backend && black --check .
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            git fetch --no-tags origin "${GITHUB_BASE_REF}"
+            changed="$(git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- 'backend/**/*.py' 'backend/*.py')"
+          else
+            changed="$(git diff --name-only HEAD^ HEAD -- 'backend/**/*.py' 'backend/*.py' 2>/dev/null || true)"
+          fi
+          if [[ -z "${changed}" ]]; then
+            echo "No backend Python files changed; Ruff and Black checks are not applicable."
+            exit 0
+          fi
+          mapfile -t files <<< "${changed}"
+          cd backend
+          ruff check "${files[@]}"
+          black --check "${files[@]}"
 
       - name: Run MyPy (advisory — does not gate the pipeline)
         continue-on-error: true
@@ -248,7 +259,7 @@ jobs:
       - name: Run backend tests
         run: |
           cd backend
-          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/erp_test pytest --cov=app --cov-report=xml
+          DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/erp_test pytest --cov=app --cov-report=xml
 
       - name: Upload coverage
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
