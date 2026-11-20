@@ -31,7 +31,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Runtime stage: keep compilers and development headers out of production.
-FROM python:3.15-alpine3.24 AS runtime
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
