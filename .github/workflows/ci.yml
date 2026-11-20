@@ -243,7 +243,7 @@ jobs:
       - name: Run Alembic migrations
         run: |
           cd backend
-          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/erp_test alembic upgrade head
+          DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/erp_test alembic upgrade head
 
       - name: Run backend tests
         run: |
@@ -268,7 +268,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: backend/frontend-react/package-lock.json
 
