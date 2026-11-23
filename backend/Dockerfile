@@ -26,7 +26,7 @@ RUN apk update \
 # Keep packaging tools at versions containing the fixes reported by Trivy.
 RUN python -m pip install --no-cache-dir --upgrade \
     "pip>=26.2.0" \
-    "setuptools>=83.0.0" \
+    "setuptools>=84.1.0" \
     "wheel>=0.46.2"
 
 COPY requirements.txt .
@@ -52,13 +52,17 @@ RUN apk update \
     && adduser -S -G app -h /home/app -s /bin/bash app \
     && rm -rf /var/cache/apk/*
 
-# The runtime image contains no stale packaging tools from the base image.
-RUN python -m pip install --no-cache-dir --upgrade \
-    "pip>=26.2.0" \
-    "setuptools>=83.0.0" \
-    "wheel>=0.46.2"
-
+# Copy runtime dependencies first. This can include packaging metadata from
+# the builder prefix, so enforce the security floor AFTER the copy to prevent
+# an older setuptools distribution from replacing the patched runtime version.
 COPY --from=builder /install /usr/local
+
+RUN python -m pip install --no-cache-dir --upgrade \
+        "pip>=26.2.0" \
+        "setuptools>=84.1.0" \
+        "wheel>=0.46.2" \
+    && python -c 'from importlib.metadata import version; v=tuple(int(part) for part in version("setuptools").split(".")[:3]); assert v >= (84, 1, 0), f"setuptools {version(\"setuptools\")} is below the required security floor"; print(f"Verified setuptools {version(\"setuptools\")}")'
+
 COPY --chown=app:app . .
 
 RUN chmod +x /app/entrypoint.sh \
