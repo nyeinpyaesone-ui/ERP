@@ -1,6 +1,6 @@
 # API, Webhook, and Frontend Contract Alignment
 
-Status: repository CI verified on 2026-11-23 (CI run #518); restored-staging validation and deployment remain pending.
+Status: repository CI verified on 2026-11-23 (CI run #520); restored-staging validation and deployment remain pending.
 
 ## Canonical source
 
@@ -107,13 +107,13 @@ The archived workflow had unpinned actions, stale frontend paths, non-blocking c
 
 ## Verification gates
 
-- [x] GitHub Actions passes backend tests, migration graph and legacy PostgreSQL migration tests, frontend lint/tests/build, Gitleaks, both image builds, and the blocking Trivy vulnerability gate (baseline run #508; follow-up run #518).
+- [x] CI run #520 passes backend tests (330 passed; 58.80% coverage), migration graph and legacy migration regression tests, frontend lint/tests/build, Gitleaks, both image builds, and the Trivy security scan. Staging and production deployment jobs were skipped.
 - [ ] OpenAPI route inventory is regenerated and compared to `docs/API_SUMMARY.md`.
-- [ ] Webhook response schema is confirmed not to expose secrets.
-- [ ] URL allowlist, private DNS rejection, redirects, and delivery error cases are tested.
-- [ ] Stripe duplicate event and same-PaymentIntent duplicate tests pass against PostgreSQL.
-- [ ] WebSocket valid/invalid first-frame authentication tests pass; production connections use `wss://`.
-- [ ] Jev production storage gate tests pass; Jev remains off in staging until durable storage is provisioned.
+- [x] Webhook response schema test confirms secrets are not serialized (CI #520).
+- [x] URL allowlist, private DNS rejection, redirect rejection, and delivery error cases pass regression tests (CI #520).
+- [x] Stripe duplicate event and same-PaymentIntent duplicate regression tests pass (CI #520).
+- [x] Valid/invalid WebSocket first-frame authentication tests pass (CI #520); staging/production `wss://` transport verification remains pending.
+- [x] Jev production durable-storage gate tests pass (CI #520); Jev remains off in staging until persistent storage is provisioned.
 - [ ] Restore a verified backup to an isolated staging database and run `alembic upgrade head` twice; validate representative tenant and business records.
 - [ ] Configure staging frontend `VITE_API_URL` and backend `CORS_ORIGINS` on the dedicated staging host.
 - [ ] Configure `WEBHOOK_ALLOWED_HOSTS` only with approved destinations; leave blank to disable outbound webhook creation/delivery.
