@@ -210,7 +210,7 @@ def test_distinct_stripe_events_for_same_intent_do_not_double_pay(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(payments, "SessionLocal", Mock(return_value=db))
-    invoice = SimpleNamespace(id=7, total=100, amount_paid=25, status="partial")
+    invoice = SimpleNamespace(id=7, total=25, amount_paid=25, status="paid")
     existing_payment = SimpleNamespace(stripe_payment_intent_id="pi_existing")
     db.query.return_value.first.side_effect = [None, invoice, existing_payment]
     event = {
