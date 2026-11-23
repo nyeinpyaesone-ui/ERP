@@ -32,8 +32,7 @@ def _columns(table: str) -> set[str]:
 
 def _foreign_keys(table: str) -> set[str]:
     return {
-        foreign_key.get("name")
-        for foreign_key in _inspector().get_foreign_keys(table)
+        foreign_key.get("name") for foreign_key in _inspector().get_foreign_keys(table)
     }
 
 
