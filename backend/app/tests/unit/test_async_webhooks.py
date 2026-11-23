@@ -160,7 +160,9 @@ def test_stripe_webhook_processing_is_idempotent(
             "object": {
                 "id": "pi_test",
                 "metadata": {"invoice_id": "7"},
+                "amount": 2500,
                 "amount_received": 2500,
+                "currency": "usd",
                 "charges": {"data": [{"id": "ch_test"}]},
             }
         },
@@ -362,3 +364,73 @@ def test_stripe_event_without_id_is_rejected_and_session_closed(
         payments._process_stripe_event({"type": "customer.updated"})
     session_factory.assert_not_called()
     db.query.assert_not_called()
+
+
+
+@pytest.mark.parametrize(
+    "intent_updates,error_message",
+    [
+        ({"currency": "eur"}, "Unexpected Stripe payment currency"),
+        ({"amount_received": 2600}, "Settled amount does not match PaymentIntent amount"),
+        ({"amount_received": 0}, "Invalid Stripe amount received"),
+    ],
+)
+def test_invalid_stripe_payment_is_not_recorded(
+    db: Mock,
+    monkeypatch: pytest.MonkeyPatch,
+    intent_updates: dict[str, object],
+    error_message: str,
+) -> None:
+    monkeypatch.setattr(payments, "SessionLocal", Mock(return_value=db))
+    invoice = SimpleNamespace(id=7, total=100, amount_paid=75, status="partial")
+    db.query.return_value.first.side_effect = [None, invoice]
+    intent = {
+        "id": "pi_invalid",
+        "metadata": {"invoice_id": "7"},
+        "amount": 2500,
+        "amount_received": 2500,
+        "currency": "usd",
+    }
+    intent.update(intent_updates)
+    event = {
+        "id": "evt_invalid",
+        "type": "payment_intent.succeeded",
+        "data": {"object": intent},
+    }
+
+    with pytest.raises(ValueError, match=error_message):
+        payments._process_stripe_event(event)
+
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+    assert invoice.amount_paid == 75
+    db.close.assert_called_once_with()
+
+
+def test_stripe_payment_cannot_exceed_invoice_balance(
+    db: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(payments, "SessionLocal", Mock(return_value=db))
+    invoice = SimpleNamespace(id=7, total=100, amount_paid=75, status="partial")
+    db.query.return_value.first.side_effect = [None, invoice]
+    event = {
+        "id": "evt_overpayment",
+        "type": "payment_intent.succeeded",
+        "data": {
+            "object": {
+                "id": "pi_overpayment",
+                "metadata": {"invoice_id": "7"},
+                "amount": 3000,
+                "amount_received": 3000,
+                "currency": "usd",
+            }
+        },
+    }
+
+    with pytest.raises(ValueError, match="exceeds invoice outstanding balance"):
+        payments._process_stripe_event(event)
+
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+    assert invoice.amount_paid == 75
+    db.close.assert_called_once_with()
