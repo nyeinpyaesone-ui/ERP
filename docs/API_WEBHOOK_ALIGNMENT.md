@@ -1,6 +1,6 @@
 # API, Webhook, and Frontend Contract Alignment
 
-Status: repository CI verified on 2026-11-23 (CI run #508); restored-staging validation and deployment remain pending.
+Status: repository CI verified on 2026-11-23 (CI run #518); restored-staging validation and deployment remain pending.
 
 ## Canonical source
 
@@ -107,7 +107,7 @@ The archived workflow had unpinned actions, stale frontend paths, non-blocking c
 
 ## Verification gates
 
-- [x] GitHub Actions passes backend tests, migration graph and legacy PostgreSQL migration tests, frontend lint/tests/build, Gitleaks, both image builds, and the blocking Trivy vulnerability gate (run #508).
+- [x] GitHub Actions passes backend tests, migration graph and legacy PostgreSQL migration tests, frontend lint/tests/build, Gitleaks, both image builds, and the blocking Trivy vulnerability gate (baseline run #508; follow-up run #518).
 - [ ] OpenAPI route inventory is regenerated and compared to `docs/API_SUMMARY.md`.
 - [ ] Webhook response schema is confirmed not to expose secrets.
 - [ ] URL allowlist, private DNS rejection, redirects, and delivery error cases are tested.
@@ -117,7 +117,7 @@ The archived workflow had unpinned actions, stale frontend paths, non-blocking c
 - [ ] Restore a verified backup to an isolated staging database and run `alembic upgrade head` twice; validate representative tenant and business records.
 - [ ] Configure staging frontend `VITE_API_URL` and backend `CORS_ORIGINS` on the dedicated staging host.
 - [ ] Configure `WEBHOOK_ALLOWED_HOSTS` only with approved destinations; leave blank to disable outbound webhook creation/delivery.
-- [x] `scripts/backup.sh` selects only `.env.staging` or `.env.production`, passes it to Compose with `--env-file`, and fails closed when the selected environment or database is unavailable.
+- [x] `scripts/backup.sh` selects only `.env.staging` or `.env.production`, passes it to Compose with `--env-file`, rejects symlinks and permissive env-file modes, ignores ambient DB overrides, and fails closed when the selected environment or database is unavailable; mocked-Docker regression tests pass in CI #518.
 - [ ] Deploy only to the dedicated staging host and staging database; do not import or mutate production ERP data. The current CI staging job accepts manual dispatches from `main` only, so this PR branch is not deployable through that job until an approved staging release path is established.
 
 ## Backup isolation
