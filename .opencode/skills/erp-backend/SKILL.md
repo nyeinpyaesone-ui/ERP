@@ -39,7 +39,7 @@ Adding a route: append to `ROUTER_MOUNTS` (factory and module app share it by co
 pytest -q                       # 285 passed, 6 warnings (~30s), no DB needed
 coverage run -m pytest -q && coverage report   # 58.89%, floor 58 in pyproject (D-010)
 ruff check . && black --check . # clean, 67 files
-alembic upgrade head --sql      # offline chain check 001->008
+alembic upgrade head --sql      # offline chain check 001->009
 alembic revision --autogenerate -m "..."       # works (env.py imports app.models)
 uvicorn app.main:app --reload   # needs postgres/redis via docker compose first
 ```
