@@ -81,7 +81,7 @@ async def websocket_endpoint(
         if not user:
             await websocket.close(code=4401, reason="Invalid or inactive user")
             return
-    except asyncio.TimeoutError:
+    except TimeoutError:
         await websocket.close(code=4408, reason="Authentication timeout")
         return
     except Exception:
