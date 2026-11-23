@@ -181,7 +181,10 @@ def test_install_interceptor_is_noop_when_disabled(events_path) -> None:
 
     assert not events_path.exists()
 
-def test_production_interception_requires_durable_absolute_storage(events_path, monkeypatch):
+
+def test_production_interception_requires_durable_absolute_storage(
+    events_path, monkeypatch
+):
     monkeypatch.setenv("ENVIRONMENT", "prod")
     monkeypatch.setenv("JEV_INTERCEPT", "1")
     monkeypatch.setenv("JEV_INTERCEPT_EVENTS_FILE", str(events_path))
@@ -193,6 +196,7 @@ def test_production_interception_requires_durable_absolute_storage(events_path, 
 
     monkeypatch.setenv("JEV_INTERCEPT_EVENTS_FILE", "events.jsonl")
     assert service.enabled() is False
+
 
 def test_middleware_redacts_sensitive_query_parameters(events_path) -> None:
     app = FastAPI()
@@ -209,6 +213,9 @@ def test_middleware_redacts_sensitive_query_parameters(events_path) -> None:
         assert response.status_code == 200
 
     record = json.loads(events_path.read_text(encoding="utf-8").splitlines()[0])
-    assert record["query_string"] == "access_token=%2A%2A%2A&filter=active&api_key=%2A%2A%2A"
+    assert (
+        record["query_string"]
+        == "access_token=%2A%2A%2A&filter=active&api_key=%2A%2A%2A"
+    )
     assert "secret-value" not in events_path.read_text(encoding="utf-8")
     assert "key-value" not in events_path.read_text(encoding="utf-8")
