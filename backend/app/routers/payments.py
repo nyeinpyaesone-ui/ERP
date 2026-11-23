@@ -26,6 +26,28 @@ class PaymentIntentRequest(BaseModel):
     amount: Decimal | None = Field(default=None, gt=0)
 
 
+def _amount_from_intent(intent: dict[str, Any]) -> Decimal:
+    """Validate the settled amount and currency before recording payment.
+
+    Invoice has no currency field today, so this payment integration is USD-only.
+    The PaymentIntent must settle exactly the amount it was created for.
+    """
+    currency = str(intent.get("currency") or "").lower()
+    amount_received = intent.get("amount_received")
+    amount_expected = intent.get("amount")
+
+    if currency != "usd":
+        raise ValueError("Unexpected Stripe payment currency")
+    if not isinstance(amount_received, int) or amount_received <= 0:
+        raise ValueError("Invalid Stripe amount received")
+    if not isinstance(amount_expected, int) or amount_expected <= 0:
+        raise ValueError("Invalid Stripe payment amount")
+    if amount_received != amount_expected:
+        raise ValueError("Settled amount does not match PaymentIntent amount")
+
+    return Decimal(amount_received) / Decimal(100)
+
+
 def _process_stripe_event(event: Any) -> str:
     """Process an event atomically; a unique event ID prevents duplicate effects."""
     event_id = str(event.get("id") or "")
@@ -42,56 +64,65 @@ def _process_stripe_event(event: Any) -> str:
         ):
             return "duplicate"
 
+        intent = None
+        invoice = None
+        amount = None
+        payment_intent_id = None
+
+        if event_type == "payment_intent.succeeded":
+            intent = event.get("data", {}).get("object", {})
+            payment_intent_id = str(intent.get("id") or "")
+            invoice_id = (intent.get("metadata") or {}).get("invoice_id")
+            if not payment_intent_id or not invoice_id:
+                raise ValueError("PaymentIntent is missing required identifiers")
+            try:
+                parsed_invoice_id = int(invoice_id)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Invalid invoice metadata") from exc
+
+            invoice = (
+                db.query(Invoice)
+                .filter(Invoice.id == parsed_invoice_id)
+                .with_for_update()
+                .first()
+            )
+            if not invoice:
+                raise ValueError("Invoice referenced by PaymentIntent was not found")
+
+            amount = _amount_from_intent(intent)
+            outstanding = Decimal(invoice.total) - Decimal(invoice.amount_paid or 0)
+            if amount > outstanding:
+                raise ValueError("Stripe payment exceeds invoice outstanding balance")
+
+            existing_payment = (
+                db.query(Payment)
+                .filter(Payment.stripe_payment_intent_id == payment_intent_id)
+                .first()
+            )
+            if existing_payment:
+                db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
+                db.commit()
+                return "duplicate"
+
         db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
 
         if event_type == "payment_intent.succeeded":
-            intent = event["data"]["object"]
-            invoice_id = (intent.get("metadata") or {}).get("invoice_id")
-            if invoice_id:
-                try:
-                    parsed_invoice_id = int(invoice_id)
-                except (TypeError, ValueError):
-                    parsed_invoice_id = None
-
-                if parsed_invoice_id is not None:
-                    invoice = (
-                        db.query(Invoice)
-                        .filter(Invoice.id == parsed_invoice_id)
-                        .with_for_update()
-                        .first()
-                    )
-                    if invoice:
-                        payment_intent_id = str(intent["id"])
-                        existing_payment = (
-                            db.query(Payment)
-                            .filter(
-                                Payment.stripe_payment_intent_id == payment_intent_id
-                            )
-                            .first()
-                        )
-                        if not existing_payment:
-                            amount = Decimal(int(intent["amount_received"])) / Decimal(
-                                100
-                            )
-                            payment = Payment(
-                                invoice_id=invoice.id,
-                                amount=amount,
-                                payment_method="stripe",
-                                payment_date=datetime.now(UTC).date(),
-                                stripe_payment_intent_id=payment_intent_id,
-                                stripe_charge_id=(
-                                    intent["charges"]["data"][0]["id"]
-                                    if intent.get("charges", {}).get("data")
-                                    else None
-                                ),
-                                status="completed",
-                            )
-                            db.add(payment)
-                            invoice.amount_paid = (
-                                invoice.amount_paid or Decimal(0)
-                            ) + amount
-                            if invoice.amount_paid >= invoice.total:
-                                invoice.status = "paid"
+            charge_data = (intent.get("charges") or {}).get("data") or []
+            payment = Payment(
+                invoice_id=invoice.id,
+                amount=amount,
+                payment_method="stripe",
+                payment_date=datetime.now(UTC).date(),
+                stripe_payment_intent_id=payment_intent_id,
+                stripe_charge_id=charge_data[0].get("id") if charge_data else None,
+                status="completed",
+            )
+            db.add(payment)
+            invoice.amount_paid = (invoice.amount_paid or Decimal(0)) + amount
+            if invoice.amount_paid >= invoice.total:
+                invoice.status = "paid"
+            else:
+                invoice.status = "partial"
 
         db.commit()
         return "processed"
@@ -104,21 +135,20 @@ def _process_stripe_event(event: Any) -> str:
         ):
             return "duplicate"
 
-        # A distinct Stripe event can still reference an already-recorded
-        # PaymentIntent. Persist this event ID after the payment transaction
-        # rolls back so Stripe receives a successful idempotent acknowledgement.
-        if event_type == "payment_intent.succeeded":
-            intent = event.get("data", {}).get("object", {})
-            payment_intent_id = str(intent.get("id") or "")
-            if (
-                payment_intent_id
-                and db.query(Payment)
-                .filter(Payment.stripe_payment_intent_id == payment_intent_id)
-                .first()
-            ):
-                db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
-                db.commit()
-                return "duplicate"
+        # Concurrent distinct events can still reference an already-recorded
+        # PaymentIntent. Acknowledge safely after confirming the unique payment.
+        intent = event.get("data", {}).get("object", {})
+        payment_intent_id = str(intent.get("id") or "")
+        if (
+            event_type == "payment_intent.succeeded"
+            and payment_intent_id
+            and db.query(Payment)
+            .filter(Payment.stripe_payment_intent_id == payment_intent_id)
+            .first()
+        ):
+            db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
+            db.commit()
+            return "duplicate"
         raise
     finally:
         db.close()
@@ -149,6 +179,7 @@ def create_payment_intent(
             detail="Payment amount exceeds the outstanding invoice balance",
         )
     amount_cents = int(amount * 100)
+    paid_cents = int(Decimal(invoice.amount_paid or 0) * 100)
 
     try:
         intent = stripe.PaymentIntent.create(
@@ -158,6 +189,9 @@ def create_payment_intent(
                 "invoice_id": invoice.id,
                 "invoice_number": invoice.invoice_number,
             },
+            idempotency_key=(
+                f"invoice-{invoice.id}-amount-{amount_cents}-paid-{paid_cents}"
+            ),
         )
         invoice.stripe_payment_intent_id = intent.id
         db.commit()
