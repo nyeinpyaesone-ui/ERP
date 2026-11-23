@@ -47,11 +47,15 @@ export DOCKER_CALL_LOG="${TMP}/docker.log"
 export ERP_DIR="${TMP}/runtime"
 export ERP_PROJECT_ROOT="${TMP}/repo"
 export ERP_COMPOSE_FILE="${TMP}/runtime/docker-compose.prod.yml"
+# Deliberately poison ambient values: the selected env file must win.
+export DB_USER=prod_user DB_NAME=prod_database
 
 # Staging must use its own env file, Compose project and database settings.
 "${ROOT}/scripts/backup.sh" "${TMP}/out" staging
-grep -q -- '--env-file ${TMP}/runtime/.env.staging' "${DOCKER_CALL_LOG}"
+
+grep -q -- "--env-file ${TMP}/runtime/.env.staging" "${DOCKER_CALL_LOG}"
 grep -q -- '-p staging-blue' "${DOCKER_CALL_LOG}"
+
 grep -q -- 'pg_dump.*stage_user.*stage_database' "${DOCKER_CALL_LOG}"
 ! grep -q 'prod-secret' "${DOCKER_CALL_LOG}"
 test -s "${TMP}/out"/erp_backup_staging_*/database.sql
