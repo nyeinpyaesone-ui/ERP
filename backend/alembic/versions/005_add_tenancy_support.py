@@ -11,9 +11,8 @@ columns, indexes, and constraints are preserved.
 
 from collections.abc import Sequence
 
-import sqlalchemy as sa
-
 from alembic import op
+import sqlalchemy as sa
 
 revision: str = "005_tenancy"
 down_revision: str | None = "005"
