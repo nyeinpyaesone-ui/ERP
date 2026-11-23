@@ -202,3 +202,72 @@ def test_distinct_stripe_events_for_same_intent_do_not_double_pay(
     assert db.add.call_count == 1
     assert invoice.amount_paid == 25
     db.commit.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://hooks.example.com/hook",
+        "https://user:password@hooks.example.com/hook",
+        "https://hooks.example.com:8443/hook",
+        "https://127.0.0.1/hook",
+    ],
+)
+def test_webhook_destination_rejects_unsafe_url_forms(
+    monkeypatch: pytest.MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setattr(integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com")
+    with pytest.raises(HTTPException):
+        integrations._validate_webhook_url(url)
+
+
+def test_webhook_request_error_is_recorded_without_url_details(
+    db: Mock,
+    actor: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com")
+    monkeypatch.setattr(
+        integrations.socket,
+        "getaddrinfo",
+        Mock(return_value=[(2, 1, 6, "", ("93.184.216.34", 443))]),
+    )
+    webhook = SimpleNamespace(
+        id=9,
+        url="https://hooks.example.com/private-path",
+        secret=None,
+        is_active=True,
+        last_triggered=None,
+    )
+    db.query.return_value.first.return_value = webhook
+    client = Mock()
+    client.__enter__ = Mock(return_value=client)
+    client.__exit__ = Mock(return_value=False)
+    client.post.side_effect = integrations.httpx.ConnectError(
+        "connection failed for https://hooks.example.com/private-path"
+    )
+    monkeypatch.setattr(integrations.httpx, "Client", Mock(return_value=client))
+
+    delivery = integrations.test_webhook(9, db, actor)
+
+    assert delivery.status == "failed"
+    assert delivery.response_status is None
+    assert delivery.response_body == "Request failed: ConnectError"
+    assert "private-path" not in delivery.response_body
+
+
+def test_non_payment_stripe_event_is_recorded_once(
+    db: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(payments, "SessionLocal", Mock(return_value=db))
+    db.query.return_value.first.return_value = None
+
+    result = payments._process_stripe_event(
+        {"id": "evt_customer_updated", "type": "customer.updated", "data": {"object": {}}}
+    )
+
+    assert result == "processed"
+    event = db.add.call_args.args[0]
+    assert isinstance(event, StripeWebhookEvent)
+    assert event.event_id == "evt_customer_updated"
+    db.commit.assert_called_once_with()
