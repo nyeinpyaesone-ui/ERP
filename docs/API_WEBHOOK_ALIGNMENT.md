@@ -1,83 +1,121 @@
 # API, Webhook, and Frontend Contract Alignment
 
-Status: source audit / staging preparation. This document does not change runtime behavior.
+Status: implementation fixes committed on this review branch; verification and staging deployment remain pending.
 
-## Canonical source examined
+## Canonical source
 
 - Repository: `nyeinpyaesone-ui/ERP`
-- Branch examined: `main`
+- Review branch: `audit/api-webhook-contract`
 - Application entry point: `backend/app/main.py`
-- API inventory: `docs/API_SUMMARY.md`
-- Frontend: `backend/frontend-react`
-- Shared HTTP client: `backend/frontend-react/src/api/axios.js`
-- Authentication provider/hook: `backend/frontend-react/src/contexts/AuthContext.jsx`
+- Shared frontend HTTP client: `backend/frontend-react/src/api/axios.js`
+- Frontend auth hook: `backend/frontend-react/src/contexts/AuthContext.jsx`
+- Webhook page: `backend/frontend-react/src/pages/Integrations.jsx`
 
-The API summary describes 102 OpenAPI paths and identifies the router registry in `backend/app/main.py` as the source of truth. Regenerate/verify this inventory from the live app OpenAPI document after route changes; do not maintain a second hand-written route registry.
+The FastAPI router registry in `backend/app/main.py` is authoritative. Generate endpoint inventories from `/openapi.json`; do not keep a second hand-written route registry as runtime configuration.
 
-## Frontend request contract
+## Frontend HTTP and authentication contract
 
-- The frontend must use the shared Axios instance from `src/api/axios.js`.
-- The configured API base is `VITE_API_URL`, defaulting to same-origin `/api/v1`.
-- The client reads the access token from localStorage key `token` and sends it as a Bearer token.
-- HTTP 401 responses clear that same token key and redirect to `/login`.
-- `AuthContext.jsx` exports `useAuth()`; it is the current custom React hook. There is no separate `src/hooks` abstraction in the inspected frontend.
-- Login submits OAuth2 form fields `username` and `password`; registration submits JSON and then performs login.
+- Use the shared Axios client from `src/api/axios.js`.
+- API base setting: `VITE_API_URL`, default `/api/v1`.
+- Access token storage key: `token`; requests send `Authorization: Bearer <token>`.
+- HTTP 401 clears the same key and redirects to `/login`.
+- `AuthContext.jsx` exports `useAuth()`; this is the current auth hook.
+- Login uses OAuth2 form fields `username` and `password`.
 
-Do not configure Render with `VITE_API_BASE_URL` unless the frontend client is changed in the same reviewed commit. The currently inspected client reads `VITE_API_URL`.
+Render frontend configuration must use `VITE_API_URL`, not `VITE_API_BASE_URL`. The backend CORS allowlist must include the exact staging frontend origin.
 
-## Webhook and related endpoint inventory
+## Webhook endpoint contract
 
-All paths below are mounted beneath the `/api/v1` prefix unless stated otherwise.
+All paths below are mounted beneath `/api/v1/integrations`.
 
 | Method | Path | Contract |
 |---|---|---|
-| GET, POST | `/integrations/integrations` | List / create integrations |
-| GET, POST | `/integrations/webhooks` | List / create outbound webhook definitions |
-| POST | `/integrations/webhooks/{webhook_id}/test` | Send a test event to a configured destination |
-| GET | `/integrations/webhooks/{webhook_id}/deliveries` | Read delivery history |
-| POST | `/payments/webhook` | Receive and verify Stripe webhook events |
-| POST | `/jev/intercept` | Opt-in Jev interception collector |
-| GET | `/jev/intercept/status` | Interception state and event-file status |
-| WS | `/ws/{client_id}` | Authenticated WebSocket connection |
-| POST | `/ws/broadcast` | HTTP broadcast trigger |
-| GET | `/health`, `/ready` | Root liveness/readiness |
-| GET | `/health`, `/ready` | Versioned health/readiness at `/api/v1/health` and `/api/v1/ready` |
+| GET, POST | `/integrations` | List / create integrations |
+| GET, POST | `/webhooks` | List / create outbound webhook definitions |
+| DELETE | `/webhooks/{webhook_id}` | Soft-disable webhook; preserve delivery history |
+| POST | `/webhooks/{webhook_id}/test` | Send guarded test event |
+| GET | `/webhooks/{webhook_id}/deliveries` | Return the most recent 100 delivery records |
 
-The Stripe receiver validates the Stripe signature. The Jev collector is disabled unless `JEV_INTERCEPT=1` and its endpoints use the `jev_intercept:read/create` permissions.
+Implementation changes:
+- `WebhookPublic` and `WebhookDeliveryPublic` are explicit response schemas; the write-only webhook secret is not serialized.
+- Webhook create and delivery require HTTPS, port 443, no embedded credentials, and an exact host in `WEBHOOK_ALLOWED_HOSTS`.
+- Delivery re-validates DNS and rejects non-public IP answers.
+- HTTP redirects are disabled, environment proxies are not trusted, and only 2xx responses count as successful delivery.
+- Database operations for a test delivery remain on one synchronous request worker/session.
+- DELETE deactivates the webhook rather than deleting its record or delivery history.
+- The Integrations page now supports create, test, disable, and delivery-history workflows.
 
-## Confirmed alignment gaps
+Security boundary: exact host allowlisting and DNS checks reduce SSRF exposure, but DNS rebinding cannot be ruled out solely by application-level preflight resolution. Production egress firewall/network policy should also restrict outbound connections to approved destinations.
 
-1. **Webhook UI has an inert delete control.** `Integrations.jsx` renders a trash button without an onClick handler. No DELETE webhook route is registered in `integrations.py` or listed in `docs/API_SUMMARY.md`.
-2. **Webhook UI does not expose the existing delivery-history endpoint.** The backend has a deliveries GET route, but the inspected page does not call it.
-3. **Webhook create flow is not present in the inspected page.** The backend supports POST create; the page imports a Plus icon but does not render a create action.
-4. **Webhook destination security needs remediation before exposure.** The create schema accepts a caller-supplied URL and the test action makes an outbound HTTP request to it. Add strict URL/host validation and network egress controls to prevent SSRF, including redirects and DNS/IP rebinding considerations.
-5. **Webhook secret response handling needs review.** The ORM model contains a `secret` field, while create/list handlers return ORM objects directly. Use explicit response schemas that never serialize the secret; treat it as write-only.
-6. **Sync SQLAlchemy session is moved between worker threads in the async test route.** The test-delivery route performs database operations through separate `asyncio.to_thread` calls. Keep one session's complete DB transaction on one worker thread or migrate that path to an async session.
-7. **Stripe delivery idempotency is missing.** The current Stripe handler documents that repeated events are not deduplicated. Persist Stripe event IDs under a unique constraint before applying payment side effects.
-8. **WebSocket token is supplied in the query string.** Review proxy/access-log exposure; prefer an authenticated handshake mechanism that does not place bearer credentials in URLs.
-9. **Jev interception writes JSONL to a local file.** Render's ephemeral filesystem is not a durable audit store. Keep interception disabled in hosted staging until storage, retention, access, and redaction policies are explicitly designed.
+## Stripe contract
 
-## CI/CD source-of-truth review
+- `POST /api/v1/payments/webhook` verifies the Stripe signature.
+- A new `stripe_webhook_events` table stores Stripe event IDs as a primary key.
+- Event processing and payment/invoice updates share one transaction.
+- Repeated event IDs are acknowledged as duplicates without repeating side effects.
+- A second event ID for an already processed PaymentIntent does not add a second payment.
+- The worker creates and closes its own SQLAlchemy session, avoiding cross-thread use of a request-scoped session.
+- Migration `009` adds the idempotency table.
 
-The active `.github/workflows/ci.yml` uses full commit-SHA pins and matches the current `backend/` and `backend/frontend-react/` layout. The repository also has a pinned `.github/workflows/codeql.yml`.
+## WebSocket contract
 
-The separate `.github/workflows/ci-cd-enhanced.yml` is stale: its job logs show GitHub rejecting `actions/checkout@v4` and `github/codeql-action/*@v3` because repository policy requires full SHA pins. Its frontend jobs still point at a root `frontend/` directory, use `|| true` around lint/build/test commands, and its deploy jobs are placeholder echo commands. It must not remain a competing push/PR/scheduled pipeline. The branch version is therefore archived as manual-only; use `ci.yml` as the canonical quality/deployment workflow and `codeql.yml` for CodeQL.
+Path: `WS /api/v1/ws/{client_id}`.
 
-## Required final verification
+The server no longer reads bearer tokens from query parameters. The client must connect, then send this first frame:
 
-- [ ] Import the FastAPI app and generate `/openapi.json`.
-- [ ] Assert every router mount is unique and every documented route exists.
-- [ ] Compare generated OpenAPI paths/methods with `docs/API_SUMMARY.md`.
-- [ ] Test auth token persistence, refresh/logout behavior, 401 handling, and RBAC.
-- [ ] Test webhook create/list/test/delivery history and permissions.
-- [ ] Add tests for secret non-disclosure, URL allow/deny rules, redirect handling, and network failures.
-- [ ] Add Stripe duplicate-event tests and database uniqueness.
-- [ ] Test WebSocket authentication and avoid query-string credentials.
-- [ ] Keep Jev interception off in Render until durable protected storage is available.
-- [ ] Run backend tests, frontend lint/tests/build, secret scan, dependency scan, and container scan.
-- [ ] Configure Render's frontend build variable as `VITE_API_URL`; verify the backend CORS allowlist contains the exact staging frontend origin.
-- [ ] Deploy only to an isolated staging database; do not import or mutate production ERP data during verification.
+```json
+{"type":"authenticate","token":"<access-token>"}
+```
+
+Authentication must complete within five seconds. The server binds the connection group to the authenticated user's ID and ignores the caller-supplied path ID. The shared client helper is `backend/frontend-react/src/api/websocket.js`.
+
+Do not use `?token=...` in WebSocket URLs; URLs are commonly retained in proxy and access logs.
+
+## Jev interception storage contract
+
+Jev capture remains disabled unless `JEV_INTERCEPT=1`. In production, it also requires:
+- `JEV_INTERCEPT_DURABLE=1`
+- an absolute `JEV_INTERCEPT_EVENTS_FILE` path on an operator-provisioned persistent volume.
+
+The durable flag is an operator assertion, not an automatic proof that a disk is mounted. Keep Jev interception disabled in Render staging until a persistent disk, access controls, retention, redaction, and backup policy are explicitly configured.
+
+## Alembic history repair
+
+The repository contained two migration files declaring the same revision ID `005`, which makes Alembic revision discovery ambiguous.
+
+The review branch now:
+- retains the permission reconciliation migration as revision `005`;
+- renames the tenancy migration revision to `005_tenancy`, parent `005`;
+- adds additive permission reconciliation revision `005_permissions_reconcile`;
+- links revision `006` to `005_permissions_reconcile`;
+- keeps the subsequent `007`, `008`, and new `009` chain intact.
+
+The tenancy migration checks for existing tables, columns, indexes, and constraints before adding them; its downgrade is intentionally a no-op to preserve tenant and ERP records. A test asserts unique revision IDs and a single head revision (`009`).
+
+Before running this on any existing database, take and verify a backup. The migration is designed to be additive/idempotent, but staging must validate it against a restored copy of the actual schema before production use.
+
+## CI/CD source of truth
+
+- `.github/workflows/ci.yml`: canonical tests, quality checks, image builds, and approved deployment flow.
+- `.github/workflows/codeql.yml`: CodeQL.
+- `.github/workflows/ci-cd-enhanced.yml`: manual-only archive; it is not a competing automatic pipeline.
+
+The archived workflow had unpinned actions, stale frontend paths, non-blocking checks, and placeholder deployment steps.
+
+## Verification gates
+
+- [ ] GitHub Actions passes backend tests, migration graph test, frontend lint/tests/build, secret scan, and image builds.
+- [ ] OpenAPI route inventory is regenerated and compared to `docs/API_SUMMARY.md`.
+- [ ] Webhook response schema is confirmed not to expose secrets.
+- [ ] URL allowlist, private DNS rejection, redirects, and delivery error cases are tested.
+- [ ] Stripe duplicate event and same-PaymentIntent duplicate tests pass against PostgreSQL.
+- [ ] WebSocket valid/invalid first-frame authentication tests pass.
+- [ ] Jev production storage gate tests pass; Jev remains off in staging until durable storage is provisioned.
+- [ ] Restore a backup to an isolated staging database and run `alembic upgrade head`.
+- [ ] Configure Render frontend `VITE_API_URL` and backend `CORS_ORIGINS`.
+- [ ] Configure `WEBHOOK_ALLOWED_HOSTS` only with approved destinations; leave blank to disable outbound webhook creation/delivery.
+- [ ] Deploy only to a separate staging database; do not import or mutate production ERP data.
 
 ## Cross-platform source-of-truth note
 
-The separately inspected GitLab project `nyeinpyaesone-ui/erp` and its `staging/render-foundation` branch are not yet verified as a synchronized mirror of this GitHub repository. Its previous Render Blueprint must not be reused for this GitHub codebase without reconciling repository identity, root directories, build commands, environment variable names, and commit lineage.
+The separate GitLab project `nyeinpyaesone-ui/erp` has not been verified as a synchronized mirror of this GitHub repository. Do not reuse its Render Blueprint without reconciling repository identity, root directories, environment names, build commands, and commit lineage.
