@@ -444,8 +444,7 @@ def test_create_payment_intent_uses_stable_idempotency_key(
 
     assert response["payment_intent_id"] == "pi_test"
     assert (
-        create.call_args.kwargs["idempotency_key"]
-        == "invoice-7-amount-2500-paid-2500"
+        create.call_args.kwargs["idempotency_key"] == "invoice-7-amount-2500-paid-2500"
     )
     assert create.call_args.kwargs["currency"] == "usd"
     assert invoice.stripe_payment_intent_id == "pi_test"
