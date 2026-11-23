@@ -180,9 +180,7 @@ def create_payment_intent(
         )
     amount_cents = int(amount * 100)
     paid_cents = int(Decimal(invoice.amount_paid or 0) * 100)
-    idempotency_key = (
-        f"invoice-{invoice.id}-amount-{amount_cents}-paid-{paid_cents}"
-    )
+    idempotency_key = f"invoice-{invoice.id}-amount-{amount_cents}-paid-{paid_cents}"
 
     try:
         intent = stripe.PaymentIntent.create(
