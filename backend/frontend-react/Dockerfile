@@ -2,25 +2,25 @@
 ###############################################################################
 # ERP SOLUTION — frontend image (static Vite build served by nginx)
 #
-# Multi-arch: node:22-alpine and nginx:alpine are manifest lists covering
-# linux/amd64 and linux/arm64, so this image builds natively on both. The
-# produced bundle is architecture-neutral JS/CSS; only the nginx runtime
-# differs per platform, which the manifest list resolves at pull time.
+# The build stage is architecture-aware; the final image contains only the
+# generated static bundle and nginx. Upgrade Alpine packages in the final
+# stage so security fixes released after the upstream base image are included.
 ###############################################################################
-FROM node:22-alpine AS builder
+FROM node:22-alpine3.24 AS builder
 
 WORKDIR /app
-# Copy the lockfile alongside the manifest so `npm ci` installs exactly the
-# versions CI resolves. The previous `COPY package.json .` + `npm install`
-# resolved fresh from the registry, so image contents could drift from the
-# lockfile that backend/frontend-react/package-lock.json pins.
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginx:alpine
+FROM nginx:stable-alpine3.24
+
+RUN apk update \
+    && apk upgrade --no-cache \
+    && rm -rf /var/cache/apk/*
+
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
 
+EXPOSE 80
