@@ -321,8 +321,9 @@ def test_delivery_history_returns_404_for_unknown_webhook(
 def test_stripe_event_without_id_is_rejected_and_session_closed(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(payments, "SessionLocal", Mock(return_value=db))
+    session_factory = Mock(return_value=db)
+    monkeypatch.setattr(payments, "SessionLocal", session_factory)
     with pytest.raises(ValueError, match="Stripe event ID is missing"):
         payments._process_stripe_event({"type": "customer.updated"})
+    session_factory.assert_not_called()
     db.query.assert_not_called()
-    db.close.assert_called_once_with()
