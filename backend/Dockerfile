@@ -52,12 +52,20 @@ RUN apk update \
     && adduser -S -G app -h /home/app -s /bin/bash app \
     && rm -rf /var/cache/apk/*
 
-# Copy runtime dependencies first. Remove stale setuptools metadata from all
-# Python installation roots before force-installing a single patched runtime
-# distribution. This prevents scanners from detecting shadowed old metadata.
+# Copy only application runtime dependencies into the final image.
 COPY --from=builder /install /usr/local
 
-RUN find /usr/local /usr/lib -type d \( -name 'setuptools-*.dist-info' -o -name 'setuptools-*.egg-info' \) -prune -exec rm -rf {} \; && python -m pip install --no-cache-dir --upgrade --force-reinstall "pip>=26.2.0" "setuptools>=84.1.0" "wheel>=0.46.2" && python -c 'from importlib.metadata import distributions, version; installed=version("setuptools"); found=sorted({item.version for item in distributions() if (item.metadata.get("Name") or "").lower() == "setuptools"}); parsed=tuple(int(part) for part in installed.split(".")[:3]); assert parsed >= (84, 1, 0), f"setuptools {installed} is below the required security floor"; assert found == [installed], f"Multiple setuptools distributions found: {found}"; print(f"Verified single patched setuptools distribution {installed}")'
+# Package installers and build tooling are not needed to execute the API.
+# Removing their entire package trees also removes setuptools' bundled
+# vulnerable jaraco.context/wheel copies from the shipped runtime image.
+RUN find /usr/local /usr/lib -type d \
+        \( -name 'pip' -o -name 'pip-*.dist-info' -o -name 'pip*.egg-info' \
+        -o -name 'setuptools' -o -name 'setuptools-*.dist-info' -o -name 'setuptools*.egg-info' \
+        -o -name 'wheel' -o -name 'wheel-*.dist-info' -o -name 'wheel*.egg-info' \) \
+        -prune -exec rm -rf {} + \
+    && rm -f /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.11 \
+        /usr/local/bin/easy_install /usr/local/bin/easy_install-* /usr/local/bin/wheel \
+    && python -c 'from importlib.metadata import distributions; forbidden={"pip", "setuptools", "wheel"}; found=sorted({(item.metadata.get("Name") or "").lower() for item in distributions()} & forbidden); assert not found, f"Build tools leaked into runtime: {found}"; print("Verified runtime image contains no pip, setuptools, or wheel distributions")'
 
 COPY --chown=app:app . .
 
