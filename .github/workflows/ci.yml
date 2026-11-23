@@ -204,7 +204,7 @@ jobs:
           cd backend
           ruff check "${python_files[@]}"
 
-      - name: Run Black on changed backend files
+      - name: Show Black formatting diff for changed backend files
         env:
           BASE_REF: ${{ github.base_ref }}
           EVENT_BEFORE: ${{ github.event.before }}
@@ -225,7 +225,7 @@ jobs:
           python_files=()
           for path in "${changed[@]}"; do python_files+=("${path#backend/}"); done
           cd backend
-          black --check "${python_files[@]}"
+          black --diff "${python_files[@]}"
 
       - name: Run MyPy (advisory — does not gate the pipeline)
         continue-on-error: true
