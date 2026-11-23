@@ -78,8 +78,23 @@ def events_file() -> Path:
 
 
 def enabled() -> bool:
-    """Return ``True`` when interception is switched on for this process."""
-    return os.getenv("JEV_INTERCEPT") == "1"
+    """Return True only when explicitly enabled and storage is safe.
+
+    Production requires JEV_INTERCEPT_DURABLE=1 and an absolute event-file
+    path supplied by the operator. This is an explicit deployment assertion:
+    the path must be backed by a persistent mounted volume, not the container
+    filesystem. The feature remains disabled by default.
+    """
+    if os.getenv("JEV_INTERCEPT") != "1":
+        return False
+    if os.getenv("ENVIRONMENT", "dev").lower() == "prod":
+        configured_path = os.getenv("JEV_INTERCEPT_EVENTS_FILE", "")
+        return (
+            os.getenv("JEV_INTERCEPT_DURABLE") == "1"
+            and bool(configured_path)
+            and Path(configured_path).is_absolute()
+        )
+    return True
 
 
 def redact(value: Any) -> Any:
