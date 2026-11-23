@@ -180,3 +180,16 @@ def test_install_interceptor_is_noop_when_disabled(events_path) -> None:
         assert test_client.get("/ping").status_code == 200
 
     assert not events_path.exists()
+
+def test_production_interception_requires_durable_absolute_storage(events_path, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "prod")
+    monkeypatch.setenv("JEV_INTERCEPT", "1")
+    monkeypatch.setenv("JEV_INTERCEPT_EVENTS_FILE", str(events_path))
+    monkeypatch.delenv("JEV_INTERCEPT_DURABLE", raising=False)
+    assert service.enabled() is False
+
+    monkeypatch.setenv("JEV_INTERCEPT_DURABLE", "1")
+    assert service.enabled() is True
+
+    monkeypatch.setenv("JEV_INTERCEPT_EVENTS_FILE", "events.jsonl")
+    assert service.enabled() is False
