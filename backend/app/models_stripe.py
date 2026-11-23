@@ -15,4 +15,6 @@ class StripeWebhookEvent(Base):
 
     event_id = Column(String(255), primary_key=True)
     event_type = Column(String(255), nullable=False)
-    processed_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    processed_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
