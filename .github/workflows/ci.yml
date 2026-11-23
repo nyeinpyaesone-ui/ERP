@@ -516,6 +516,14 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
+      - name: Verify backend runtime packaging baseline
+        if: github.event_name == 'merge_group' || github.event_name == 'pull_request'
+        env:
+          BACKEND_IMAGE: ${{ needs.docker-backend.outputs.image_sha_ref }}
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint python "${BACKEND_IMAGE}" -c 'from importlib.metadata import version; installed=version("setuptools"); parsed=tuple(int(part) for part in installed.split(".")[:3]); assert parsed >= (84, 1, 0), f"setuptools {installed} is below the required security floor"; print(f"Verified patched setuptools {installed}")'
+
       - name: Log in to Docker Hub for backend scan
         if: needs.config.outputs.can_push == 'true'
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
