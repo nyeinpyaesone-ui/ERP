@@ -24,8 +24,8 @@ case "${ENVIRONMENT}" in
         ;;
 esac
 
-# An explicit override is permitted for controlled automation, but it must
-# still identify a real file. Without it, never fall back across environments.
+# Resolve only the environment-specific filename. Never accept an override or
+# fall back to the other environment, even when the selected file is missing.
 ENV_FILE="${ERP_DIR}/.env.${ENVIRONMENT}"
 if [ ! -f "${ENV_FILE}" ]; then
     echo "Error: ${ENVIRONMENT} environment file not found: ${ENV_FILE}" >&2
