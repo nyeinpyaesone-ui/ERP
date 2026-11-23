@@ -57,6 +57,12 @@ The Stripe receiver validates the Stripe signature. The Jev collector is disable
 8. **WebSocket token is supplied in the query string.** Review proxy/access-log exposure; prefer an authenticated handshake mechanism that does not place bearer credentials in URLs.
 9. **Jev interception writes JSONL to a local file.** Render's ephemeral filesystem is not a durable audit store. Keep interception disabled in hosted staging until storage, retention, access, and redaction policies are explicitly designed.
 
+## CI/CD source-of-truth review
+
+The active `.github/workflows/ci.yml` uses full commit-SHA pins and matches the current `backend/` and `backend/frontend-react/` layout. The repository also has a pinned `.github/workflows/codeql.yml`.
+
+The separate `.github/workflows/ci-cd-enhanced.yml` is stale: its job logs show GitHub rejecting `actions/checkout@v4` and `github/codeql-action/*@v3` because repository policy requires full SHA pins. Its frontend jobs still point at a root `frontend/` directory, use `|| true` around lint/build/test commands, and its deploy jobs are placeholder echo commands. It must not remain a competing push/PR/scheduled pipeline. The branch version is therefore archived as manual-only; use `ci.yml` as the canonical quality/deployment workflow and `codeql.yml` for CodeQL.
+
 ## Required final verification
 
 - [ ] Import the FastAPI app and generate `/openapi.json`.
