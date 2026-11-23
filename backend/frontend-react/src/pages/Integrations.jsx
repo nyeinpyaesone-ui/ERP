@@ -6,7 +6,6 @@ import {
   Trash2,
   Send,
   History,
-  Slack,
   MessageCircle,
   Zap,
   RefreshCw,
@@ -105,7 +104,7 @@ export default function Integrations() {
   };
 
   const getProviderIcon = (provider) => {
-    if (provider === 'slack') return <Slack className="w-5 h-5" />;
+    if (provider === 'slack') return <Plug className="w-5 h-5" />;
     if (provider === 'teams') return <MessageCircle className="w-5 h-5" />;
     if (provider === 'zapier') return <Zap className="w-5 h-5" />;
     return <Plug className="w-5 h-5" />;
