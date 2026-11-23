@@ -71,9 +71,7 @@ def upgrade() -> None:
         sa.column("description", sa.String(255)),
     )
     names = {
-        f"{resource}:{action}"
-        for resource in RESOURCES
-        for action in STANDARD_ACTIONS
+        f"{resource}:{action}" for resource in RESOURCES for action in STANDARD_ACTIONS
     }
     names.update(
         f"{resource}:{action}"
@@ -83,7 +81,9 @@ def upgrade() -> None:
     rows = []
     for name in sorted(names):
         resource, action = name.split(":", 1)
-        description = f"{action.replace('_', ' ').capitalize()} {resource.replace('_', ' ')}"
+        description = (
+            f"{action.replace('_', ' ').capitalize()} {resource.replace('_', ' ')}"
+        )
         rows.append(
             {
                 "name": name,
@@ -93,8 +93,10 @@ def upgrade() -> None:
             }
         )
     if rows:
-        statement = insert(permissions).values(rows).on_conflict_do_nothing(
-            index_elements=["name"]
+        statement = (
+            insert(permissions)
+            .values(rows)
+            .on_conflict_do_nothing(index_elements=["name"])
         )
         op.execute(statement)
 
