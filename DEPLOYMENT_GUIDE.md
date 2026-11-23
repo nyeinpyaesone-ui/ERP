@@ -159,7 +159,7 @@ files and read-only Docker Hub pull credentials are configured separately.
 ### How It Works
 
 1. **Two Colors per Host**: Blue (active) and Green (inactive); staging and production are separate hosts
-2. **Shared Database**: Both environments use the same PostgreSQL/Redis
+2. **Host-local shared services**: Blue and green on the same host use that host's PostgreSQL/Redis; staging and production hosts never share databases, Redis, credentials, or persistent volumes.
 3. **Traffic Switch**: Nginx upstream file is updated in place, validated, and reloaded; the previous file is retained for rollback
 4. **Health Verification**: Comprehensive checks before switch
 5. **Rollback**: Restore the exact previous Nginx upstream file if validation or post-switch checks fail
@@ -169,7 +169,7 @@ files and read-only Docker Hub pull credentials are configured separately.
 | Environment | Backend Container | Frontend Container |
 |-------------|-------------------|---------------------|
 | Blue (active) | `erp-blue-backend` | `erp-blue-frontend` |
-| Green (staging) | `erp-green-backend` | `erp-green-frontend` |
+| Green (inactive) | `erp-green-backend` | `erp-green-frontend` |
 
 ### Deployment Flow
 
