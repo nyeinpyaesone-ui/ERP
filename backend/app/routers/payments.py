@@ -182,9 +182,14 @@ def create_payment_intent(
     paid_cents = int(Decimal(invoice.amount_paid or 0) * 100)
 
     try:
+        paid_cents = int(Decimal(invoice.amount_paid or 0) * 100)
+        idempotency_key = (
+            f"invoice-{invoice.id}-amount-{amount_cents}-paid-{paid_cents}"
+        )
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
             currency="usd",
+            idempotency_key=idempotency_key,
             metadata={
                 "invoice_id": invoice.id,
                 "invoice_number": invoice.invoice_number,
