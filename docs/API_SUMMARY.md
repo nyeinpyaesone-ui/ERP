@@ -160,11 +160,12 @@ Root `GET /` returns service info (`name`, `version`, `status`, `features`).
 | POST | `/api/v1/payments/create-intent` | Create Stripe payment intent |
 | POST | `/api/v1/payments/webhook` | Stripe webhook receiver |
 
-### Integrations — `/api/v1/integrations` (4 paths)
+### Integrations — `/api/v1/integrations` (5 paths)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET/POST | `/api/v1/integrations/integrations` | List / create integrations |
 | GET/POST | `/api/v1/integrations/webhooks` | List / create webhooks |
+| DELETE | `/api/v1/integrations/webhooks/{webhook_id}` | Disable webhook while preserving delivery history |
 | GET | `/api/v1/integrations/webhooks/{webhook_id}/deliveries` | Webhook deliveries |
 | POST | `/api/v1/integrations/webhooks/{webhook_id}/test` | Test webhook |
 
