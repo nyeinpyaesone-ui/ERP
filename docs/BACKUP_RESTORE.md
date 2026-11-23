@@ -33,33 +33,25 @@ The `scripts/backup.sh` script handles all backup operations.
 ```
 
 ### What It Backs Up
+
+The script requires the selected environment file (`/opt/erp-solution/.env.production` or `/opt/erp-solution/.env.staging`) and uses the matching Compose project (`production-blue` or `staging-blue`). It passes the file to Docker Compose with `--env-file`; it never evaluates the file as shell. Missing environment configuration or an unavailable PostgreSQL service stops the backup rather than creating an incomplete archive.
+
 ```
 backup_<env>_<timestamp>/
-├── source_code.tar.gz        # Full repo (excludes .git, node_modules, venv)
-├── database.sql              # PostgreSQL dump (if DB running)
-├── manifest.txt              # Metadata; runtime env files are excluded
-└── manifest.txt              # Metadata: date, git commit, version
+├── source_code.tar.gz        # Repository source; .env files and secrets excluded
+├── database.sql              # PostgreSQL SQL dump
+└── manifest.txt              # Environment, DB metadata, source revision
 ```
 
+Runtime env files are deliberately not copied. Restore them from the approved secret manager; never copy production credentials into staging.
+
 ### Example Output
+
+The header, manifest, selected env file, and Compose project must all identify the same environment.
+
 ```
-==========================================
-  ERP SOLUTION Backup (production)
-==========================================
-  Destination: /opt/erp-solution/backups/erp_backup_production_20240115_020000
-==========================================
-[1/4] Backing up source code...
-  ✓ Source code backed up
-[2/4] Backing up database...
-  ✓ Database backed up
-[3/4] Backing up environment files...
-  ✓ Environment files backed up
-[4/4] Creating backup manifest...
-  ✓ Manifest created
-==========================================
-  Backup Complete!
-  Location: /opt/erp-solution/backups/erp_backup_production_20240115_020000
-==========================================
+Backing up staging into /opt/erp-solution/backups/erp_backup_staging_<timestamp>
+Backup complete: /opt/erp-solution/backups/erp_backup_staging_<timestamp>
 ```
 
 ---
