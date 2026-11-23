@@ -7,8 +7,8 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
+import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
