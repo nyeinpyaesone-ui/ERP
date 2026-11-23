@@ -72,6 +72,7 @@ if "${ROOT}/scripts/backup.sh" "${TMP}/missing-out" staging >/dev/null 2>&1; the
     exit 1
 fi
 test ! -e "${TMP}/missing-out"
+mv "${TMP}/runtime/.env.staging.off" "${TMP}/runtime/.env.staging"
 
 # A staging env symlink must not redirect the operation to production.
 mv "${TMP}/runtime/.env.staging" "${TMP}/runtime/.env.staging.off"
