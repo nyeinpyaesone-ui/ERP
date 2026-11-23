@@ -62,11 +62,7 @@ async def get_websocket_user(
         await websocket.close(code=4001, reason="Invalid token")
         return None
 
-    user = (
-        db.query(User)
-        .filter(User.id == user_id, User.is_active.is_(True))
-        .first()
-    )
+    user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
     if not user or not user.is_active:
         await websocket.close(code=4001, reason="Invalid or inactive user")
         return None
