@@ -28,7 +28,7 @@ The `scripts/backup.sh` script handles all backup operations.
 # Backup to custom directory
 ./scripts/backup.sh /mnt/backups/erp
 
-# Backup staging environment
+# Backup staging environment (uses .env.staging and staging-blue only)
 ./scripts/backup.sh /opt/erp-solution/backups staging
 ```
 
@@ -37,7 +37,7 @@ The `scripts/backup.sh` script handles all backup operations.
 backup_<env>_<timestamp>/
 ├── source_code.tar.gz        # Full repo (excludes .git, node_modules, venv)
 ├── database.sql              # PostgreSQL dump (if DB running)
-├── env.production            # Production environment config
+├── manifest.txt              # Metadata; runtime env files are excluded
 └── manifest.txt              # Metadata: date, git commit, version
 ```
 
