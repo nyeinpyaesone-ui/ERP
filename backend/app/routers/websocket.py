@@ -4,7 +4,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
-from app.auth import decode_token
+from app.auth import decode_token, get_current_user_optional
 from app.database import get_db
 from app.models import User
 
@@ -134,7 +134,7 @@ async def websocket_endpoint(
 
 @router.post("/broadcast")
 async def broadcast_message(
-    message: dict, current_user=Depends(__import__("app.auth", fromlist=["get_current_user_optional"]).get_current_user_optional)
+    message: dict, current_user=Depends(get_current_user_optional)
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
