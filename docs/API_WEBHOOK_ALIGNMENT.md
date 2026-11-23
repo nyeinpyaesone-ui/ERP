@@ -67,7 +67,7 @@ The server no longer reads bearer tokens from query parameters. The client must 
 {"type":"authenticate","token":"<access-token>"}
 ```
 
-Authentication must complete within five seconds. The server binds the connection group to the authenticated user's ID and ignores the caller-supplied path ID. The shared client helper is `backend/frontend-react/src/api/websocket.js`.
+Authentication must complete within five seconds. The server binds the connection group to the authenticated user's ID and ignores the caller-supplied path ID. The shared client helper is `backend/frontend-react/src/api/websocket.js`; it rejects `ws://` on HTTPS pages so bearer tokens are only sent over secure WebSocket transport in production.
 
 Do not use `?token=...` in WebSocket URLs; URLs are commonly retained in proxy and access logs.
 
@@ -109,7 +109,7 @@ The archived workflow had unpinned actions, stale frontend paths, non-blocking c
 - [ ] Webhook response schema is confirmed not to expose secrets.
 - [ ] URL allowlist, private DNS rejection, redirects, and delivery error cases are tested.
 - [ ] Stripe duplicate event and same-PaymentIntent duplicate tests pass against PostgreSQL.
-- [ ] WebSocket valid/invalid first-frame authentication tests pass.
+- [ ] WebSocket valid/invalid first-frame authentication tests pass; production connections use `wss://`.
 - [ ] Jev production storage gate tests pass; Jev remains off in staging until durable storage is provisioned.
 - [ ] Restore a backup to an isolated staging database and run `alembic upgrade head`.
 - [ ] Configure Render frontend `VITE_API_URL` and backend `CORS_ORIGINS`.
