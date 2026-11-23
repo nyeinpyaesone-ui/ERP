@@ -30,7 +30,9 @@ def test_websocket_authenticates_from_first_frame_not_query_string(
     )
 
     with TestClient(app) as client:
-        with client.websocket_connect("/api/v1/ws/client-ignored?token=not-used") as socket:
+        with client.websocket_connect(
+            "/api/v1/ws/client-ignored?token=not-used"
+        ) as socket:
             socket.send_json({"type": "authenticate", "token": "valid-token"})
             socket.send_json({"type": "ping"})
             assert socket.receive_json()["type"] == "pong"
