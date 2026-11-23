@@ -61,9 +61,7 @@ def test_legacy_005_stamp_upgrades_without_losing_tenant_data(
 
         query = dict(base_url.query)
         query["options"] = f"-csearch_path={schema}"
-        isolated_url = base_url.set(query=query).render_as_string(
-            hide_password=False
-        )
+        isolated_url = base_url.set(query=query).render_as_string(hide_password=False)
         schema_engine = create_engine(isolated_url)
 
         # Both historical installations had completed the canonical 005
@@ -72,20 +70,16 @@ def test_legacy_005_stamp_upgrades_without_losing_tenant_data(
         if tenancy_already_applied:
             _run_alembic(backend_dir, isolated_url, "upgrade", "005_tenancy")
             with schema_engine.begin() as connection:
-                connection.execute(
-                    text(
-                        """
-                        INSERT INTO tenants (
-                            name, subdomain, schema_name,
-                            subscription_start, subscription_end
-                        )
-                        VALUES (
-                            'Legacy tenant', 'legacy', 'tenant_legacy',
-                            DATE '2024-01-01', DATE '2099-12-31'
-                        )
-                        """
+                connection.execute(text("""
+                    INSERT INTO tenants (
+                        name, subdomain, schema_name,
+                        subscription_start, subscription_end
                     )
-                )
+                    VALUES (
+                        'Legacy tenant', 'legacy', 'tenant_legacy',
+                        DATE '2024-01-01', DATE '2099-12-31'
+                    )
+                """))
                 # Simulate a legacy installation where the tenancy revision
                 # was stamped as 005 and this permission was missing.
                 connection.execute(
@@ -101,9 +95,7 @@ def test_legacy_005_stamp_upgrades_without_losing_tenant_data(
 
         with schema_engine.connect() as connection:
             tenant_count = connection.execute(
-                text(
-                    "SELECT COUNT(*) FROM tenants WHERE name = 'Legacy tenant'"
-                )
+                text("SELECT COUNT(*) FROM tenants WHERE name = 'Legacy tenant'")
             ).scalar_one()
             permission_count = connection.execute(
                 text("SELECT COUNT(*) FROM permissions WHERE name = 'webhooks:test'")
