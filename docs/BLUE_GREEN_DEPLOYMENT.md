@@ -19,16 +19,16 @@ This guide covers zero-downtime production deployments using the `deploy-blue-gr
               ▼                               ▼
     ┌─────────────────────┐         ┌─────────────────────┐
     │    BLUE ENVIRONMENT │         │   GREEN ENVIRONMENT │
-    │  (Currently Active) │         │   (Staging/Next)    │
+    │  (Currently Active) │         │  (Inactive/Next)    │
     │                     │         │                     │
     │ erp-blue-backend    │         │ erp-green-backend   │
     │ erp-blue-frontend   │         │ erp-green-frontend  │
     │                     │         │                     │
-    │ Shared: PostgreSQL, Redis, Ollama, Nginx             │
+    │ Each host has its own PostgreSQL, Redis, Ollama, Nginx │
     └─────────────────────┘         └─────────────────────┘
 ```
 
-**Key Principle:** Only **one** environment receives live traffic at a time. The inactive environment is fully started and health-checked **before** traffic switches.
+**Key Principle:** Blue and green are deployment colors on one host, not staging and production environments. Each host has its own database and Redis. Staging and production run on separate hosts with separate credentials and data. Only one color on a given host receives live traffic at a time; the inactive color is fully started and health-checked **before** traffic switches.
 
 ---
 
