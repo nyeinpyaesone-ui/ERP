@@ -102,7 +102,9 @@ def _validate_webhook_url(value: str, *, resolve: bool = False) -> str:
     except ValueError:
         pass
     else:
-        raise HTTPException(status_code=422, detail="IP-literal webhook destinations are not allowed")
+        raise HTTPException(
+            status_code=422, detail="IP-literal webhook destinations are not allowed"
+        )
 
     if host not in _allowed_webhook_hosts():
         raise HTTPException(
@@ -114,9 +116,13 @@ def _validate_webhook_url(value: str, *, resolve: bool = False) -> str:
         try:
             records = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
         except OSError as exc:
-            raise HTTPException(status_code=422, detail="Webhook destination could not be resolved") from exc
+            raise HTTPException(
+                status_code=422, detail="Webhook destination could not be resolved"
+            ) from exc
         addresses = {record[4][0] for record in records}
-        if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
+        if not addresses or any(
+            not ipaddress.ip_address(address).is_global for address in addresses
+        ):
             raise HTTPException(
                 status_code=422,
                 detail="Webhook destination must resolve only to public IP addresses",
@@ -146,7 +152,9 @@ def list_integrations(
     return db.query(Integration).all()
 
 
-@router.post("/webhooks", response_model=WebhookPublic, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/webhooks", response_model=WebhookPublic, status_code=status.HTTP_201_CREATED
+)
 def create_webhook(
     data: WebhookCreate,
     db: Session = Depends(get_db),
@@ -202,14 +210,22 @@ def test_webhook(
         "timestamp": datetime.now(UTC).isoformat(),
         "data": {"message": "Test webhook delivery"},
     }
-    payload_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    payload_bytes = json.dumps(
+        payload, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if webhook.secret:
-        signature = hmac.new(webhook.secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
+        signature = hmac.new(
+            webhook.secret.encode(), payload_bytes, hashlib.sha256
+        ).hexdigest()
         headers["X-Webhook-Signature"] = f"sha256={signature}"
 
     delivery = WebhookDelivery(
-        webhook_id=webhook_id, event="test", payload=payload, attempt=1, status="pending"
+        webhook_id=webhook_id,
+        event="test",
+        payload=payload,
+        attempt=1,
+        status="pending",
     )
     db.add(delivery)
     db.commit()
