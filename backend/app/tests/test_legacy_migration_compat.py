@@ -50,7 +50,7 @@ def test_legacy_005_stamp_upgrades_without_losing_tenant_data(
     if base_url.get_backend_name() != "postgresql":
         pytest.skip("Legacy migration compatibility test requires PostgreSQL")
 
-    backend_dir = Path(__file__).resolve().parents[3]
+    backend_dir = Path(__file__).resolve().parents[2]
     schema = f"legacy_005_{uuid.uuid4().hex[:12]}"
     admin_engine = create_engine(base_url)
     schema_engine = None
