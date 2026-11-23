@@ -113,9 +113,7 @@ async def test_endpoint_rejects_wrong_first_frame(
 
     await websocket.websocket_endpoint(socket, "spoofed", db)
 
-    socket.close.assert_awaited_once_with(
-        code=4401, reason="Authentication required"
-    )
+    socket.close.assert_awaited_once_with(code=4401, reason="Authentication required")
     manager.connect.assert_not_awaited()
 
 
