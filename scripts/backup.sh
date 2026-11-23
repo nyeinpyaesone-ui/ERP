@@ -8,6 +8,7 @@
 ###############################################################################
 
 set -Eeuo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ERP_PROJECT_ROOT="${ERP_PROJECT_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
@@ -27,8 +28,20 @@ esac
 # Resolve only the environment-specific filename. Never accept an override or
 # fall back to the other environment, even when the selected file is missing.
 ENV_FILE="${ERP_DIR}/.env.${ENVIRONMENT}"
+if [ -L "${ENV_FILE}" ]; then
+    echo "Error: refusing a symlinked environment file: ${ENV_FILE}" >&2
+    exit 1
+fi
 if [ ! -f "${ENV_FILE}" ]; then
     echo "Error: ${ENVIRONMENT} environment file not found: ${ENV_FILE}" >&2
+    exit 1
+fi
+ENV_FILE_MODE="$(stat -c '%a' "${ENV_FILE}")" || {
+    echo "Error: could not inspect environment file permissions." >&2
+    exit 1
+}
+if (( (8#${ENV_FILE_MODE} & 077) != 0 )); then
+    echo "Error: ${ENV_FILE} must not be accessible by group or other users (use chmod 600)." >&2
     exit 1
 fi
 if [ ! -f "${COMPOSE_FILE}" ]; then
