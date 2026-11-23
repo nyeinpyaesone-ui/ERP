@@ -4,7 +4,8 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
-from app.auth import decode_token, get_current_user_optional
+from app import auth
+from app.auth import get_current_user_optional
 from app.database import get_db
 from app.models import User
 
@@ -41,23 +42,35 @@ class ConnectionManager:
             try:
                 await connection.send_text(message)
             except Exception:
-                # A disconnected socket is cleaned up by its receive loop.
                 continue
 
 
 manager = ConnectionManager()
 
 
-def _authenticated_user(token: str, db: Session) -> User | None:
-    payload = decode_token(token)
-    user_id = payload.get("sub")
-    if user_id is None:
+async def get_websocket_user(
+    websocket: WebSocket, token: str, db: Session
+) -> User | None:
+    """Validate an access token and close unauthenticated sockets safely."""
+    try:
+        payload = auth.decode_token(token)
+        subject = payload.get("sub")
+        if subject is None:
+            raise ValueError("Token subject missing")
+        user_id = int(subject)
+    except Exception:
+        await websocket.close(code=4001, reason="Invalid token")
         return None
-    return (
+
+    user = (
         db.query(User)
-        .filter(User.id == int(user_id), User.is_active.is_(True))
+        .filter(User.id == user_id, User.is_active.is_(True))
         .first()
     )
+    if not user:
+        await websocket.close(code=4001, reason="Invalid or inactive user")
+        return None
+    return user
 
 
 @router.websocket("/{client_id}")
@@ -70,26 +83,25 @@ async def websocket_endpoint(
     await websocket.accept()
     try:
         auth_message = await asyncio.wait_for(websocket.receive_json(), timeout=5)
-        if (
-            not isinstance(auth_message, dict)
-            or auth_message.get("type") != "authenticate"
-            or not isinstance(auth_message.get("token"), str)
-        ):
-            await websocket.close(code=4401, reason="Authentication required")
-            return
-        user = _authenticated_user(auth_message["token"], db)
-        if not user:
-            await websocket.close(code=4401, reason="Invalid or inactive user")
-            return
     except TimeoutError:
         await websocket.close(code=4408, reason="Authentication timeout")
         return
     except Exception:
-        await websocket.close(code=4401, reason="Invalid authentication")
+        await websocket.close(code=4401, reason="Authentication required")
         return
 
-    # The path client_id is intentionally ignored; authorization is bound to
-    # the authenticated principal and no client can select another user's ID.
+    if (
+        not isinstance(auth_message, dict)
+        or auth_message.get("type") != "authenticate"
+        or not isinstance(auth_message.get("token"), str)
+    ):
+        await websocket.close(code=4401, reason="Authentication required")
+        return
+
+    user = await get_websocket_user(websocket, auth_message["token"], db)
+    if not user:
+        return
+
     authenticated_id = str(user.id)
     await manager.connect(websocket, authenticated_id)
     try:
@@ -118,8 +130,6 @@ async def websocket_endpoint(
                     json.dumps({"type": "subscribed", "channel": channel}), websocket
                 )
             else:
-                # A user may only publish to their own channel. Global broadcast
-                # is reserved for the authenticated HTTP endpoint below.
                 await manager.broadcast(
                     json.dumps(
                         {"type": "message", "data": message, "from": authenticated_id}
