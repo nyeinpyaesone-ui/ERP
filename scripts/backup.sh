@@ -26,7 +26,7 @@ esac
 
 # An explicit override is permitted for controlled automation, but it must
 # still identify a real file. Without it, never fall back across environments.
-ENV_FILE="${ERP_ENV_FILE:-${ERP_DIR}/.env.${ENVIRONMENT}}"
+ENV_FILE="${ERP_DIR}/.env.${ENVIRONMENT}"
 if [ ! -f "${ENV_FILE}" ]; then
     echo "Error: ${ENVIRONMENT} environment file not found: ${ENV_FILE}" >&2
     exit 1
@@ -63,8 +63,8 @@ read_env_value() {
     ' "${file}"
 }
 
-DB_USER="${DB_USER:-$(read_env_value DB_USER "${ENV_FILE}")}"
-DB_NAME="${DB_NAME:-$(read_env_value DB_NAME "${ENV_FILE}")}"
+DB_USER="$(read_env_value DB_USER "${ENV_FILE}")"
+DB_NAME="$(read_env_value DB_NAME "${ENV_FILE}")"
 DB_USER="${DB_USER:-erp}"
 DB_NAME="${DB_NAME:-erp_solution}"
 
