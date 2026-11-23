@@ -2,43 +2,61 @@
 ###############################################################################
 # ERP SOLUTION — backend image
 #
-# Multi-arch: python:3.11-slim is a manifest list covering linux/amd64 and
-# linux/arm64 (and ppc64le/s390x), so this Dockerfile builds natively on both
-# without any architecture-specific layer. Build for several platforms with:
-#   docker buildx build --platform linux/amd64,linux/arm64 --push ...
-# or locally via ./docker-build.sh --platform=linux/amd64,linux/arm64 --push
-#
-# Builder note: `pip install --prefix=/install` (not --user) is used because
-# the --user site lives under /root/.local in the builder; copying it into a
-# non-root home made the interpreter skip it unless PYTHONNOUSERSITE happened
-# to be unset. The prefix has no such dependency.
+# Alpine runtime keeps the production image minimal. The builder contains the
+# compiler and PostgreSQL headers; only runtime libraries are copied/installed
+# in the final stage. The same Python/Alpine release is used in both stages.
 ###############################################################################
 
-# Build stage
-FROM python:3.11-slim AS builder
+FROM python:3.11.18-alpine3.24 AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libc6-dev \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk update \
+    && apk upgrade --no-cache \
+    && apk add --no-cache --virtual .build-deps \
+        build-base \
+        linux-headers \
+        postgresql-dev \
+        freetype-dev \
+        libpng-dev \
+        jpeg-dev \
+        pkgconf \
+    && rm -rf /var/cache/apk/*
 
-# Pip's wheel cache resolves manylinux wheels per-interpreter; installing into
-# an isolated prefix keeps the runtime stage free of build tooling.
+# Keep packaging tools at versions containing the fixes reported by Trivy.
+RUN python -m pip install --no-cache-dir --upgrade \
+    "pip>=26.2.0" \
+    "setuptools>=83.0.0" \
+    "wheel>=0.46.2"
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN python -m pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Runtime stage: keep compilers and development headers out of production.
-FROM python:3.11-slim AS runtime
+FROM python:3.11.18-alpine3.24 AS runtime
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 postgresql-client redis-tools curl wget ca-certificates bash \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home --shell /bin/bash app
+# Do not install postgresql-client, redis-tools, curl, or wget. The entrypoint
+# uses the Python database/Redis clients and Compose healthchecks use urllib.
+RUN apk update \
+    && apk upgrade --no-cache \
+    && apk add --no-cache \
+        bash \
+        ca-certificates \
+        freetype \
+        libjpeg-turbo \
+        libpng \
+        libpq \
+        libstdc++ \
+    && addgroup -S app \
+    && adduser -S -G app -h /home/app -s /bin/bash app \
+    && rm -rf /var/cache/apk/*
+
+# The runtime image contains no stale packaging tools from the base image.
+RUN python -m pip install --no-cache-dir --upgrade \
+    "pip>=26.2.0" \
+    "setuptools>=83.0.0" \
+    "wheel>=0.46.2"
 
 COPY --from=builder /install /usr/local
 COPY --chown=app:app . .
@@ -49,9 +67,9 @@ RUN chmod +x /app/entrypoint.sh \
 
 USER app
 
-# With --prefix=/install the console scripts land in /usr/local/bin, already
-# on PATH; PYTHONPATH only points at the application code.
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
