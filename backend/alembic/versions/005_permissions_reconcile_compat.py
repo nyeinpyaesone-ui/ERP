@@ -9,10 +9,9 @@ historical revision 005 may have represented either of the colliding files.
 
 from collections.abc import Sequence
 
+from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert
-
-from alembic import op
 
 from app.permissions_catalogue import ALL_PERMISSIONS
 
