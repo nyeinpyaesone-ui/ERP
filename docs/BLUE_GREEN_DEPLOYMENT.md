@@ -18,13 +18,13 @@ This guide covers zero-downtime production deployments using the `deploy-blue-gr
               ┌───────────────┴───────────────┐
               ▼                               ▼
     ┌─────────────────────┐         ┌─────────────────────┐
-    │    BLUE ENVIRONMENT │         │   GREEN ENVIRONMENT │
+    │       BLUE COLOR    │         │      GREEN COLOR    │
     │  (Currently Active) │         │  (Inactive/Next)    │
     │                     │         │                     │
     │ erp-blue-backend    │         │ erp-green-backend   │
     │ erp-blue-frontend   │         │ erp-green-frontend  │
     │                     │         │                     │
-    │ Each host has its own PostgreSQL, Redis, Ollama, Nginx │
+    │ Host-local PostgreSQL / Redis / Ollama / Nginx         │
     └─────────────────────┘         └─────────────────────┘
 ```
 
