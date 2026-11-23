@@ -10,7 +10,7 @@ This guide covers backup procedures, scheduling, and disaster recovery for ERP S
 |-----------|--------|-----------|-----------|
 | PostgreSQL | `pg_dump` (custom format) | Daily (2 AM) | 30 days |
 | Redis | RDB snapshot + AOF | Daily | 7 days |
-| Application Config | File copy (`.env.production`) | On change | Indefinite |
+| Runtime secrets | External secret manager / host-local protected files (never included in archives) | On change | Per secret-manager policy |
 | User Uploads | Volume snapshot / rsync | Daily | 30 days |
 | SSL Certificates | File copy | On renewal | Indefinite |
 
@@ -137,11 +137,11 @@ docker cp erp-redis:/data/dump.rdb ./redis_backup_$(date +%Y%m%d).rdb
 ```
 
 ### Configuration Backup
-```bash
-# Backup .env.production
-cp /opt/erp-solution/.env.production /opt/erp-solution/backups/env.production.$(date +%Y%m%d)
 
-# Backup nginx configs
+Runtime environment files (`.env.staging` and `.env.production`) contain credentials and are deliberately excluded from backup archives. Keep them on their respective hosts with mode `0600`, or restore them from the approved secret manager. Never copy production secrets into staging or place runtime env files in source-code/database backup bundles.
+
+Back up non-secret Nginx configuration separately:
+```bash
 tar -czf nginx_configs_$(date +%Y%m%d).tar.gz /opt/erp-solution/ERP/nginx/
 ```
 
