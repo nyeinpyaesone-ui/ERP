@@ -437,7 +437,6 @@ def test_stripe_payment_cannot_exceed_invoice_balance(
     db.close.assert_called_once_with()
 
 
-
 def test_create_payment_intent_uses_stable_idempotency_key(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
