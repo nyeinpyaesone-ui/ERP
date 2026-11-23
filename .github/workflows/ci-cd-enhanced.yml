@@ -1,13 +1,17 @@
 # Archived CI/CD workflow
-
-This workflow is retained for history and manual reference only.
-
-The repository's active CI/CD implementation is:
-- `.github/workflows/ci.yml` for tests, quality checks, builds, security scans, and approved deployments.
-- `.github/workflows/codeql.yml` for CodeQL analysis.
-
-The former workflow referenced unpinned actions, obsolete root-level frontend paths, non-blocking test commands, and placeholder deployment steps. It is intentionally no longer triggered by push, pull request, or schedule events.
-
+#
+# This workflow is retained for history and manual reference only.
+#
+# The repository's active CI/CD implementation is:
+# - .github/workflows/ci.yml for tests, quality checks, builds, security scans,
+#   and approved deployments.
+# - .github/workflows/codeql.yml for CodeQL analysis.
+#
+# The former workflow referenced unpinned actions, obsolete frontend paths,
+# non-blocking tests, and placeholder deployment steps. It is intentionally
+# not triggered by push, pull request, or schedule events.
+#
+name: Archived CI/CD
 on:
   workflow_dispatch:
 
