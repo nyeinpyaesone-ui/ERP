@@ -193,3 +193,22 @@ def test_production_interception_requires_durable_absolute_storage(events_path, 
 
     monkeypatch.setenv("JEV_INTERCEPT_EVENTS_FILE", "events.jsonl")
     assert service.enabled() is False
+
+def test_middleware_redacts_sensitive_query_parameters(events_path) -> None:
+    app = FastAPI()
+    app.add_middleware(service.InterceptMiddleware)
+
+    @app.get("/private")
+    async def private():
+        return {"ok": True}
+
+    with TestClient(app) as test_client:
+        response = test_client.get(
+            "/private?access_token=secret-value&filter=active&api_key=key-value"
+        )
+        assert response.status_code == 200
+
+    record = json.loads(events_path.read_text(encoding="utf-8").splitlines()[0])
+    assert record["query_string"] == "access_token=%2A%2A%2A&filter=active&api_key=%2A%2A%2A"
+    assert "secret-value" not in events_path.read_text(encoding="utf-8")
+    assert "key-value" not in events_path.read_text(encoding="utf-8")
