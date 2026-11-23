@@ -21,7 +21,10 @@ def test_alembic_revision_graph_is_unique_and_has_one_head() -> None:
 def test_inventory_payment_migration_preserves_settings_and_added_data() -> None:
     backend_dir = Path(__file__).resolve().parents[3]
     migration_path = (
-        backend_dir / "alembic" / "versions" / "006_inventory_payment_setting_columns.py"
+        backend_dir
+        / "alembic"
+        / "versions"
+        / "006_inventory_payment_setting_columns.py"
     )
     source = migration_path.read_text(encoding="utf-8")
 
