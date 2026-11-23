@@ -3,11 +3,12 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+import stripe
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-import stripe
 
 from app.auth import get_current_user
 from app.config import settings
