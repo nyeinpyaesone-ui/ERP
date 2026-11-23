@@ -384,7 +384,7 @@ def test_invalid_stripe_payment_is_not_recorded(
 ) -> None:
     monkeypatch.setattr(payments, "SessionLocal", Mock(return_value=db))
     invoice = SimpleNamespace(id=7, total=100, amount_paid=75, status="partial")
-    db.query.return_value.first.side_effect = [None, invoice]
+    db.query.return_value.first.side_effect = [None, invoice, None]
     intent = {
         "id": "pi_invalid",
         "metadata": {"invoice_id": "7"},
@@ -413,7 +413,7 @@ def test_stripe_payment_cannot_exceed_invoice_balance(
 ) -> None:
     monkeypatch.setattr(payments, "SessionLocal", Mock(return_value=db))
     invoice = SimpleNamespace(id=7, total=100, amount_paid=75, status="partial")
-    db.query.return_value.first.side_effect = [None, invoice]
+    db.query.return_value.first.side_effect = [None, invoice, None]
     event = {
         "id": "evt_overpayment",
         "type": "payment_intent.succeeded",
