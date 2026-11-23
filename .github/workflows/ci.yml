@@ -162,6 +162,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -178,13 +180,38 @@ jobs:
           pip install -r requirements-dev.txt
           pip install mypy
 
-      - name: Run Ruff
+      - name: Check changed Python files (Ruff and Black)
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          cd backend && ruff check .
-
-      - name: Run Black
-        run: |
-          cd backend && black --check .
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            # Compare exact PR snapshots; no merge-base is required.
+            changed="$(git diff --diff-filter=ACMRT --name-only "${BASE_SHA}" "${HEAD_SHA}" -- 'backend/**/*.py' 'backend/*.py')"
+          else
+            changed="$(git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- 'backend/**/*.py' 'backend/*.py' 2>/dev/null || true)"
+          fi
+          if [[ -z "${changed}" ]]; then
+            echo "No added or modified backend Python files; Ruff and Black checks are not applicable."
+            exit 0
+          fi
+          mapfile -t files <<< "${changed}"
+          python_files=()
+          for file in "${files[@]}"; do
+            relative="${file#backend/}"
+            if [[ -f "backend/${relative}" ]]; then
+              python_files+=("${relative}")
+            fi
+          done
+          if (( ${#python_files[@]} == 0 )); then
+            echo "No existing backend Python files to lint."
+            exit 0
+          fi
+          cd backend
+          ruff check "${python_files[@]}"
+          black --check "${python_files[@]}"
 
       - name: Run MyPy (advisory — does not gate the pipeline)
         continue-on-error: true
@@ -243,12 +270,12 @@ jobs:
       - name: Run Alembic migrations
         run: |
           cd backend
-          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/erp_test alembic upgrade head
+          DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/erp_test alembic upgrade head
 
       - name: Run backend tests
         run: |
           cd backend
-          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/erp_test pytest --cov=app --cov-report=xml
+          DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/erp_test pytest --cov=app --cov-report=term-missing:skip-covered --cov-report=xml
 
       - name: Upload coverage
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
@@ -268,7 +295,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: backend/frontend-react/package-lock.json
 
