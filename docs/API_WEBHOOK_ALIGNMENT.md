@@ -1,6 +1,6 @@
 # API, Webhook, and Frontend Contract Alignment
 
-Status: repository CI verified on 2026-11-23 (CI run #507); restored-staging validation and deployment remain pending.
+Status: repository CI verified on 2026-11-23 (CI run #508); restored-staging validation and deployment remain pending.
 
 ## Canonical source
 
@@ -22,7 +22,7 @@ The FastAPI router registry in `backend/app/main.py` is authoritative. Generate 
 - `AuthContext.jsx` exports `useAuth()`; this is the current auth hook.
 - Login uses OAuth2 form fields `username` and `password`.
 
-Render frontend configuration must use `VITE_API_URL`, not `VITE_API_BASE_URL`. The backend CORS allowlist must include the exact staging frontend origin.
+The staging frontend build must use `VITE_API_URL`; the backend `CORS_ORIGINS` allowlist must include the exact staging frontend origin. These values belong only in the isolated staging environment.
 
 ## Webhook endpoint contract
 
@@ -77,7 +77,7 @@ Jev capture remains disabled unless `JEV_INTERCEPT=1`. In production, it also re
 - `JEV_INTERCEPT_DURABLE=1`
 - an absolute `JEV_INTERCEPT_EVENTS_FILE` path on an operator-provisioned persistent volume.
 
-The durable flag is an operator assertion, not an automatic proof that a disk is mounted. Keep Jev interception disabled in Render staging until a persistent disk, access controls, retention, redaction, and backup policy are explicitly configured.
+The durable flag is an operator assertion, not an automatic proof that a disk is mounted. Keep Jev interception disabled in staging until persistent storage, access controls, retention, redaction, and backup policy are explicitly configured.
 
 ## Alembic history repair
 
@@ -107,18 +107,23 @@ The archived workflow had unpinned actions, stale frontend paths, non-blocking c
 
 ## Verification gates
 
-- [x] GitHub Actions passes backend tests, migration graph and legacy PostgreSQL migration tests, frontend lint/tests/build, Gitleaks, both image builds, and the blocking Trivy vulnerability gate (run #507).
+- [x] GitHub Actions passes backend tests, migration graph and legacy PostgreSQL migration tests, frontend lint/tests/build, Gitleaks, both image builds, and the blocking Trivy vulnerability gate (run #508).
 - [ ] OpenAPI route inventory is regenerated and compared to `docs/API_SUMMARY.md`.
 - [ ] Webhook response schema is confirmed not to expose secrets.
 - [ ] URL allowlist, private DNS rejection, redirects, and delivery error cases are tested.
 - [ ] Stripe duplicate event and same-PaymentIntent duplicate tests pass against PostgreSQL.
 - [ ] WebSocket valid/invalid first-frame authentication tests pass; production connections use `wss://`.
 - [ ] Jev production storage gate tests pass; Jev remains off in staging until durable storage is provisioned.
-- [ ] Restore a backup to an isolated staging database and run `alembic upgrade head`.
-- [ ] Configure Render frontend `VITE_API_URL` and backend `CORS_ORIGINS`.
+- [ ] Restore a verified backup to an isolated staging database and run `alembic upgrade head` twice; validate representative tenant and business records.
+- [ ] Configure staging frontend `VITE_API_URL` and backend `CORS_ORIGINS` on the dedicated staging host.
 - [ ] Configure `WEBHOOK_ALLOWED_HOSTS` only with approved destinations; leave blank to disable outbound webhook creation/delivery.
-- [ ] Deploy only to a separate staging database; do not import or mutate production ERP data.
+- [x] `scripts/backup.sh` selects only `.env.staging` or `.env.production`, passes it to Compose with `--env-file`, and fails closed when the selected environment or database is unavailable.
+- [ ] Deploy only to the dedicated staging host and staging database; do not import or mutate production ERP data. The current CI staging job accepts manual dispatches from `main` only, so this PR branch is not deployable through that job until an approved staging release path is established.
+
+## Backup isolation
+
+The backup script no longer sources an environment file as shell or copies runtime env files into the backup. It uses the exact selected `.env.<environment>` file, the matching `<environment>-blue` Compose project, and the database name/user from that file. It fails before producing a backup if the selected env file, Compose file, or PostgreSQL service is unavailable. A CI regression test verifies that ambient production DB variables cannot override staging settings and that a missing staging file never falls back to production.
 
 ## Cross-platform source-of-truth note
 
-The separate GitLab project `nyeinpyaesone-ui/erp` has not been verified as a synchronized mirror of this GitHub repository. Do not reuse its Render Blueprint without reconciling repository identity, root directories, environment names, build commands, and commit lineage.
+The separate GitLab project `nyeinpyaesone-ui/erp` is a distinct fork/project and is not established as a synchronized mirror of this GitHub repository. Do not reuse its deployment configuration without reconciling repository identity, root directories, environment names, build commands, and commit lineage.
