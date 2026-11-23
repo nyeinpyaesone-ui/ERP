@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -149,7 +150,7 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid signature") from err
 
     try:
-        result = await __import__("asyncio").to_thread(_process_stripe_event, event)
+        result = await asyncio.to_thread(_process_stripe_event, event)
     except (KeyError, TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail="Invalid Stripe event payload") from exc
 
