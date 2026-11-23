@@ -42,7 +42,9 @@ async def test_socket_rejects_missing_or_disabled_user(
     db.query.return_value.first.return_value = user
     socket = AsyncMock()
     assert await websocket.get_websocket_user(socket, "token", db) is None
-    socket.close.assert_awaited_once_with(code=4001, reason="Invalid or inactive user")
+    socket.close.assert_awaited_once_with(
+        code=4001, reason="Invalid or inactive user"
+    )
 
 
 async def test_socket_resolves_active_user(
@@ -55,21 +57,28 @@ async def test_socket_resolves_active_user(
     socket.close.assert_not_awaited()
 
 
-@pytest.mark.parametrize("last_message", [WebSocketDisconnect(), "invalid-json"])
-async def test_endpoint_uses_authenticated_identity_and_cleans_up(
+async def test_endpoint_uses_first_frame_auth_and_authenticated_identity(
     db: Mock,
     actor: SimpleNamespace,
     monkeypatch: pytest.MonkeyPatch,
-    last_message,
 ) -> None:
     monkeypatch.setattr(websocket, "get_websocket_user", AsyncMock(return_value=actor))
-    manager = Mock(connect=AsyncMock(), broadcast=AsyncMock())
+    manager = Mock(
+        connect=AsyncMock(),
+        broadcast=AsyncMock(),
+        disconnect=Mock(),
+    )
     monkeypatch.setattr(websocket, "manager", manager)
     socket = AsyncMock()
-    socket.receive_text.side_effect = [json.dumps({"text": "hello"}), last_message]
+    socket.receive_json.side_effect = [
+        {"type": "authenticate", "token": "access-token"},
+        {"text": "hello"},
+        WebSocketDisconnect(),
+    ]
 
-    await websocket.websocket_endpoint(socket, "spoofed-user-id", "token", db)
+    await websocket.websocket_endpoint(socket, "spoofed-user-id", db)
 
+    socket.accept.assert_awaited_once_with()
     manager.connect.assert_awaited_once_with(socket, "42")
     message, channel = manager.broadcast.await_args.args
     assert json.loads(message) == {
@@ -81,13 +90,34 @@ async def test_endpoint_uses_authenticated_identity_and_cleans_up(
     manager.disconnect.assert_called_once_with(socket, "42")
 
 
-async def test_endpoint_never_accepts_unauthenticated_socket(
+async def test_endpoint_never_registers_unauthenticated_socket(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(websocket, "get_websocket_user", AsyncMock(return_value=None))
     manager = Mock(connect=AsyncMock())
     monkeypatch.setattr(websocket, "manager", manager)
-    await websocket.websocket_endpoint(AsyncMock(), "spoofed", "token", db)
+    socket = AsyncMock()
+    socket.receive_json.return_value = {"type": "authenticate", "token": "bad"}
+
+    await websocket.websocket_endpoint(socket, "spoofed", db)
+
+    socket.accept.assert_awaited_once_with()
+    manager.connect.assert_not_awaited()
+
+
+async def test_endpoint_rejects_wrong_first_frame(
+    db: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = Mock(connect=AsyncMock())
+    monkeypatch.setattr(websocket, "manager", manager)
+    socket = AsyncMock()
+    socket.receive_json.return_value = {"type": "ping"}
+
+    await websocket.websocket_endpoint(socket, "spoofed", db)
+
+    socket.close.assert_awaited_once_with(
+        code=4401, reason="Authentication required"
+    )
     manager.connect.assert_not_awaited()
 
 
