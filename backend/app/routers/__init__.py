@@ -12,7 +12,6 @@ from app.routers import (
     hr,
     integrations,
     inventory,
-    jev_intercept,
     llm,
     payments,
     permissions,
@@ -42,5 +41,4 @@ __all__ = [
     "search",
     "permissions",
     "llm",
-    "jev_intercept",
 ]

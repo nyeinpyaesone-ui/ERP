@@ -4,7 +4,7 @@ Durable cross-session state. Companion to [`AGENTS.md`](../AGENTS.md)
 (AGENTS.md = **how the repo works**; this file = **what is true right now**).
 Append-only ledger; never store secrets (env var *names* only).
 
-**Last verified:** 2026-11-01 (session: Jev-Intercept repo-native — 295 passed, 58.96%, guard OK)
+**Last verified:** 2026-10-15 (session: T-009 majors to audit 0, gitleaks PR-scan fix, image hygiene — see §3)
 
 ---
 
@@ -304,31 +304,6 @@ Append-only ledger; never store secrets (env var *names* only).
   repo held zero commits. Likely the same qwen-chat task bot that opened junk
   PR #135 (see T-019).
 
-- **Done (2026-11-01 Jev-Intercept repo-native):** quarantined the previous
-  broken backend patch (`/tmp/opencode/quarantine/jev-intercept/jev_intercept.py`:
-  wrong import path, double `/api/jev` prefix, no permission guard) and
-  re-implemented it repo-native: `backend/app/services/jev_intercept.py`
-  (single implementation) + `backend/app/routers/jev_intercept.py` (no prefix,
-  mounted once at `/api/v1/jev`), resource `jev_intercept` in
-  `permissions_catalogue.py`, `jev_intercept` added to `CATALOGUE_ENFORCED` in
-  `test_permission_consistency.py`, and `/api/v1/jev/intercept/status` added to
-  the double-prefix regression test in `test_app_wiring.py`. Router count
-  20→21 in AGENTS.md and `@erp-backend`. Frontend plugin rewritten as a
-  dev-only runtime-hook injector (no source rewriting; `fetch`/XHR capture
-  with credential masking, manual `window.__jevRecord`). All hardcoded
-  `/home/admin/...` paths removed via `scripts/_paths.py` (env overrides
-  `JEV_ERP_REPO_ROOT`, `JEV_SKILLS_ROOT`, `JEV_JEV_DEVOPS_SCRIPT`). Request
-  bodies captured lazily (no buffering/replay); structural JSON redaction +
-  form-encoded masking; `_safe_write` so interception can never break a
-  request; `print()` replaced with `logging`. Collector is inert unless
-  `JEV_INTERCEPT=1` (404 otherwise). **Verified:** 295 passed (285 baseline +
-  10 new), ruff + black clean (70 files), coverage 58.85% ≥ 58, alembic
-  001→008 offline, `make guard` OK (297 tracked files), `node --check` +
-  runtime-hook smoke (fetch + XHR capture, credential masking) green, OpenAPI
-  102 paths with exactly `/api/v1/jev/intercept` and `/api/v1/jev/intercept/status`.
-  `docs/API_SUMMARY.md` regenerated (102 paths, auth 5→7, new Jev section).
-  **Not committed/pushed** (HEAD stays at `9f79efe2`; push requires approval).
-
 ## 4. Open threads
 
 | ID | Thread | Next action |
@@ -410,14 +385,6 @@ Append-only ledger; never store secrets (env var *names* only).
 | **CI run 38602493260 + CodeQL (main, `7d23e367`)** | ✅ both **success** — node:24-alpine + pip/setuptools/wheel image hygiene, full pipeline green | 2026-10-15 |
 | gitleaks PR-context proof (fresh `pull_request` run 38602759242, Dependabot docker PR) | ✅ Secret Scan **success** — rerunning PR #136's old run failed (reruns reuse the original workflow snapshot); the fresh PR event is the real proof | 2026-10-15 |
 | code-scanning (Trivy) open alerts | ⚠️ ~100 of container/base-image class — hygiene started (`7d23e367`), re-measure after next SARIF uploads; exit-code gating = pending policy call (T-008) | 2026-10-15 |
-| `pytest` (backend) post Jev-Intercept | ✅ **295 passed**, 6 warnings, ruff + black clean (70 files) | 2026-11-01 |
-| `coverage run -m pytest` post Jev-Intercept | ✅ **58.85%** ≥ 58 floor | 2026-11-01 |
-| `alembic upgrade head --sql` (offline) post Jev-Intercept | ✅ emits through `008` (no migration needed; catalogue is idempotent-seeded) | 2026-11-01 |
-| `make guard` post Jev-Intercept | ✅ OK — 297 tracked files, no nested `.git` | 2026-11-01 |
-| OpenAPI post Jev-Intercept | ✅ 102 paths; exactly `/api/v1/jev/intercept` + `/api/v1/jev/intercept/status` (no double prefix) | 2026-11-01 |
-| `node --check` + runtime-hook smoke (frontend plugin) | ✅ fetch + XHR capture, credential query-param masking, manual `__jevRecord` | 2026-11-01 |
-| `jev_judge.py` on synthetic events | ✅ simulation envelope (`mode: agent_simulation`, `jev_called: false`, `needs_review: true`); `pii_leak=true`, `perf_regression=2` | 2026-11-01 |
-| `detect.py` / `detect_optimized.py` | ✅ route to `jev-triage` / `jev-code-review` via jev-devops auto router; no hardcoded paths | 2026-11-01 |
 
 > Rule: mark ⬜/⏳ honestly. Never upgrade a claim to ✅ without tool output.
 
@@ -440,31 +407,3 @@ Append-only ledger; never store secrets (env var *names* only).
 3. Any statement older than the last merge to `main` → re-verify before acting.
 4. On forgetting a decision: check §2 first; if absent, it was never a decision.
 5. Session end: append to §3, update §5 with actual results, add drift to §4.
-
-
----
-
-## 8. Verified deployment configuration update — 2026-11-08
-
-This entry supersedes the older GitHub secret/variable rows in §1 and the
-first-deploy instructions in the 2026-11-01 snapshot. Keep earlier ledger
-entries for historical context; do not treat them as current.
-
-| Fact | Verified value | Evidence |
-|---|---|---|
-| PR #154 | Merged to main at 972f558e79818441fe524eba8d8d58bcdad14eff on 2026-11-08 | GitHub PR metadata |
-| Main CI after PR #154 | Run 42465025608 completed successfully | GitHub Actions run |
-| Docker Hub push tokens | DOCKER_PAT_BACKEND and DOCKER_PAT_FRONTEND were present (masked in runner environment) | Deploy Configuration job 128682408031 |
-| Docker Hub namespace variable | DOCKER_USER was empty in the same runner environment; image publishing therefore remained disabled | Job 128682408031 runner environment |
-| SSH deploy config | Staging and production SSH keys, pinned known_hosts, host and user values were empty in the same run | Job 128682408031 runner environment |
-| Actual deployment | No staging or production deployment occurred; both deploy jobs were skipped | Main CI run 42465025608 |
-| Follow-up | PR #155, branch ops/configuration-bootstrap-and-deploy-hardening, adds an interactive repository config bootstrapper, separate staging env template, explicit Docker namespace validation, and CI checks | PR #155 |
-| Runtime boundary | Compose blue-green is the active CI/CD path. Kubernetes manifests reference different GHCR images and are not wired to CI | infra/k8s/README-Kubernetes.md and CI workflow |
-
-The PR #155 bootstrapper deliberately does not fabricate infrastructure values
-or deploy. It prompts for real staging/production hosts, domains, users,
-dedicated SSH keys, and pinned known_hosts files. Existing Docker Hub token
-secrets are preserved by default and can be explicitly replaced from files.
-Do not mark this setup complete until the bootstrapper is run and its output
-and GitHub settings are verified. Do not merge/deploy based on this ledger
-entry alone; check the latest PR checks and environment state.

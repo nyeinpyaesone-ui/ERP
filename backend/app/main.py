@@ -21,7 +21,6 @@ from app.routers import (
     hr,
     integrations,
     inventory,
-    jev_intercept,
     llm,
     payments,
     permissions,
@@ -53,7 +52,6 @@ ROUTER_MOUNTS: tuple[tuple[object, str, list[str]], ...] = (
     (search.router, "/api/v1/search", ["Search"]),
     (permissions.router, "/api/v1/permissions", ["Permissions"]),
     (llm.router, "/api/v1/llm", ["LLM"]),
-    (jev_intercept.router, "/api/v1/jev", ["Jev-Intercept"]),
     (health.router, "/api/v1", ["Health"]),
     (health_root.router, "", ["Health"]),
 )
@@ -103,11 +101,6 @@ def create_app(
 
     for router, prefix, tags in mounts if mounts is not None else ROUTER_MOUNTS:
         app.include_router(router, prefix=prefix, tags=tags)
-
-    # Opt-in runtime interception; a no-op unless JEV_INTERCEPT=1.
-    from app.services.jev_intercept import install_interceptor
-
-    install_interceptor(app)
 
     os.makedirs("static", exist_ok=True)
     app.mount("/static", StaticFiles(directory="static"), name="static")
