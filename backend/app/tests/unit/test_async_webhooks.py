@@ -5,7 +5,6 @@ from unittest.mock import Mock
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy.exc import IntegrityError
 
 from app.models_stripe import StripeWebhookEvent
 from app.routers import integrations, payments
