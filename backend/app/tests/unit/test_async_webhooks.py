@@ -12,6 +12,7 @@ from app.routers import integrations, payments
 
 pytestmark = pytest.mark.unit
 
+
 @pytest.mark.parametrize(
     "status,expected",
     [
@@ -73,6 +74,7 @@ def test_webhook_delivery_uses_allowlist_and_records_result(
     assert db.commit.call_count == 2
     assert webhook.last_triggered is not None
 
+
 def test_webhook_destination_rejects_private_and_non_allowlisted_hosts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -86,6 +88,7 @@ def test_webhook_destination_rejects_private_and_non_allowlisted_hosts(
     with pytest.raises(HTTPException) as error:
         integrations._validate_webhook_url("https://other.example.com/hook")
     assert error.value.status_code == 422
+
 
 def test_webhook_destination_rejects_private_dns_resolution(
     monkeypatch: pytest.MonkeyPatch,
@@ -104,6 +107,7 @@ def test_webhook_destination_rejects_private_dns_resolution(
         )
     assert error.value.status_code == 422
 
+
 def test_webhook_public_response_never_serializes_secret() -> None:
     webhook = SimpleNamespace(
         id=1,
@@ -120,6 +124,7 @@ def test_webhook_public_response_never_serializes_secret() -> None:
     response = integrations.WebhookPublic.model_validate(webhook)
     assert "secret" not in response.model_dump()
 
+
 def test_disable_webhook_preserves_record_and_history(
     db: Mock, actor: SimpleNamespace
 ) -> None:
@@ -133,6 +138,7 @@ def test_disable_webhook_preserves_record_and_history(
     db.delete.assert_not_called()
     db.commit.assert_called_once_with()
 
+
 def test_unknown_webhook_returns_404_on_disable(
     db: Mock, actor: SimpleNamespace
 ) -> None:
@@ -140,6 +146,7 @@ def test_unknown_webhook_returns_404_on_disable(
     with pytest.raises(HTTPException) as error:
         integrations.disable_webhook(999, db, actor)
     assert error.value.status_code == 404
+
 
 def test_stripe_webhook_processing_is_idempotent(
     db: Mock, monkeypatch: pytest.MonkeyPatch
@@ -179,6 +186,7 @@ def test_stripe_webhook_processing_is_idempotent(
     db.commit.assert_called_once_with()
     db.close.assert_called_once_with()
 
+
 def test_duplicate_stripe_event_has_no_side_effects(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -196,6 +204,7 @@ def test_duplicate_stripe_event_has_no_side_effects(
     db.add.assert_not_called()
     db.commit.assert_not_called()
     db.close.assert_called_once_with()
+
 
 def test_distinct_stripe_events_for_same_intent_do_not_double_pay(
     db: Mock, monkeypatch: pytest.MonkeyPatch
@@ -222,6 +231,7 @@ def test_distinct_stripe_events_for_same_intent_do_not_double_pay(
     assert invoice.amount_paid == 25
     db.commit.assert_called_once_with()
 
+
 @pytest.mark.parametrize(
     "url",
     [
@@ -239,6 +249,7 @@ def test_webhook_destination_rejects_unsafe_url_forms(
     )
     with pytest.raises(HTTPException):
         integrations._validate_webhook_url(url)
+
 
 def test_webhook_request_error_is_recorded_without_url_details(
     db: Mock,
@@ -276,6 +287,7 @@ def test_webhook_request_error_is_recorded_without_url_details(
     assert delivery.response_body == "Request failed: ConnectError"
     assert "private-path" not in delivery.response_body
 
+
 def test_non_payment_stripe_event_is_recorded_once(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -296,6 +308,7 @@ def test_non_payment_stripe_event_is_recorded_once(
     assert event.event_id == "evt_customer_updated"
     db.commit.assert_called_once_with()
 
+
 def test_webhook_delivery_rejects_disabled_webhook(
     db: Mock, actor: SimpleNamespace
 ) -> None:
@@ -306,6 +319,7 @@ def test_webhook_delivery_rejects_disabled_webhook(
         integrations.test_webhook(11, db, actor)
     assert error.value.status_code == 409
     db.add.assert_not_called()
+
 
 def test_webhook_dns_resolution_failure_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
@@ -324,12 +338,14 @@ def test_webhook_dns_resolution_failure_is_rejected(
         )
     assert error.value.status_code == 422
 
+
 def test_delivery_history_returns_empty_list_for_existing_webhook(
     db: Mock, actor: SimpleNamespace
 ) -> None:
     db.query.return_value.first.return_value = SimpleNamespace(id=12)
     assert integrations.get_deliveries(12, db, actor) == []
     assert db.query.call_count == 2
+
 
 def test_delivery_history_returns_404_for_unknown_webhook(
     db: Mock, actor: SimpleNamespace
@@ -338,6 +354,7 @@ def test_delivery_history_returns_404_for_unknown_webhook(
     with pytest.raises(HTTPException) as error:
         integrations.get_deliveries(404, db, actor)
     assert error.value.status_code == 404
+
 
 def test_stripe_event_without_id_is_rejected_and_session_closed(
     db: Mock, monkeypatch: pytest.MonkeyPatch
@@ -348,6 +365,7 @@ def test_stripe_event_without_id_is_rejected_and_session_closed(
         payments._process_stripe_event({"type": "customer.updated"})
     session_factory.assert_not_called()
     db.query.assert_not_called()
+
 
 @pytest.mark.parametrize(
     "intent_updates,error_message",
@@ -391,6 +409,7 @@ def test_invalid_stripe_payment_is_not_recorded(
     assert invoice.amount_paid == 75
     db.close.assert_called_once_with()
 
+
 def test_stripe_payment_cannot_exceed_invoice_balance(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -418,6 +437,7 @@ def test_stripe_payment_cannot_exceed_invoice_balance(
     db.commit.assert_not_called()
     assert invoice.amount_paid == 75
     db.close.assert_called_once_with()
+
 
 def test_create_payment_intent_uses_stable_idempotency_key(
     db: Mock, monkeypatch: pytest.MonkeyPatch
