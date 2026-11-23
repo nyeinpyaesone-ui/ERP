@@ -42,9 +42,7 @@ async def test_socket_rejects_missing_or_disabled_user(
     db.query.return_value.first.return_value = user
     socket = AsyncMock()
     assert await websocket.get_websocket_user(socket, "token", db) is None
-    socket.close.assert_awaited_once_with(
-        code=4001, reason="Invalid or inactive user"
-    )
+    socket.close.assert_awaited_once_with(code=4001, reason="Invalid or inactive user")
 
 
 async def test_socket_resolves_active_user(
