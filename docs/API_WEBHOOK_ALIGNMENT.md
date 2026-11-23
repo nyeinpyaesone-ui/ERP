@@ -1,6 +1,6 @@
 # API, Webhook, and Frontend Contract Alignment
 
-Status: implementation fixes committed on this review branch; verification and staging deployment remain pending.
+Status: repository CI verified on 2026-11-23 (CI run #507); restored-staging validation and deployment remain pending.
 
 ## Canonical source
 
@@ -90,7 +90,7 @@ The review branch now:
 - links revision `006` to `005_permissions_reconcile`;
 - keeps the subsequent `007`, `008`, and new `009` chain intact.
 
-The tenancy migration checks for existing tables, columns, indexes, and constraints before adding them; its downgrade is intentionally a no-op to preserve tenant and ERP records. A test asserts unique revision IDs and a single head revision (`009`).
+The tenancy migration checks for existing tables, columns, indexes, and constraints before adding them; its downgrade is intentionally a no-op to preserve tenant and ERP records. Tests assert unique revision IDs and a single head revision (`009`). A PostgreSQL integration regression test also creates disposable schemas for both legacy `005` interpretations, upgrades to head twice, checks permission reconciliation, and confirms an existing synthetic tenant row survives.
 
 Before running this on any existing database, take and verify a backup. The migration is designed to be additive/idempotent, but staging must validate it against a restored copy of the actual schema before production use.
 
@@ -100,13 +100,14 @@ Before running this on any existing database, take and verify a backup. The migr
 - `.github/workflows/codeql.yml`: CodeQL.
 - `.github/workflows/ci-cd-enhanced.yml`: manual-only archive; it is not a competing automatic pipeline.
 - Backend PostgreSQL URLs are normalized to the installed `psycopg2` driver; the frontend CI/Docker build uses Node 22 for the current jsdom/undici runtime.
+- The final backend runtime image removes `pip`, `setuptools`, and `wheel` after copying application dependencies; these build/install tools remain outside the shipped runtime image.
 - Ruff and Black are blocking on changed backend Python files. Full-repository lint debt predates this patch and remains a separate cleanup task.
 
 The archived workflow had unpinned actions, stale frontend paths, non-blocking checks, and placeholder deployment steps.
 
 ## Verification gates
 
-- [ ] GitHub Actions passes backend tests, migration graph test, frontend lint/tests/build, secret scan, and image builds.
+- [x] GitHub Actions passes backend tests, migration graph and legacy PostgreSQL migration tests, frontend lint/tests/build, Gitleaks, both image builds, and the blocking Trivy vulnerability gate (run #507).
 - [ ] OpenAPI route inventory is regenerated and compared to `docs/API_SUMMARY.md`.
 - [ ] Webhook response schema is confirmed not to expose secrets.
 - [ ] URL allowlist, private DNS rejection, redirects, and delivery error cases are tested.
