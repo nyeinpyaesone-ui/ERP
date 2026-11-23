@@ -18,18 +18,14 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     bind = op.get_bind()
-    duplicates = bind.execute(
-        sa.text(
-            """
+    duplicates = bind.execute(sa.text("""
             SELECT stripe_payment_intent_id
             FROM payments
             WHERE stripe_payment_intent_id IS NOT NULL
             GROUP BY stripe_payment_intent_id
             HAVING COUNT(*) > 1
             LIMIT 1
-            """
-        )
-    ).first()
+            """)).first()
     if duplicates:
         raise RuntimeError(
             "Cannot add PaymentIntent uniqueness: duplicate payment intent IDs "
