@@ -90,6 +90,19 @@ def _process_stripe_event(event: Any) -> str:
         db.rollback()
         if db.query(StripeWebhookEvent).filter(StripeWebhookEvent.event_id == event_id).first():
             return "duplicate"
+
+        # A distinct Stripe event can still reference an already-recorded
+        # PaymentIntent. Persist this event ID after the payment transaction
+        # rolls back so Stripe receives a successful idempotent acknowledgement.
+        if event_type == "payment_intent.succeeded":
+            intent = event.get("data", {}).get("object", {})
+            payment_intent_id = str(intent.get("id") or "")
+            if payment_intent_id and db.query(Payment).filter(
+                Payment.stripe_payment_intent_id == payment_intent_id
+            ).first():
+                db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
+                db.commit()
+                return "duplicate"
         raise
     finally:
         db.close()
