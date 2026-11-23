@@ -372,7 +372,10 @@ def test_stripe_event_without_id_is_rejected_and_session_closed(
     "intent_updates,error_message",
     [
         ({"currency": "eur"}, "Unexpected Stripe payment currency"),
-        ({"amount_received": 2600}, "Settled amount does not match PaymentIntent amount"),
+        (
+            {"amount_received": 2600},
+            "Settled amount does not match PaymentIntent amount",
+        ),
         ({"amount_received": 0}, "Invalid Stripe amount received"),
     ],
 )
