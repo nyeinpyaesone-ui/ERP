@@ -7,7 +7,7 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
-from app.models import StripeWebhookEvent
+from app.models_stripe import StripeWebhookEvent
 from app.routers import integrations, payments
 
 pytestmark = pytest.mark.unit
@@ -43,7 +43,8 @@ def test_webhook_delivery_uses_allowlist_and_records_result(
     client.__enter__ = Mock(return_value=client)
     client.__exit__ = Mock(return_value=False)
     client.post.return_value = response
-    monkeypatch.setattr(integrations.httpx, "Client", Mock(return_value=client))
+    client_factory = Mock(return_value=client)
+    monkeypatch.setattr(integrations.httpx, "Client", client_factory)
 
     delivery = integrations.test_webhook(7, db, actor)
 
@@ -56,7 +57,8 @@ def test_webhook_delivery_uses_allowlist_and_records_result(
         b"synthetic-secret", request.kwargs["content"], hashlib.sha256
     ).hexdigest()
     assert request.kwargs["headers"]["X-Webhook-Signature"] == f"sha256={expected_signature}"
-    assert request.kwargs["follow_redirects"] if "follow_redirects" in request.kwargs else True
+    assert client_factory.call_args.kwargs["follow_redirects"] is False
+    assert client_factory.call_args.kwargs["trust_env"] is False
     assert db.add.call_count == 1
     assert db.commit.call_count == 2
     assert webhook.last_triggered is not None
