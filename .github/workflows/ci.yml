@@ -162,6 +162,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -178,13 +180,52 @@ jobs:
           pip install -r requirements-dev.txt
           pip install mypy
 
-      - name: Run Ruff
+      - name: Run Ruff on changed backend files
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          EVENT_BEFORE: ${{ github.event.before }}
         run: |
-          cd backend && ruff check .
+          set -euo pipefail
+          if [ -n "${BASE_REF}" ]; then
+            git fetch origin "${BASE_REF}" --depth=1
+            diff_range="origin/${BASE_REF}...HEAD"
+          elif [ -n "${EVENT_BEFORE}" ] && [ "${EVENT_BEFORE}" != "0000000000000000000000000000000000000000" ]; then
+            diff_range="${EVENT_BEFORE}...HEAD"
+          else
+            diff_range="HEAD^...HEAD"
+          fi
+          mapfile -t changed < <(git diff --name-only "${diff_range}" -- 'backend/*.py' 'backend/**/*.py')
+          if [ "${#changed[@]}" -eq 0 ]; then
+            echo "No changed backend Python files."
+            exit 0
+          fi
+          python_files=()
+          for path in "${changed[@]}"; do python_files+=("${path#backend/}"); done
+          cd backend
+          ruff check "${python_files[@]}"
 
-      - name: Run Black
+      - name: Run Black on changed backend files
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          EVENT_BEFORE: ${{ github.event.before }}
         run: |
-          cd backend && black --check .
+          set -euo pipefail
+          if [ -n "${BASE_REF}" ]; then
+            diff_range="origin/${BASE_REF}...HEAD"
+          elif [ -n "${EVENT_BEFORE}" ] && [ "${EVENT_BEFORE}" != "0000000000000000000000000000000000000000" ]; then
+            diff_range="${EVENT_BEFORE}...HEAD"
+          else
+            diff_range="HEAD^...HEAD"
+          fi
+          mapfile -t changed < <(git diff --name-only "${diff_range}" -- 'backend/*.py' 'backend/**/*.py')
+          if [ "${#changed[@]}" -eq 0 ]; then
+            echo "No changed backend Python files."
+            exit 0
+          fi
+          python_files=()
+          for path in "${changed[@]}"; do python_files+=("${path#backend/}"); done
+          cd backend
+          black --check "${python_files[@]}"
 
       - name: Run MyPy (advisory — does not gate the pipeline)
         continue-on-error: true
