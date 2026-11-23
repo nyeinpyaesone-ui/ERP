@@ -99,6 +99,8 @@ Before running this on any existing database, take and verify a backup. The migr
 - `.github/workflows/ci.yml`: canonical tests, quality checks, image builds, and approved deployment flow.
 - `.github/workflows/codeql.yml`: CodeQL.
 - `.github/workflows/ci-cd-enhanced.yml`: manual-only archive; it is not a competing automatic pipeline.
+- Backend PostgreSQL URLs are normalized to the installed `psycopg2` driver; the frontend CI/Docker build uses Node 22 for the current jsdom/undici runtime.
+- Ruff and Black are blocking on changed backend Python files. Full-repository lint debt predates this patch and remains a separate cleanup task.
 
 The archived workflow had unpinned actions, stale frontend paths, non-blocking checks, and placeholder deployment steps.
 
