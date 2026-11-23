@@ -4,7 +4,6 @@ from decimal import Decimal
 from typing import Any
 
 import stripe
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
