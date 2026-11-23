@@ -35,7 +35,11 @@ def _process_stripe_event(event: Any) -> str:
 
     db: Session = SessionLocal()
     try:
-        if db.query(StripeWebhookEvent).filter(StripeWebhookEvent.event_id == event_id).first():
+        if (
+            db.query(StripeWebhookEvent)
+            .filter(StripeWebhookEvent.event_id == event_id)
+            .first()
+        ):
             return "duplicate"
 
         db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
@@ -60,11 +64,15 @@ def _process_stripe_event(event: Any) -> str:
                         payment_intent_id = str(intent["id"])
                         existing_payment = (
                             db.query(Payment)
-                            .filter(Payment.stripe_payment_intent_id == payment_intent_id)
+                            .filter(
+                                Payment.stripe_payment_intent_id == payment_intent_id
+                            )
                             .first()
                         )
                         if not existing_payment:
-                            amount = Decimal(int(intent["amount_received"])) / Decimal(100)
+                            amount = Decimal(int(intent["amount_received"])) / Decimal(
+                                100
+                            )
                             payment = Payment(
                                 invoice_id=invoice.id,
                                 amount=amount,
@@ -79,7 +87,9 @@ def _process_stripe_event(event: Any) -> str:
                                 status="completed",
                             )
                             db.add(payment)
-                            invoice.amount_paid = (invoice.amount_paid or Decimal(0)) + amount
+                            invoice.amount_paid = (
+                                invoice.amount_paid or Decimal(0)
+                            ) + amount
                             if invoice.amount_paid >= invoice.total:
                                 invoice.status = "paid"
 
@@ -87,7 +97,11 @@ def _process_stripe_event(event: Any) -> str:
         return "processed"
     except IntegrityError:
         db.rollback()
-        if db.query(StripeWebhookEvent).filter(StripeWebhookEvent.event_id == event_id).first():
+        if (
+            db.query(StripeWebhookEvent)
+            .filter(StripeWebhookEvent.event_id == event_id)
+            .first()
+        ):
             return "duplicate"
 
         # A distinct Stripe event can still reference an already-recorded
@@ -96,9 +110,12 @@ def _process_stripe_event(event: Any) -> str:
         if event_type == "payment_intent.succeeded":
             intent = event.get("data", {}).get("object", {})
             payment_intent_id = str(intent.get("id") or "")
-            if payment_intent_id and db.query(Payment).filter(
-                Payment.stripe_payment_intent_id == payment_intent_id
-            ).first():
+            if (
+                payment_intent_id
+                and db.query(Payment)
+                .filter(Payment.stripe_payment_intent_id == payment_intent_id)
+                .first()
+            ):
                 db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
                 db.commit()
                 return "duplicate"
@@ -123,9 +140,14 @@ def create_payment_intent(
     outstanding = Decimal(invoice.total) - Decimal(invoice.amount_paid or 0)
     amount = data.amount if data.amount is not None else outstanding
     if amount != amount.quantize(Decimal("0.01")):
-        raise HTTPException(status_code=422, detail="Payment amount must use at most two decimal places")
+        raise HTTPException(
+            status_code=422, detail="Payment amount must use at most two decimal places"
+        )
     if amount <= 0 or amount > outstanding:
-        raise HTTPException(status_code=422, detail="Payment amount exceeds the outstanding invoice balance")
+        raise HTTPException(
+            status_code=422,
+            detail="Payment amount exceeds the outstanding invoice balance",
+        )
     amount_cents = int(amount * 100)
 
     try:
@@ -146,7 +168,9 @@ def create_payment_intent(
             "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
         }
     except stripe.StripeError as exc:
-        raise HTTPException(status_code=400, detail="Payment provider request failed") from exc
+        raise HTTPException(
+            status_code=400, detail="Payment provider request failed"
+        ) from exc
 
 
 @router.post("/webhook")
@@ -167,6 +191,8 @@ async def stripe_webhook(request: Request):
     try:
         result = await asyncio.to_thread(_process_stripe_event, event)
     except (KeyError, TypeError, ValueError) as exc:
-        raise HTTPException(status_code=400, detail="Invalid Stripe event payload") from exc
+        raise HTTPException(
+            status_code=400, detail="Invalid Stripe event payload"
+        ) from exc
 
     return {"status": result}
