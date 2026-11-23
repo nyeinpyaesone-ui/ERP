@@ -31,6 +31,7 @@ from collections.abc import Mapping
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlencode
 
 REDACT_KEYS = frozenset(
     {
@@ -41,6 +42,11 @@ REDACT_KEYS = frozenset(
         "authorization",
         "ssn",
         "credit_card",
+        "access_token",
+        "refresh_token",
+        "api_key",
+        "client_secret",
+        "signature",
     }
 )
 
@@ -137,6 +143,17 @@ def _decode(chunk: bytes) -> str:
     return chunk.decode("utf-8", errors="replace")
 
 
+def _redact_query_string(query_string: bytes) -> str:
+    """Mask credential-like query parameters before writing request traces."""
+    pairs = parse_qsl(_decode(query_string), keep_blank_values=True)
+    return urlencode(
+        [
+            (key, "***" if key.lower() in REDACT_KEYS else value)
+            for key, value in pairs
+        ]
+    )
+
+
 _FORM_SECRET = re.compile(r"(?i)\b(" + "|".join(sorted(REDACT_KEYS)) + r")=([^&\s\"]+)")
 
 
@@ -226,7 +243,7 @@ class InterceptMiddleware:
                     "type": "http_request",
                     "method": scope.get("method"),
                     "path": scope.get("path"),
-                    "query_string": _decode(scope.get("query_string", b"")),
+                    "query_string": _redact_query_string(scope.get("query_string", b"")),
                     "request_body": summarize_body(bytes(request_body)),
                     "response_status": response_status,
                     "response_body": summarize_body(bytes(response_body)),
