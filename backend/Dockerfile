@@ -61,7 +61,7 @@ RUN python -m pip install --no-cache-dir --upgrade \
         "pip>=26.2.0" \
         "setuptools>=84.1.0" \
         "wheel>=0.46.2" \
-    && python -c 'from importlib.metadata import version; v=tuple(int(part) for part in version("setuptools").split(".")[:3]); assert v >= (84, 1, 0), f"setuptools {version(\"setuptools\")} is below the required security floor"; print(f"Verified setuptools {version(\"setuptools\")}")'
+    && python -c 'from importlib.metadata import version; installed=version("setuptools"); v=tuple(int(part) for part in installed.split(".")[:3]); assert v >= (84, 1, 0), f"setuptools {installed} is below the required security floor"; print(f"Verified setuptools {installed}")'
 
 COPY --chown=app:app . .
 
