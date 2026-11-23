@@ -271,3 +271,58 @@ def test_non_payment_stripe_event_is_recorded_once(
     assert isinstance(event, StripeWebhookEvent)
     assert event.event_id == "evt_customer_updated"
     db.commit.assert_called_once_with()
+
+
+def test_webhook_delivery_rejects_disabled_webhook(
+    db: Mock, actor: SimpleNamespace
+) -> None:
+    db.query.return_value.first.return_value = SimpleNamespace(
+        id=11, url="https://hooks.example.com/hook", is_active=False
+    )
+    with pytest.raises(HTTPException) as error:
+        integrations.test_webhook(11, db, actor)
+    assert error.value.status_code == 409
+    db.add.assert_not_called()
+
+
+def test_webhook_dns_resolution_failure_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com")
+    monkeypatch.setattr(
+        integrations.socket,
+        "getaddrinfo",
+        Mock(side_effect=OSError("dns unavailable")),
+    )
+    with pytest.raises(HTTPException) as error:
+        integrations._validate_webhook_url(
+            "https://hooks.example.com/hook", resolve=True
+        )
+    assert error.value.status_code == 422
+
+
+def test_delivery_history_returns_empty_list_for_existing_webhook(
+    db: Mock, actor: SimpleNamespace
+) -> None:
+    db.query.return_value.first.return_value = SimpleNamespace(id=12)
+    assert integrations.get_deliveries(12, db, actor) == []
+    assert db.query.call_count == 2
+
+
+def test_delivery_history_returns_404_for_unknown_webhook(
+    db: Mock, actor: SimpleNamespace
+) -> None:
+    db.query.return_value.first.return_value = None
+    with pytest.raises(HTTPException) as error:
+        integrations.get_deliveries(404, db, actor)
+    assert error.value.status_code == 404
+
+
+def test_stripe_event_without_id_is_rejected_and_session_closed(
+    db: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(payments, "SessionLocal", Mock(return_value=db))
+    with pytest.raises(ValueError, match="Stripe event ID is missing"):
+        payments._process_stripe_event({"type": "customer.updated"})
+    db.query.assert_not_called()
+    db.close.assert_called_once_with()
