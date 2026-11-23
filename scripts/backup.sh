@@ -1,97 +1,155 @@
 #!/usr/bin/env bash
 ###############################################################################
-# ERP SOLUTION — Backup Script
-# Usage: ./scripts/backup.sh [output_dir] [environment]
-#   environment: production (default) | staging
+# ERP SOLUTION — Environment-isolated backup
+# Usage: ./scripts/backup.sh [output_dir] [production|staging]
+#
+# The selected environment determines the exact env file and Compose project.
+# Secrets are passed to Compose via --env-file and are never sourced as shell.
 ###############################################################################
 
-set -euo pipefail
+set -Eeuo pipefail
 
-OUTPUT_DIR="${1:-/opt/erp-solution/backups}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ERP_PROJECT_ROOT="${ERP_PROJECT_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+ERP_DIR="${ERP_DIR:-/opt/erp-solution}"
+COMPOSE_FILE="${ERP_COMPOSE_FILE:-${ERP_DIR}/docker-compose.prod.yml}"
+OUTPUT_DIR="${1:-${ERP_DIR}/backups}"
 ENVIRONMENT="${2:-production}"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_NAME="erp_backup_${ENVIRONMENT}_${TIMESTAMP}"
-BACKUP_PATH="${OUTPUT_DIR}/${BACKUP_NAME}"
 
-DOCKER_COMPOSE_CMD=""
-if docker compose version &> /dev/null; then
-    DOCKER_COMPOSE_CMD="docker compose"
-elif command -v docker-compose &> /dev/null; then
-    DOCKER_COMPOSE_CMD="docker-compose"
+case "${ENVIRONMENT}" in
+    production|staging) ;;
+    *)
+        echo "Error: environment must be exactly 'production' or 'staging'." >&2
+        exit 2
+        ;;
+esac
+
+# An explicit override is permitted for controlled automation, but it must
+# still identify a real file. Without it, never fall back across environments.
+ENV_FILE="${ERP_ENV_FILE:-${ERP_DIR}/.env.${ENVIRONMENT}}"
+if [ ! -f "${ENV_FILE}" ]; then
+    echo "Error: ${ENVIRONMENT} environment file not found: ${ENV_FILE}" >&2
+    exit 1
+fi
+if [ ! -f "${COMPOSE_FILE}" ]; then
+    echo "Error: Compose file not found: ${COMPOSE_FILE}" >&2
+    exit 1
+fi
+if [ ! -d "${ERP_PROJECT_ROOT}" ]; then
+    echo "Error: repository source directory not found: ${ERP_PROJECT_ROOT}" >&2
+    exit 1
+fi
+
+# Read simple KEY=VALUE settings without evaluating the env file as shell.
+# Values are used only as single argv entries for pg_dump.
+read_env_value() {
+    local key="$1" file="$2"
+    awk -v wanted="${key}" '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        {
+            line=$0
+            sub(/^[[:space:]]*/, "", line)
+            split(line, pair, "=")
+            if (pair[1] == wanted) {
+                sub(/^[^=]*=/, "", line)
+                sub(/[[:space:]]+#.*/, "", line)
+                sub(/^[[:space:]]*/, "", line)
+                sub(/[[:space:]]*$/, "", line)
+                if (line ~ /^".*"$/ || line ~ /^\047.*\047$/) line=substr(line, 2, length(line)-2)
+                value=line
+            }
+        }
+        END { if (value != "") print value }
+    ' "${file}"
+}
+
+DB_USER="${DB_USER:-$(read_env_value DB_USER "${ENV_FILE}")}"
+DB_NAME="${DB_NAME:-$(read_env_value DB_NAME "${ENV_FILE}")}"
+DB_USER="${DB_USER:-erp}"
+DB_NAME="${DB_NAME:-erp_solution}"
+
+if ! command -v docker >/dev/null 2>&1; then
+    echo "Error: docker is required." >&2
+    exit 1
+fi
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1 && docker-compose version >/dev/null 2>&1; then
+    COMPOSE=(docker-compose)
 else
-    echo "Error: Neither 'docker compose' nor 'docker-compose' found" >&2
+    echo "Error: neither 'docker compose' nor 'docker-compose' is available." >&2
     exit 1
 fi
 
 PROJECT_NAME="${ENVIRONMENT}-blue"
-COMPOSE_FILE="/opt/erp-solution/docker-compose.prod.yml"
-ENV_FILE="/opt/erp-solution/.env.production"
+COMPOSE_ARGS=(--env-file "${ENV_FILE}" -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}")
 
-if [ -f "${ENV_FILE}" ]; then
-    set -a
-    source "${ENV_FILE}"
-    set +a
+# Fail before creating a backup that could be mistaken for a complete backup.
+if ! "${COMPOSE[@]}" "${COMPOSE_ARGS[@]}" exec -T postgres pg_isready -U "${DB_USER}" -d "${DB_NAME}" >/dev/null 2>&1; then
+    echo "Error: ${ENVIRONMENT} PostgreSQL is not ready; no backup was created." >&2
+    exit 1
 fi
 
-echo "=========================================="
-echo "  ERP SOLUTION Backup (${ENVIRONMENT})"
-echo "=========================================="
-echo "  Destination: ${BACKUP_PATH}"
-echo ""
+TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+BACKUP_NAME="erp_backup_${ENVIRONMENT}_${TIMESTAMP}"
+BACKUP_PATH="${OUTPUT_DIR%/}/${BACKUP_NAME}"
+mkdir -p "${OUTPUT_DIR}"
+if [ -e "${BACKUP_PATH}" ]; then
+    echo "Error: backup destination already exists: ${BACKUP_PATH}" >&2
+    exit 1
+fi
+mkdir -m 0700 "${BACKUP_PATH}"
 
-mkdir -p "${BACKUP_PATH}"
+cleanup() {
+    local status=$?
+    if [ "$status" -ne 0 ]; then
+        rm -rf -- "${BACKUP_PATH}"
+        echo "Backup failed; incomplete output removed." >&2
+    fi
+    exit "$status"
+}
+trap cleanup EXIT
 
-# Backup source code (excluding .git and node_modules)
-echo "[1/4] Backing up source code..."
+echo "Backing up ${ENVIRONMENT} into ${BACKUP_PATH}"
+
 tar -czf "${BACKUP_PATH}/source_code.tar.gz" \
     --exclude='.git' \
     --exclude='node_modules' \
     --exclude='venv' \
     --exclude='__pycache__' \
     --exclude='*.pyc' \
-    /opt/erp-solution 2>/dev/null || tar -czf "${BACKUP_PATH}/source_code.tar.gz" --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' .
-echo "  ✓ Source code backed up"
+    --exclude='.env' \
+    --exclude='.env.*' \
+    --exclude='backups' \
+    -C "${ERP_PROJECT_ROOT}" .
 
-# Backup database (if running) — never abort env/manifest on DB skip
-echo "[2/4] Backing up database..."
-if ${DOCKER_COMPOSE_CMD} -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps postgres 2>/dev/null | grep -q "Up"; then
-    DB_USER="${DB_USER:-erp}"
-    DB_NAME="${DB_NAME:-erp_solution}"
-    ${DOCKER_COMPOSE_CMD} -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" exec -T postgres pg_dump -U "${DB_USER}" "${DB_NAME}" > "${BACKUP_PATH}/database.sql"
-    echo "  ✓ Database backed up"
-else
-    echo "  ! PostgreSQL not running, database backup skipped (env + manifest continue)"
-    echo "PostgreSQL not running at $(date)" > "${BACKUP_PATH}/database.skipped"
+"${COMPOSE[@]}" "${COMPOSE_ARGS[@]}" exec -T postgres \
+    pg_dump --no-owner --no-acl -U "${DB_USER}" "${DB_NAME}" \
+    > "${BACKUP_PATH}/database.sql"
+
+if [ ! -s "${BACKUP_PATH}/database.sql" ]; then
+    echo "Error: PostgreSQL returned an empty dump." >&2
+    exit 1
 fi
 
-# Backup environment files (WITHOUT copying .env.production which contains secrets)
-echo "[3/4] Backing up environment template (without secrets)..."
-if [ -f "${ENV_FILE}" ]; then
-    # Create a template without secrets
-    sed -E 's/^(DB_PASSWORD|REDIS_PASSWORD|SECRET_KEY|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|OPENAI_API_KEY|SMTP_PASSWORD|SENTRY_DSN)=.*/\1=(REDACTED)/' "${ENV_FILE}" > "${BACKUP_PATH}/env.template"
-    echo "  ✓ Environment template backed up (secrets redacted)"
-fi
-
-# Create backup manifest
-echo "[4/4] Creating backup manifest..."
-cat > "${BACKUP_PATH}/manifest.txt" << EOF
+cat > "${BACKUP_PATH}/manifest.txt" <<EOF
 ERP SOLUTION Backup
-======================
-Date: $(date)
+===================
+Created: $(date -Is)
 Environment: ${ENVIRONMENT}
-Version: $(git describe --tags --always 2>/dev/null || echo "unknown")
-Commit: $(git rev-parse HEAD 2>/dev/null || echo "unknown")
-Branch: $(git branch --show-current 2>/dev/null || echo "unknown")
+Compose project: ${PROJECT_NAME}
+Database: ${DB_NAME}
+Database user: ${DB_USER}
+Source revision: $(git -C "${ERP_PROJECT_ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)
 
 Contents:
-- source_code.tar.gz (full source)
-- database.sql (PostgreSQL dump)
-- env.template (environment template with redacted secrets)
-EOF
-echo "  ✓ Manifest created"
+- source_code.tar.gz (repository source; env files and secrets excluded)
+- database.sql (PostgreSQL plain SQL dump)
+- manifest.txt (backup metadata)
 
-echo ""
-echo "=========================================="
-echo "  Backup Complete!"
-echo "  Location: ${BACKUP_PATH}"
-echo "=========================================="
+Runtime environment files are deliberately not copied. Restore configuration
+from the approved secret manager; never copy production secrets into staging.
+EOF
+
+trap - EXIT
+echo "Backup complete: ${BACKUP_PATH}"
