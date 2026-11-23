@@ -434,3 +434,34 @@ def test_stripe_payment_cannot_exceed_invoice_balance(
     db.commit.assert_not_called()
     assert invoice.amount_paid == 75
     db.close.assert_called_once_with()
+
+
+
+def test_create_payment_intent_uses_stable_idempotency_key(
+    db: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    invoice = SimpleNamespace(
+        id=7,
+        invoice_number="INV-007",
+        total=Decimal("100.00"),
+        amount_paid=Decimal("25.00"),
+        stripe_payment_intent_id=None,
+    )
+    db.query.return_value.first.return_value = invoice
+    monkeypatch.setattr(payments.settings, "STRIPE_SECRET_KEY", "test-secret")
+    monkeypatch.setattr(payments.settings, "STRIPE_PUBLISHABLE_KEY", "test-publishable")
+    intent = SimpleNamespace(id="pi_test", client_secret="client-secret")
+    create = Mock(return_value=intent)
+    monkeypatch.setattr(payments.stripe.PaymentIntent, "create", create)
+
+    response = payments.create_payment_intent(
+        payments.PaymentIntentRequest(invoice_id=7, amount=Decimal("25.00")),
+        db,
+        SimpleNamespace(id=1),
+    )
+
+    assert response["payment_intent_id"] == "pi_test"
+    assert create.call_args.kwargs["idempotency_key"] == "invoice-7-amount-2500-paid-2500"
+    assert create.call_args.kwargs["currency"] == "usd"
+    assert invoice.stripe_payment_intent_id == "pi_test"
+    db.commit.assert_called_once_with()
