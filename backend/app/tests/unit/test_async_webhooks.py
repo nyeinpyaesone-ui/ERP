@@ -225,7 +225,7 @@ def test_distinct_stripe_events_for_same_intent_do_not_double_pay(
         },
     }
 
-    assert payments._process_stripe_event(event) == "processed"
+    assert payments._process_stripe_event(event) == "duplicate"
     assert isinstance(db.add.call_args.args[0], StripeWebhookEvent)
     assert db.add.call_count == 1
     assert invoice.amount_paid == 25
