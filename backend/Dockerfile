@@ -57,14 +57,7 @@ RUN apk update \
 # distribution. This prevents scanners from detecting shadowed old metadata.
 COPY --from=builder /install /usr/local
 
-RUN find /usr/local /usr/lib -type d \\
-        \\( -name 'setuptools-*.dist-info' -o -name 'setuptools-*.egg-info' \\) \\
-        -prune -exec rm -rf {} \\; \\
-    && python -m pip install --no-cache-dir --upgrade --force-reinstall \\
-        "pip>=26.2.0" \\
-        "setuptools>=84.1.0" \\
-        "wheel>=0.46.2" \\
-    && python -c 'from importlib.metadata import distributions, version; installed=version("setuptools"); found=sorted({item.version for item in distributions() if (item.metadata.get("Name") or "").lower() == "setuptools"}); parsed=tuple(int(part) for part in installed.split(".")[:3]); assert parsed >= (84, 1, 0), f"setuptools {installed} is below the required security floor"; assert found == [installed], f"Multiple setuptools distributions found: {found}"; print(f"Verified single patched setuptools distribution {installed}")'
+RUN find /usr/local /usr/lib -type d \( -name 'setuptools-*.dist-info' -o -name 'setuptools-*.egg-info' \) -prune -exec rm -rf {} \; && python -m pip install --no-cache-dir --upgrade --force-reinstall "pip>=26.2.0" "setuptools>=84.1.0" "wheel>=0.46.2" && python -c 'from importlib.metadata import distributions, version; installed=version("setuptools"); found=sorted({item.version for item in distributions() if (item.metadata.get("Name") or "").lower() == "setuptools"}); parsed=tuple(int(part) for part in installed.split(".")[:3]); assert parsed >= (84, 1, 0), f"setuptools {installed} is below the required security floor"; assert found == [installed], f"Multiple setuptools distributions found: {found}"; print(f"Verified single patched setuptools distribution {installed}")'
 
 COPY --chown=app:app . .
 
