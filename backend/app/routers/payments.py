@@ -89,11 +89,6 @@ def _process_stripe_event(event: Any) -> str:
             if not invoice:
                 raise ValueError("Invoice referenced by PaymentIntent was not found")
 
-            amount = _amount_from_intent(intent)
-            outstanding = Decimal(invoice.total) - Decimal(invoice.amount_paid or 0)
-            if amount > outstanding:
-                raise ValueError("Stripe payment exceeds invoice outstanding balance")
-
             existing_payment = (
                 db.query(Payment)
                 .filter(Payment.stripe_payment_intent_id == payment_intent_id)
@@ -103,6 +98,11 @@ def _process_stripe_event(event: Any) -> str:
                 db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
                 db.commit()
                 return "duplicate"
+
+            amount = _amount_from_intent(intent)
+            outstanding = Decimal(invoice.total) - Decimal(invoice.amount_paid or 0)
+            if amount > outstanding:
+                raise ValueError("Stripe payment exceeds invoice outstanding balance")
 
         db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
 
