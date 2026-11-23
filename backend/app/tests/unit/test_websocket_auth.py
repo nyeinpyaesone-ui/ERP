@@ -25,7 +25,9 @@ def test_websocket_authenticates_from_first_frame_not_query_string(
     app, db = websocket_app
     user = SimpleNamespace(id=42, is_active=True)
     db.query.return_value.filter.return_value.first.return_value = user
-    monkeypatch.setattr(websocket_router, "decode_token", lambda token: {"sub": "42"})
+    monkeypatch.setattr(
+        websocket_router.auth, "decode_token", lambda token: {"sub": "42"}
+    )
 
     with TestClient(app) as client:
         with client.websocket_connect("/api/v1/ws/client-ignored?token=not-used") as socket:
@@ -42,6 +44,7 @@ def test_websocket_rejects_query_token_without_authentication_frame(
         with pytest.raises(WebSocketDisconnect) as error:
             with client.websocket_connect("/api/v1/ws/42?token=valid-token") as socket:
                 socket.send_json({"type": "ping"})
+                socket.receive_json()
         assert error.value.code == 4401
 
 
@@ -53,4 +56,5 @@ def test_websocket_rejects_invalid_first_frame(
         with pytest.raises(WebSocketDisconnect) as error:
             with client.websocket_connect("/api/v1/ws/42") as socket:
                 socket.send_json({"type": "ping"})
+                socket.receive_json()
         assert error.value.code == 4401
