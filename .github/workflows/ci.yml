@@ -522,7 +522,7 @@ jobs:
           BACKEND_IMAGE: ${{ needs.docker-backend.outputs.image_sha_ref }}
         run: |
           set -euo pipefail
-          docker run --rm --entrypoint python "${BACKEND_IMAGE}" -c 'from importlib.metadata import version; installed=version("setuptools"); parsed=tuple(int(part) for part in installed.split(".")[:3]); assert parsed >= (84, 1, 0), f"setuptools {installed} is below the required security floor"; print(f"Verified patched setuptools {installed}")'
+          docker run --rm --entrypoint python "${BACKEND_IMAGE}" -c 'from importlib.metadata import distributions, version; installed=version("setuptools"); found=sorted({item.version for item in distributions() if (item.metadata.get("Name") or "").lower() == "setuptools"}); parsed=tuple(int(part) for part in installed.split(".")[:3]); assert parsed >= (84, 1, 0), f"setuptools {installed} is below the required security floor"; assert found == [installed], f"Multiple setuptools distributions found: {found}"; print(f"Verified single patched setuptools distribution {installed}")'
 
       - name: Log in to Docker Hub for backend scan
         if: needs.config.outputs.can_push == 'true'
