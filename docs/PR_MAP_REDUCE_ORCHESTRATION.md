@@ -52,6 +52,8 @@ A map report is eligible only when:
 - No reviewer's latest submitted review is `CHANGES_REQUESTED`.
 - Changed-file data is available.
 
+The mandatory-check names, accepted check conclusions, and risk order are defined once in `scripts/pr-orchestrator/policy.py`; a unit test asserts that the list documented above stays identical to the coded list.
+
 Approvals are recorded as evidence, but the orchestrator does not invent a review policy. The GitHub merge API and repository rules remain the authority: required approvals, required status checks, merge queues, branch protection, and rulesets cannot be bypassed by this workflow.
 
 Missing, stale, contradictory, or unavailable evidence blocks that PR. Fork-head PRs are not automatically merged by this workflow.
@@ -95,7 +97,7 @@ The token used for merge mode must create normal push events so that the main-br
 
 Every run preserves:
 - Discovery snapshot.
-- Per-PR map reports.
+- Per-PR map reports, including the raw classic commit-status snapshot (`state`, `total_count`, and each context/state pair) that produced the decision.
 - Reduced orchestration plan.
 - Merge results and exact merge/CI SHAs.
 

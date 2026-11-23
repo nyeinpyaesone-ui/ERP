@@ -86,7 +86,8 @@ Each map worker writes one JSON report:
   "risk_order": 99,
   "changed_files": [],
   "approved_reviewers": [],
-  "reasons": []
+  "reasons": [],
+  "classic_status": null
 }
 \`\`\`
 

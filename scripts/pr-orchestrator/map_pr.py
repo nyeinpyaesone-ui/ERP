@@ -7,6 +7,7 @@ import json
 import os
 import time
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from urllib.parse import urlencode
 
@@ -18,27 +19,7 @@ from client import (
     repo_api_path,
     write_json,
 )
-
-ALLOWED_CHECK_CONCLUSIONS = {"success", "skipped", "neutral"}
-REQUIRED_GREEN_CHECKS = {
-    "Code Quality",
-    "CodeQL",
-    "Deploy Configuration",
-    "Frontend Build",
-    "Build Backend Image",
-    "Build Frontend Image",
-    "Security Scan",
-    "Secret Scan (Gitleaks)",
-    "Tests",
-}
-RISK_ORDER = {
-    "documentation": 1,
-    "dependency": 2,
-    "frontend": 3,
-    "backend": 4,
-    "application": 5,
-    "infrastructure": 6,
-}
+from policy import ALLOWED_CHECK_CONCLUSIONS, REQUIRED_GREEN_CHECKS, RISK_ORDER
 
 
 def latest_check_runs(check_runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -129,6 +110,37 @@ def _latest_reviews_by_user(reviews: list[dict[str, Any]]) -> dict[str, dict[str
     return latest
 
 
+def _coerce_total_count(value: Any, fallback: int) -> int:
+    """Coerce a GitHub count; one malformed field must not block an otherwise green PR."""
+    if isinstance(value, bool):
+        return fallback
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _classic_status_snapshot(combined_status: dict[str, Any]) -> dict[str, Any]:
+    """Normalize the classic commit-status response into auditable evidence."""
+    contexts = combined_status.get("statuses") or []
+    if not isinstance(contexts, list):
+        contexts = []
+    return {
+        "state": str(combined_status.get("state") or "pending"),
+        "total_count": _coerce_total_count(
+            combined_status.get("total_count"), len(contexts)
+        ),
+        "contexts": [
+            {
+                "context": str(item.get("context", "")),
+                "state": str(item.get("state", "")),
+            }
+            for item in contexts
+            if isinstance(item, dict)
+        ],
+    }
+
+
 def evaluate_pr(
     pr: dict[str, Any],
     check_runs: list[dict[str, Any]],
@@ -198,9 +210,9 @@ def evaluate_pr(
     # GitHub's classic commit-status API is independent of Actions check-runs.
     # A pending combined status with zero contexts is not a failure when the
     # check-runs API above contains completed successful checks.
-    classic_statuses = combined_status.get("statuses") or []
-    classic_state = combined_status.get("state") or "pending"
-    classic_total = int(combined_status.get("total_count") or len(classic_statuses))
+    classic_status_snapshot = _classic_status_snapshot(combined_status)
+    classic_state = classic_status_snapshot["state"]
+    classic_total = classic_status_snapshot["total_count"]
     if classic_state != "success" and (classic_total > 0 or classic_state != "pending"):
         reasons.append(f"commit_status_{classic_state}")
 
@@ -236,6 +248,7 @@ def evaluate_pr(
         "eligible": not reasons,
         "status": "eligible" if not reasons else "blocked",
         "reasons": reasons,
+        "classic_status": classic_status_snapshot,
         "updated_at": pr.get("updated_at"),
     }
 
@@ -254,15 +267,29 @@ def build_pr_report(
         time.sleep(2)
         pr = api_get(repo_api_path(f"/pulls/{number}"))
     head_sha = pr.get("head", {}).get("sha", "")
-    checks = api_paginate_field(
-        repo_api_path(f"/commits/{head_sha}/check-runs") + f"?{token_query}",
-        "check_runs",
-    )
-    combined_status = api_get(repo_api_path(f"/commits/{head_sha}/status"))
-    reviews = api_paginate(
-        repo_api_path(f"/pulls/{number}/reviews") + f"?{token_query}"
-    )
-    files = api_paginate(repo_api_path(f"/pulls/{number}/files") + f"?{token_query}")
+    # These four reads are independent; fetching them together cuts the
+    # per-PR latency (there can be up to 50 map workers) without extra calls.
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        checks_future = pool.submit(
+            api_paginate_field,
+            repo_api_path(f"/commits/{head_sha}/check-runs") + f"?{token_query}",
+            "check_runs",
+        )
+        status_future = pool.submit(
+            api_get, repo_api_path(f"/commits/{head_sha}/status")
+        )
+        reviews_future = pool.submit(
+            api_paginate,
+            repo_api_path(f"/pulls/{number}/reviews") + f"?{token_query}",
+        )
+        files_future = pool.submit(
+            api_paginate,
+            repo_api_path(f"/pulls/{number}/files") + f"?{token_query}",
+        )
+        checks = checks_future.result()
+        combined_status = status_future.result()
+        reviews = reviews_future.result()
+        files = files_future.result()
     return evaluate_pr(
         pr,
         checks,
@@ -307,6 +334,7 @@ def main() -> int:
             "risk_order": 99,
             "changed_files": [],
             "reasons": [f"map_worker_error:{type(error).__name__}:{error}"],
+            "classic_status": None,
         }
     write_json(args.output, report)
     print(json.dumps(report, indent=2))

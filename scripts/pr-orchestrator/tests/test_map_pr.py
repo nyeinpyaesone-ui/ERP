@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import unittest
+from unittest.mock import patch
 
+import map_pr
 from map_pr import REQUIRED_GREEN_CHECKS, classify_risk, evaluate_pr
 
 
@@ -141,6 +144,92 @@ class MapPRTests(unittest.TestCase):
         )
         self.assertFalse(report["eligible"])
         self.assertIn("commit_status_failure", report["reasons"])
+
+    def test_classic_status_snapshot_records_failure_evidence(self) -> None:
+        report = self.report(
+            combined_status={
+                "state": "failure",
+                "total_count": 1,
+                "statuses": [{"context": "legacy-check", "state": "failure"}],
+            }
+        )
+        self.assertEqual(
+            report["classic_status"],
+            {
+                "state": "failure",
+                "total_count": 1,
+                "contexts": [{"context": "legacy-check", "state": "failure"}],
+            },
+        )
+
+    def test_classic_status_snapshot_records_defaults(self) -> None:
+        # Default fixture has no total_count/statuses: fall back to len([]) == 0.
+        snapshot = self.report()["classic_status"]
+        self.assertEqual(snapshot["state"], "success")
+        self.assertEqual(snapshot["total_count"], 0)
+        self.assertEqual(snapshot["contexts"], [])
+
+    def test_classic_status_snapshot_records_benign_pending(self) -> None:
+        snapshot = self.report(
+            combined_status={"state": "pending", "total_count": 0, "statuses": []}
+        )["classic_status"]
+        self.assertEqual(snapshot["state"], "pending")
+        self.assertEqual(snapshot["total_count"], 0)
+        self.assertEqual(snapshot["contexts"], [])
+
+    def test_malformed_status_count_does_not_block_green_pr(self) -> None:
+        report = self.report(
+            combined_status={
+                "state": "success",
+                "total_count": "not-a-number",
+                "statuses": [{"context": "legacy", "state": "success"}],
+            }
+        )
+        self.assertTrue(report["eligible"])
+        self.assertEqual(report["classic_status"]["total_count"], 1)
+
+    def test_non_dict_status_context_is_ignored(self) -> None:
+        report = self.report(
+            combined_status={
+                "state": "failure",
+                "total_count": 1,
+                "statuses": ["corrupt", {"context": "legacy", "state": "failure"}],
+            }
+        )
+        self.assertFalse(report["eligible"])
+        self.assertEqual(
+            report["classic_status"]["contexts"],
+            [{"context": "legacy", "state": "failure"}],
+        )
+
+    def test_build_pr_report_fetches_all_evidence(self) -> None:
+        """The parallel map fetch returns a complete, eligible report."""
+        pr = dict(self.pr)
+
+        def fake_get(path, token=None):
+            if path.endswith("/pulls/42"):
+                return pr
+            if path.endswith("/status"):
+                return {"state": "success"}
+            raise AssertionError(f"unexpected GET {path}")
+
+        def fake_paginate(path, token=None):
+            if "/reviews" in path:
+                return self.reviews
+            if "/files" in path:
+                return self.files
+            raise AssertionError(f"unexpected paginate {path}")
+
+        with (
+            patch.dict(os.environ, {"GITHUB_REPOSITORY": "example/repo"}),
+            patch("map_pr.api_get", side_effect=fake_get),
+            patch("map_pr.api_paginate", side_effect=fake_paginate),
+            patch("map_pr.api_paginate_field", return_value=self.check_runs),
+        ):
+            report = map_pr.build_pr_report(42, "head-sha", "base-sha", "example/repo")
+        self.assertTrue(report["eligible"])
+        self.assertEqual(report["number"], 42)
+        self.assertEqual(report["head_sha"], "head-sha")
 
     def test_latest_check_result_supersedes_older_same_app_run(self) -> None:
         from map_pr import latest_check_runs
