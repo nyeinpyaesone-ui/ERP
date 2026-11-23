@@ -67,15 +67,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    if "fk_payments_created_by_users" in _foreign_keys("payments"):
-        op.drop_constraint(
-            "fk_payments_created_by_users", "payments", type_="foreignkey"
-        )
-    payment_columns = _columns("payments")
-    if "created_by" in payment_columns:
-        op.drop_column("payments", "created_by")
-    movement_columns = _columns("inventory_movements")
-    if "new_quantity" in movement_columns:
-        op.drop_column("inventory_movements", "new_quantity")
-    if "previous_quantity" in movement_columns:
-        op.drop_column("inventory_movements", "previous_quantity")
+    # Keep added data during rollback; extra columns are backward-compatible.
+    # Reverting these fields requires a separate, explicitly approved data migration.
+    pass
