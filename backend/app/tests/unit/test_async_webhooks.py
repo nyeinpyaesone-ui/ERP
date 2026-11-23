@@ -321,7 +321,9 @@ def test_webhook_delivery_rejects_disabled_webhook(
 def test_webhook_dns_resolution_failure_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com")
+    monkeypatch.setattr(
+        integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com"
+    )
     monkeypatch.setattr(
         integrations.socket,
         "getaddrinfo",
