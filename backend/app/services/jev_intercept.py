@@ -147,10 +147,7 @@ def _redact_query_string(query_string: bytes) -> str:
     """Mask credential-like query parameters before writing request traces."""
     pairs = parse_qsl(_decode(query_string), keep_blank_values=True)
     return urlencode(
-        [
-            (key, "***" if key.lower() in REDACT_KEYS else value)
-            for key, value in pairs
-        ]
+        [(key, "***" if key.lower() in REDACT_KEYS else value) for key, value in pairs]
     )
 
 
@@ -243,7 +240,9 @@ class InterceptMiddleware:
                     "type": "http_request",
                     "method": scope.get("method"),
                     "path": scope.get("path"),
-                    "query_string": _redact_query_string(scope.get("query_string", b"")),
+                    "query_string": _redact_query_string(
+                        scope.get("query_string", b"")
+                    ),
                     "request_body": summarize_body(bytes(request_body)),
                     "response_status": response_status,
                     "response_body": summarize_body(bytes(response_body)),
