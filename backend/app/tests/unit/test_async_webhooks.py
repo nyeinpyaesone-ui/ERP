@@ -14,7 +14,13 @@ pytestmark = pytest.mark.unit
 
 @pytest.mark.parametrize(
     "status,expected",
-    [(200, "delivered"), (204, "delivered"), (302, "failed"), (400, "failed"), (500, "failed")],
+    [
+        (200, "delivered"),
+        (204, "delivered"),
+        (302, "failed"),
+        (400, "failed"),
+        (500, "failed"),
+    ],
 )
 def test_webhook_delivery_uses_allowlist_and_records_result(
     db: Mock,
@@ -23,7 +29,9 @@ def test_webhook_delivery_uses_allowlist_and_records_result(
     status: int,
     expected: str,
 ) -> None:
-    monkeypatch.setattr(integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com")
+    monkeypatch.setattr(
+        integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com"
+    )
     monkeypatch.setattr(
         integrations.socket,
         "getaddrinfo",
@@ -55,7 +63,10 @@ def test_webhook_delivery_uses_allowlist_and_records_result(
     expected_signature = hmac.new(
         b"synthetic-secret", request.kwargs["content"], hashlib.sha256
     ).hexdigest()
-    assert request.kwargs["headers"]["X-Webhook-Signature"] == f"sha256={expected_signature}"
+    assert (
+        request.kwargs["headers"]["X-Webhook-Signature"]
+        == f"sha256={expected_signature}"
+    )
     assert client_factory.call_args.kwargs["follow_redirects"] is False
     assert client_factory.call_args.kwargs["trust_env"] is False
     assert db.add.call_count == 1
@@ -66,7 +77,9 @@ def test_webhook_delivery_uses_allowlist_and_records_result(
 def test_webhook_destination_rejects_private_and_non_allowlisted_hosts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com")
+    monkeypatch.setattr(
+        integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com"
+    )
     with pytest.raises(HTTPException) as error:
         integrations._validate_webhook_url("http://127.0.0.1/admin")
     assert error.value.status_code == 422
@@ -79,14 +92,18 @@ def test_webhook_destination_rejects_private_and_non_allowlisted_hosts(
 def test_webhook_destination_rejects_private_dns_resolution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com")
+    monkeypatch.setattr(
+        integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com"
+    )
     monkeypatch.setattr(
         integrations.socket,
         "getaddrinfo",
         Mock(return_value=[(2, 1, 6, "", ("127.0.0.1", 443))]),
     )
     with pytest.raises(HTTPException) as error:
-        integrations._validate_webhook_url("https://hooks.example.com/hook", resolve=True)
+        integrations._validate_webhook_url(
+            "https://hooks.example.com/hook", resolve=True
+        )
     assert error.value.status_code == 422
 
 
@@ -121,7 +138,9 @@ def test_disable_webhook_preserves_record_and_history(
     db.commit.assert_called_once_with()
 
 
-def test_unknown_webhook_returns_404_on_disable(db: Mock, actor: SimpleNamespace) -> None:
+def test_unknown_webhook_returns_404_on_disable(
+    db: Mock, actor: SimpleNamespace
+) -> None:
     db.query.return_value.first.return_value = None
     with pytest.raises(HTTPException) as error:
         integrations.disable_webhook(999, db, actor)
@@ -172,7 +191,11 @@ def test_duplicate_stripe_event_has_no_side_effects(
     db.query.return_value.first.return_value = StripeWebhookEvent(
         event_id="evt_duplicate", event_type="payment_intent.succeeded"
     )
-    event = {"id": "evt_duplicate", "type": "payment_intent.succeeded", "data": {"object": {}}}
+    event = {
+        "id": "evt_duplicate",
+        "type": "payment_intent.succeeded",
+        "data": {"object": {}},
+    }
 
     assert payments._process_stripe_event(event) == "duplicate"
     db.add.assert_not_called()
@@ -190,11 +213,13 @@ def test_distinct_stripe_events_for_same_intent_do_not_double_pay(
     event = {
         "id": "evt_second_delivery",
         "type": "payment_intent.succeeded",
-        "data": {"object": {
-            "id": "pi_existing",
-            "metadata": {"invoice_id": "7"},
-            "amount_received": 2500,
-        }},
+        "data": {
+            "object": {
+                "id": "pi_existing",
+                "metadata": {"invoice_id": "7"},
+                "amount_received": 2500,
+            }
+        },
     }
 
     assert payments._process_stripe_event(event) == "processed"
@@ -216,7 +241,9 @@ def test_distinct_stripe_events_for_same_intent_do_not_double_pay(
 def test_webhook_destination_rejects_unsafe_url_forms(
     monkeypatch: pytest.MonkeyPatch, url: str
 ) -> None:
-    monkeypatch.setattr(integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com")
+    monkeypatch.setattr(
+        integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com"
+    )
     with pytest.raises(HTTPException):
         integrations._validate_webhook_url(url)
 
@@ -226,7 +253,9 @@ def test_webhook_request_error_is_recorded_without_url_details(
     actor: SimpleNamespace,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com")
+    monkeypatch.setattr(
+        integrations.settings, "WEBHOOK_ALLOWED_HOSTS", "hooks.example.com"
+    )
     monkeypatch.setattr(
         integrations.socket,
         "getaddrinfo",
@@ -263,7 +292,11 @@ def test_non_payment_stripe_event_is_recorded_once(
     db.query.return_value.first.return_value = None
 
     result = payments._process_stripe_event(
-        {"id": "evt_customer_updated", "type": "customer.updated", "data": {"object": {}}}
+        {
+            "id": "evt_customer_updated",
+            "type": "customer.updated",
+            "data": {"object": {}},
+        }
     )
 
     assert result == "processed"
