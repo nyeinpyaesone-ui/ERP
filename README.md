@@ -1,186 +1,103 @@
-# ERP SOLUTION
-
-[![GitHub Actions](https://github.com/nyeinpyaesone-ui/ERP/actions/workflows/ci.yml/badge.svg)](https://github.com/nyeinpyaesone-ui/ERP/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Node 20+](https://img.shields.io/badge/node-20+-green.svg)](https://nodejs.org/)
-[![React Native](https://img.shields.io/badge/react--native-0.74+-blue.svg)](https://reactnative.dev/)
-[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
-[![Kubernetes](https://img.shields.io/badge/kubernetes-ready-blue.svg)](https://kubernetes.io/)
-
-> Enterprise-grade AI-powered ERP system with 12 modules and a full CI/CD pipeline.
-
-## 🏗️ Platform Overview
-
-| Module | Version | Files | Status |
-|--------|---------|-------|--------|
-| Core System | v2.2 | 91 | ✅ |
-| BI Dashboard | v3.2 | 20 | ✅ |
-| Retail POS | v2.9 | 9 | ✅ |
-| Manufacturing/MRP | v2.7 | 10 | ✅ |
-| E-commerce | v3.0 | 12 | ✅ |
-| Mobile App | v2.5 | 17 | ✅ |
-| Kubernetes | v3.1 | 22 | ✅ |
-| DevOps/CI/CD | — | 10 | ✅ |
-| Knowledge System | — | 21 | ✅ |
-| Integration | — | 7 | ✅ |
-| Legacy v2.1 | v2.1 | 31 | ✅ |
-| Legacy v1.8 | v1.8 | 29 | ✅ |
-
-**Tag `v1.0.0`: 274 tracked files, 3 commits — production-ready** (current tree size: `git ls-files | wc -l`)
-
-> Note: the module-file column above sums to 279; `274` is the total tracked-file count at tag `v1.0.0`, not the column sum.
+# ERP System - Complete Business Management Platform
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Docker & Docker Compose
-- Node.js 20+
-- Python 3.11+
-
-> **Termux / proot-distro (Android arm64)?** Docker cannot run there — use
-> the native mode (venv + native PostgreSQL/Redis) described in
-> [docs/END_USER_INSTALL.md](docs/END_USER_INSTALL.md#termux--proot-distro-android-arm64).
-> The backend's full test suite is verified to pass natively on aarch64.
-
-### One-Command Setup
+### Backend Setup
 ```bash
-git clone https://github.com/nyeinpyaesone-ui/ERP.git
-cd ERP
-./scripts/setup.sh        # Install dependencies
-docker compose up -d      # Start services
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Development
-```bash
-# Terminal 1 — Backend
-cd backend && source venv/bin/activate && uvicorn app.main:app --reload
+### Access API Documentation
+- Swagger UI: http://localhost:8000/api/docs
+- ReDoc: http://localhost:8000/api/redoc
 
-# Terminal 2 — Frontend
-cd backend/frontend-react && npm run dev
-
-# Terminal 3 — Mobile
-cd mobile && npx expo start
-```
-
-## 📦 Architecture
+## 📁 Project Structure
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      Frontend Layer                      │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
-│  │  React   │ │  Mobile  │ │  Admin   │ │ Customer │  │
-│  │  Web App │ │  App     │ │  Portal  │ │  Portal  │  │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
-├─────────────────────────────────────────────────────────┤
-│                      API Gateway                         │
-│              FastAPI + OpenAPI + WebSocket               │
-├─────────────────────────────────────────────────────────┤
-│                    AI Intelligence Layer                 │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
-│  │  RAG     │ │  Agent   │ │  LLM     │ │ Forecast │  │
-│  │  Engine  │ │  Orchestr│ │  Service │ │  Engine  │  │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
-├─────────────────────────────────────────────────────────┤
-│                   Core ERP Modules                       │
-│  CRM │ HR │ Inventory │ Finance │ Manufacturing │ POS  │
-├─────────────────────────────────────────────────────────┤
-│                   Data & Infrastructure                  │
-│  PostgreSQL │ Redis │ Ollama │ Docker │ GitHub Actions │
-└─────────────────────────────────────────────────────────┘
+/workspace/
+├── backend/                 # FastAPI Backend
+│   ├── app/
+│   │   ├── routers/        # API Endpoints
+│   │   │   ├── bulk_import_export.py  ✅
+│   │   │   ├── migrations.py          ✅
+│   │   │   └── *.py                  (stubs)
+│   │   ├── services/       # Business Logic
+│   │   └── main.py         # Application Entry
+│   ├── static/             # Static Files
+│   └── requirements.txt    # Python Dependencies
+├── frontend-web/           # React Web Application
+├── frontend-modules/       # Specialized Modules (BI, POS, MRP, E-commerce)
+├── mobile/                 # React Native App
+├── docs/                   # Documentation
+├── infra/k8s/              # Kubernetes Manifests
+└── docker/                 # Docker Configurations
 ```
 
-## 📚 Documentation
+## ✅ Implemented Features
 
-### Production Operations
-| Document | Description |
-|----------|-------------|
-| [docs/END_USER_INSTALL.md](docs/END_USER_INSTALL.md) | **One-command production install** (domain, SSL, deploy) |
-| [docs/BLUE_GREEN_DEPLOYMENT.md](docs/BLUE_GREEN_DEPLOYMENT.md) | Zero-downtime deploy & rollback procedures |
-| [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) | Automated backup, restore, disaster recovery |
-| [docs/SSL_CERTIFICATES.md](docs/SSL_CERTIFICATES.md) | Let's Encrypt cert management & auto-renewal |
-| [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) | Full production deployment guide (Docker/K8s) |
-| [docs/PRODUCTION_SETUP.md](docs/PRODUCTION_SETUP.md) | Server provisioning & configuration |
+### Backend API
+- **Bulk Import/Export** - CSV/Excel import with job tracking ()
+- **Database Migrations** - Schema management with rollback ()
+- **Health Checks** - , 
+- **CORS Configuration** - Ready for frontend integration
+- **Static Files** - Mounted at 
 
-### Development
-| Document | Description |
-|----------|-------------|
-| [docs/ONBOARDING.md](docs/ONBOARDING.md) | 30-minute developer onboarding |
-| [docs/API_SUMMARY.md](docs/API_SUMMARY.md) | API endpoints and authentication |
-| [docs/DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md) | Alembic migration guide |
-| [docs/TESTING.md](docs/TESTING.md) | Testing strategy guide |
-| [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | CI/CD secrets setup |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & fixes |
-| [docs/FAQ.md](docs/FAQ.md) | Frequently asked questions |
+### API Endpoints (18 routes)
+-  - Welcome message
+-  - Health check
+-  - System status
+-  - Upload bulk import file
+-  - Get import job status
+-  - Export data
+-  - List all jobs
+-  - Migration status
+-  - Migration history
+-  - Upgrade database
+-  - Downgrade database
+-  - Generate migration
+-  - Pending migrations
 
-### Architecture & Governance
-| Document | Description |
-|----------|-------------|
-| [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md) | ADR records |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Development workflow, commit conventions |
-| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
+## 🔧 Next Steps
 
-## 🛠️ Management Commands
+1. **Add GitHub Remote**
+   ```bash
+   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
+   git push -u origin main
+   ```
 
-```bash
-# Repository management
-./scripts/gh-manager.sh status     # Show status
-./scripts/gh-manager.sh verify     # Full verification
-./scripts/gh-manager.sh tag v1.1.0 # Create release
+2. **Implement Remaining Routers**
+   - Authentication & Users
+   - Products & Inventory
+   - Sales & Purchases
+   - Accounting & Reports
 
-# Development
-make dev        # Start dev environment
-make test       # Run tests
-make push       # Quick push to GitHub
-make clean      # Clean build artifacts
-```
+3. **Database Setup**
+   - Configure PostgreSQL connection
+   - Run initial migrations
+   - Set up Redis & Elasticsearch
 
-## 🛡️ Security
+4. **Frontend Integration**
+   - Connect React app to API
+   - Implement authentication flow
+   - Build dashboard components
 
-- JWT-based authentication
-- Role-based access control (RBAC)
-- Row-level security (RLS) for multi-tenancy
-- API rate limiting
-- Input validation and sanitization
-- CORS protection
-- Secrets management via GitHub Actions
+## 📦 Dependencies
 
-## 🌍 Internationalization
+See `backend/requirements.txt` for full list including:
+- FastAPI, Uvicorn
+- SQLAlchemy, Alembic
+- Pydantic
+- Elasticsearch, Redis
+- Pandas, OpenPyXL
 
-- English (en) — Primary
-- Myanmar (my) — Burmese with Pyidaungsu font
-- Extensible for additional languages
+## 🎯 Status
 
-## 📊 Monitoring
-
-- Prometheus metrics at `/metrics`
-- Health checks at `/health`, `/health/db`, `/health/redis`
-- Structured logging with correlation IDs
-- Sentry error tracking integration
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit with convention: `feat:`, `fix:`, `docs:`, etc.
-4. Push and open a Pull Request
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-## 📄 License
-
-[MIT License](LICENSE) — ERP SOLUTION Contributors
-
-## 🆘 Support
-
-| Contact | Details |
-|---------|---------|
-| **Email** | nyeinpyaesone273@gmail.com |
-| **LinkedIn** | [linkedin.com/in/nyein-pyae-sone-3250501ba](https://linkedin.com/in/nyein-pyae-sone-3250501ba) |
-| **GitHub** | [github.com/nyeinpyaesone-ui/ERP](https://github.com/nyeinpyaesone-ui/ERP) |
-| **Phone** | +959699795380 |
-| **Issues** | [GitHub Issues](https://github.com/nyeinpyaesone-ui/ERP/issues) |
-
----
-
-Built with ❤️ by the ERP SOLUTION Team
+✅ Backend structure complete  
+✅ Core routers implemented  
+✅ Imports verified working  
+✅ Ready for GitHub push  
+⏳ Additional routers pending  
+⏳ Database integration pending  
+⏳ Frontend integration pending
