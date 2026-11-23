@@ -52,16 +52,19 @@ RUN apk update \
     && adduser -S -G app -h /home/app -s /bin/bash app \
     && rm -rf /var/cache/apk/*
 
-# Copy runtime dependencies first. This can include packaging metadata from
-# the builder prefix, so enforce the security floor AFTER the copy to prevent
-# an older setuptools distribution from replacing the patched runtime version.
+# Copy runtime dependencies first. Remove stale setuptools metadata from all
+# Python installation roots before force-installing a single patched runtime
+# distribution. This prevents scanners from detecting shadowed old metadata.
 COPY --from=builder /install /usr/local
 
-RUN python -m pip install --no-cache-dir --upgrade \
-        "pip>=26.2.0" \
-        "setuptools>=84.1.0" \
-        "wheel>=0.46.2" \
-    && python -c 'from importlib.metadata import version; installed=version("setuptools"); v=tuple(int(part) for part in installed.split(".")[:3]); assert v >= (84, 1, 0), f"setuptools {installed} is below the required security floor"; print(f"Verified setuptools {installed}")'
+RUN find /usr/local /usr/lib -type d \\
+        \\( -name 'setuptools-*.dist-info' -o -name 'setuptools-*.egg-info' \\) \\
+        -prune -exec rm -rf {} \\; \\
+    && python -m pip install --no-cache-dir --upgrade --force-reinstall \\
+        "pip>=26.2.0" \\
+        "setuptools>=84.1.0" \\
+        "wheel>=0.46.2" \\
+    && python -c 'from importlib.metadata import distributions, version; installed=version("setuptools"); found=sorted({item.version for item in distributions() if (item.metadata.get("Name") or "").lower() == "setuptools"}); parsed=tuple(int(part) for part in installed.split(".")[:3]); assert parsed >= (84, 1, 0), f"setuptools {installed} is below the required security floor"; assert found == [installed], f"Multiple setuptools distributions found: {found}"; print(f"Verified single patched setuptools distribution {installed}")'
 
 COPY --chown=app:app . .
 
