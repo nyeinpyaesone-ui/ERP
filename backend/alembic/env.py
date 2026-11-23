@@ -12,10 +12,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # Importing the models registers every table on Base.metadata. Without this,
 # target_metadata is empty and `alembic revision --autogenerate` emits DROP
 # TABLE for the entire schema.
-import app.models  # noqa: E402,F401
-import app.models_stripe  # noqa: E402,F401
 from app.config import settings  # noqa: E402
 from app.database import Base, normalize_database_url  # noqa: E402
+import app.models  # noqa: E402,F401
+import app.models_stripe  # noqa: E402,F401
 
 config = context.config
 
