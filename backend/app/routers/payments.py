@@ -24,7 +24,7 @@ if settings.STRIPE_SECRET_KEY:
 
 class PaymentIntentRequest(BaseModel):
     invoice_id: int
-    amount: float | None = Field(default=None, gt=0)
+    amount: Decimal | None = Field(default=None, gt=0)
 
 
 def _process_stripe_event(event: Any) -> str:
@@ -122,7 +122,9 @@ def create_payment_intent(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     outstanding = Decimal(invoice.total) - Decimal(invoice.amount_paid or 0)
-    amount = Decimal(str(data.amount)) if data.amount is not None else outstanding
+    amount = data.amount if data.amount is not None else outstanding
+    if amount != amount.quantize(Decimal("0.01")):
+        raise HTTPException(status_code=422, detail="Payment amount must use at most two decimal places")
     if amount <= 0 or amount > outstanding:
         raise HTTPException(status_code=422, detail="Payment amount exceeds the outstanding invoice balance")
     amount_cents = int(amount * 100)
