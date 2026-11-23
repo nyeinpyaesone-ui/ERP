@@ -15,3 +15,16 @@ def test_alembic_revision_graph_is_unique_and_has_one_head() -> None:
 
     assert len(revision_ids) == len(set(revision_ids))
     assert script.get_heads() == ["009"]
+
+
+
+def test_inventory_payment_migration_preserves_settings_and_added_data() -> None:
+    backend_dir = Path(__file__).resolve().parents[3]
+    migration_path = (
+        backend_dir / "alembic" / "versions" / "006_inventory_payment_setting_columns.py"
+    )
+    source = migration_path.read_text(encoding="utf-8")
+
+    assert 'drop_column("settings", "is_encrypted")' not in source
+    assert "def downgrade() -> None:" in source
+    assert "    pass" in source[source.index("def downgrade() -> None:") :]
