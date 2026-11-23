@@ -194,9 +194,6 @@ def create_payment_intent(
                 "invoice_id": invoice.id,
                 "invoice_number": invoice.invoice_number,
             },
-            idempotency_key=(
-                f"invoice-{invoice.id}-amount-{amount_cents}-paid-{paid_cents}"
-            ),
         )
         invoice.stripe_payment_intent_id = intent.id
         db.commit()
