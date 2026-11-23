@@ -12,7 +12,7 @@ backend/                       # the only backend (FastAPI)
   app/config.py                # Pydantic Settings; reads ./.env
   app/permissions_catalogue.py # single source of truth: resources, actions, role grants
   app/services/permissions.py  # has_permission / get_user_permissions live ONLY here
-  app/routers/ (21) · app/services/ · app/tests/ · alembic/versions/ (001→008)
+  app/routers/ (21) · app/services/ · app/tests/ · alembic/versions/ (001→009)
   pytest.ini                   # the ACTIVE pytest config — see Testing
   frontend-react/              # canonical frontend (see below)
   docker-compose.yml           # nested and UNUSED — the root compose file is the real one
@@ -33,7 +33,7 @@ cd backend && . venv/bin/activate          # shell is sh: use ".", never "source
 pytest -q                                  # 285 passed, ~35s
 coverage run -m pytest -q && coverage report   # 58.89% — the floor (58) lives ONLY in pyproject.toml
 ruff check . && black --check .            # clean, 67 files (CI enforces both)
-alembic upgrade head --sql                 # offline chain check 001→008, no DB needed
+alembic upgrade head --sql                 # offline chain check 001→009, no DB needed
 uvicorn app.main:app --reload              # needs postgres + redis reachable
 pytest app/tests/unit/test_auth.py -q      # single file
 pytest app/tests -k permission -q          # single area
