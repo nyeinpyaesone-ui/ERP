@@ -183,6 +183,14 @@ def create_payment_intent(
     idempotency_key = f"invoice-{invoice.id}-amount-{amount_cents}-paid-{paid_cents}"
 
     try:
+        # Stripe caches canceled results too. Rotate deterministically per
+        # canceled intent so retries after a failed DB commit remain idempotent.
+        previous_intent_id = invoice.stripe_payment_intent_id
+        if previous_intent_id:
+            previous_intent = stripe.PaymentIntent.retrieve(previous_intent_id)
+            if previous_intent.status == "canceled":
+                idempotency_key = f"{idempotency_key}-retry-{previous_intent.id}"
+
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
             currency="usd",
