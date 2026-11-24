@@ -469,7 +469,6 @@ def test_create_payment_intent_uses_stable_idempotency_key(
     assert db.commit.call_count == 2
 
 
-
 def test_active_payment_intent_is_reused_for_same_amount(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
