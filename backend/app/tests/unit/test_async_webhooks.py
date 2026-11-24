@@ -441,10 +441,13 @@ def test_create_payment_intent_uses_stable_idempotency_key(
         total=Decimal("100.00"),
         amount_paid=Decimal("25.00"),
         stripe_payment_intent_id=None,
+        stripe_payment_attempt_key=None,
+        stripe_payment_attempt_intent_id=None,
     )
     db.query.return_value.first.return_value = invoice
     monkeypatch.setattr(payments.settings, "STRIPE_SECRET_KEY", "test-secret")
     monkeypatch.setattr(payments.settings, "STRIPE_PUBLISHABLE_KEY", "test-publishable")
+    monkeypatch.setattr(payments, "uuid4", Mock(return_value=SimpleNamespace(hex="attempt-123")))
     intent = SimpleNamespace(id="pi_test", client_secret="client-secret")
     create = Mock(return_value=intent)
     monkeypatch.setattr(payments.stripe.PaymentIntent, "create", create)
@@ -457,11 +460,13 @@ def test_create_payment_intent_uses_stable_idempotency_key(
 
     assert response["payment_intent_id"] == "pi_test"
     assert (
-        create.call_args.kwargs["idempotency_key"] == "invoice-7-amount-2500-paid-2500"
+        create.call_args.kwargs["idempotency_key"] == "invoice-7-attempt-attempt-123"
     )
     assert create.call_args.kwargs["currency"] == "usd"
     assert invoice.stripe_payment_intent_id == "pi_test"
-    db.commit.assert_called_once_with()
+    assert invoice.stripe_payment_attempt_key == "attempt-123"
+    assert invoice.stripe_payment_attempt_intent_id == "pi_test"
+    assert db.commit.call_count == 2
 
 
 def test_canceled_payment_intent_uses_new_stable_retry_key(
@@ -473,6 +478,8 @@ def test_canceled_payment_intent_uses_new_stable_retry_key(
         total=Decimal("100.00"),
         amount_paid=Decimal("25.00"),
         stripe_payment_intent_id="pi_canceled",
+        stripe_payment_attempt_key="old-attempt",
+        stripe_payment_attempt_intent_id="pi_canceled",
     )
     db.query.return_value.first.return_value = invoice
     monkeypatch.setattr(payments.settings, "STRIPE_SECRET_KEY", "test-secret")
@@ -480,8 +487,9 @@ def test_canceled_payment_intent_uses_new_stable_retry_key(
     monkeypatch.setattr(
         payments.stripe.PaymentIntent,
         "retrieve",
-        Mock(return_value=SimpleNamespace(id="pi_canceled", status="canceled")),
+        Mock(return_value=SimpleNamespace(id="pi_canceled", status="canceled", amount=2500, currency="usd")),
     )
+    monkeypatch.setattr(payments, "uuid4", Mock(return_value=SimpleNamespace(hex="attempt-new")))
     intent = SimpleNamespace(id="pi_replacement", client_secret="new-client-secret")
     create = Mock(return_value=intent)
     monkeypatch.setattr(payments.stripe.PaymentIntent, "create", create)
@@ -494,7 +502,9 @@ def test_canceled_payment_intent_uses_new_stable_retry_key(
 
     assert response["payment_intent_id"] == "pi_replacement"
     assert create.call_args.kwargs["idempotency_key"] == (
-        "invoice-7-amount-2500-paid-2500-retry-pi_canceled"
+        "invoice-7-attempt-attempt-new"
     )
     assert invoice.stripe_payment_intent_id == "pi_replacement"
-    db.commit.assert_called_once_with()
+    assert invoice.stripe_payment_attempt_key == "attempt-new"
+    assert invoice.stripe_payment_attempt_intent_id == "pi_replacement"
+    assert db.commit.call_count == 2
