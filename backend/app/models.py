@@ -268,6 +268,8 @@ class Invoice(Base):
     notes = Column(Text, nullable=True)
     terms = Column(Text, nullable=True)
     stripe_payment_intent_id = Column(String(255), nullable=True)
+    stripe_payment_attempt_key = Column(String(64), nullable=True)
+    stripe_payment_attempt_intent_id = Column(String(255), nullable=True)
     created_by = Column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
