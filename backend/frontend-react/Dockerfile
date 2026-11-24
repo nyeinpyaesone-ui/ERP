@@ -7,7 +7,7 @@
 # produced bundle is architecture-neutral JS/CSS; only the nginx runtime
 # differs per platform, which the manifest list resolves at pull time.
 ###############################################################################
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 # Copy the lockfile alongside the manifest so `npm ci` installs exactly the
