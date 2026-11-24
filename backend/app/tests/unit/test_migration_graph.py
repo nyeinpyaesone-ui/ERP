@@ -14,7 +14,7 @@ def test_alembic_revision_graph_is_unique_and_has_one_head() -> None:
     revision_ids = [revision.revision for revision in revisions]
 
     assert len(revision_ids) == len(set(revision_ids))
-    assert script.get_heads() == ["010"]
+    assert script.get_heads() == ["011"]
 
 
 def test_inventory_payment_migration_preserves_settings_and_added_data() -> None:
