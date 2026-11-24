@@ -63,9 +63,7 @@ def test_webhook_delivery_uses_allowlist_and_records_result(
     expected_signature = hmac.new(
         b"synthetic-secret", request.args[3], hashlib.sha256
     ).hexdigest()
-    assert (
-        request.args[4]["X-Webhook-Signature"] == f"sha256={expected_signature}"
-    )
+    assert request.args[4]["X-Webhook-Signature"] == f"sha256={expected_signature}"
     assert db.add.call_count == 1
     assert db.commit.call_count == 2
     assert webhook.last_triggered is not None
@@ -268,9 +266,11 @@ def test_webhook_request_error_is_recorded_without_url_details(
         last_triggered=None,
     )
     db.query.return_value.first.return_value = webhook
-    post = Mock(side_effect=OSError(
-        "connection failed for https://hooks.example.com/private-path"
-    ))
+    post = Mock(
+        side_effect=OSError(
+            "connection failed for https://hooks.example.com/private-path"
+        )
+    )
     monkeypatch.setattr(integrations, "_post_webhook_to_pinned_address", post)
 
     delivery = integrations.test_webhook(9, db, actor)
