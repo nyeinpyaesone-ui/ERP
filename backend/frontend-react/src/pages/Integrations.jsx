@@ -14,6 +14,17 @@ import api from '../api/axios';
 
 const emptyWebhook = { name: '', url: '', events: '', secret: '' };
 
+const getErrorMessage = (requestError, fallback) => {
+  const detail = requestError.response?.data?.detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (typeof item === 'string' ? item : item?.msg))
+      .filter(Boolean);
+    return messages.join(' ') || fallback;
+  }
+  return typeof detail === 'string' && detail.trim() ? detail : fallback;
+};
+
 export default function Integrations() {
   const [integrations, setIntegrations] = useState([]);
   const [webhooks, setWebhooks] = useState([]);
@@ -35,7 +46,7 @@ export default function Integrations() {
       setIntegrations(integrationResponse.data);
       setWebhooks(webhookResponse.data);
     } catch (requestError) {
-      setError(requestError.response?.data?.detail || 'Unable to load integrations.');
+      setError(getErrorMessage(requestError, 'Unable to load integrations.'));
     } finally {
       setLoading(false);
     }
@@ -65,7 +76,7 @@ export default function Integrations() {
       setShowCreate(false);
       await loadData();
     } catch (requestError) {
-      setError(requestError.response?.data?.detail || 'Webhook could not be created.');
+      setError(getErrorMessage(requestError, 'Webhook could not be created.'));
     }
   };
 
@@ -78,7 +89,7 @@ export default function Integrations() {
         : 'Test delivery failed. Check delivery history for details.');
       await loadDeliveries(id);
     } catch (requestError) {
-      setError(requestError.response?.data?.detail || 'Webhook test failed.');
+      setError(getErrorMessage(requestError, 'Webhook test failed.'));
     }
   };
 
@@ -89,7 +100,7 @@ export default function Integrations() {
       await api.delete(`/integrations/webhooks/${id}`);
       await loadData();
     } catch (requestError) {
-      setError(requestError.response?.data?.detail || 'Webhook could not be disabled.');
+      setError(getErrorMessage(requestError, 'Webhook could not be disabled.'));
     }
   };
 
@@ -99,7 +110,7 @@ export default function Integrations() {
       const response = await api.get(`/integrations/webhooks/${id}/deliveries`);
       setDeliveries((current) => ({ ...current, [id]: response.data }));
     } catch (requestError) {
-      setError(requestError.response?.data?.detail || 'Unable to load delivery history.');
+      setError(getErrorMessage(requestError, 'Unable to load delivery history.'));
     }
   };
 
