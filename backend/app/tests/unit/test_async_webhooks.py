@@ -469,6 +469,46 @@ def test_create_payment_intent_uses_stable_idempotency_key(
     assert db.commit.call_count == 2
 
 
+
+def test_active_payment_intent_is_reused_for_same_amount(
+    db: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    invoice = SimpleNamespace(
+        id=7,
+        invoice_number="INV-007",
+        total=Decimal("100.00"),
+        amount_paid=Decimal("25.00"),
+        stripe_payment_intent_id="pi_existing",
+        stripe_payment_attempt_key="attempt-existing",
+        stripe_payment_attempt_intent_id="pi_existing",
+    )
+    db.query.return_value.first.return_value = invoice
+    monkeypatch.setattr(payments.settings, "STRIPE_SECRET_KEY", "test-secret")
+    monkeypatch.setattr(payments.settings, "STRIPE_PUBLISHABLE_KEY", "test-publishable")
+    existing = SimpleNamespace(
+        id="pi_existing",
+        status="requires_action",
+        amount=2500,
+        currency="usd",
+        client_secret="existing-client-secret",
+    )
+    retrieve = Mock(return_value=existing)
+    create = Mock()
+    monkeypatch.setattr(payments.stripe.PaymentIntent, "retrieve", retrieve)
+    monkeypatch.setattr(payments.stripe.PaymentIntent, "create", create)
+
+    response = payments.create_payment_intent(
+        payments.PaymentIntentRequest(invoice_id=7, amount=Decimal("25.00")),
+        db,
+        SimpleNamespace(id=1),
+    )
+
+    assert response["client_secret"] == "existing-client-secret"
+    assert response["payment_intent_id"] == "pi_existing"
+    retrieve.assert_called_once_with("pi_existing")
+    create.assert_not_called()
+    db.commit.assert_called_once_with()
+
 def test_canceled_payment_intent_uses_new_stable_retry_key(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
