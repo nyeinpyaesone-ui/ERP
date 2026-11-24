@@ -1,13 +1,14 @@
 import hashlib
+import http.client
 import hmac
 import ipaddress
 import json
 import socket
+import ssl
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
@@ -113,22 +114,78 @@ def _validate_webhook_url(value: str, *, resolve: bool = False) -> str:
         )
 
     if resolve:
-        try:
-            records = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
-        except OSError as exc:
-            raise HTTPException(
-                status_code=422, detail="Webhook destination could not be resolved"
-            ) from exc
-        addresses = {record[4][0] for record in records}
-        if not addresses or any(
-            not ipaddress.ip_address(address).is_global for address in addresses
-        ):
-            raise HTTPException(
-                status_code=422,
-                detail="Webhook destination must resolve only to public IP addresses",
-            )
+        _resolve_public_webhook_addresses(host)
 
     return value
+
+
+def _resolve_public_webhook_addresses(host: str) -> list[tuple[int, tuple]]:
+    """Resolve once, reject mixed/private answers, and return socket addresses.
+
+    The returned sockaddr values are used directly for the connection so the
+    HTTP client cannot perform a second DNS lookup after validation.
+    """
+    try:
+        records = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=422, detail="Webhook destination could not be resolved"
+        ) from exc
+
+    if not records or any(
+        not ipaddress.ip_address(record[4][0]).is_global for record in records
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Webhook destination must resolve only to public IP addresses",
+        )
+
+    unique = {}
+    for family, _socktype, _proto, _canonname, sockaddr in records:
+        unique[(family, sockaddr)] = (family, sockaddr)
+    return list(unique.values())
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    """HTTPS connection pinned to a validated sockaddr, retaining host SNI."""
+
+    def __init__(self, host: str, family: int, sockaddr: tuple, **kwargs):
+        self._address_family = family
+        self._validated_sockaddr = sockaddr
+        super().__init__(host, **kwargs)
+
+    def connect(self) -> None:
+        sock = socket.socket(self._address_family, socket.SOCK_STREAM)
+        try:
+            sock.settimeout(self.timeout)
+            sock.connect(self._validated_sockaddr)
+            self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+        except Exception:
+            sock.close()
+            raise
+
+
+def _post_webhook_to_pinned_address(
+    url: str, family: int, sockaddr: tuple, payload: bytes, headers: dict[str, str]
+) -> tuple[int, str]:
+    parsed = urlsplit(url)
+    target = parsed.path or "/"
+    if parsed.query:
+        target = f"{target}?{parsed.query}"
+    connection = _PinnedHTTPSConnection(
+        parsed.hostname or "",
+        family,
+        sockaddr,
+        timeout=15.0,
+        context=ssl.create_default_context(),
+    )
+    try:
+        connection.request("POST", target, body=payload, headers=headers)
+        response = connection.getresponse()
+        body = response.read(1000).decode("utf-8", errors="replace")
+        return response.status, body
+    finally:
+        connection.close()
 
 
 @router.post("/integrations")
@@ -203,7 +260,11 @@ def test_webhook(
     if not webhook.is_active:
         raise HTTPException(status_code=409, detail="Webhook is disabled")
 
-    _validate_webhook_url(webhook.url, resolve=True)
+    _validate_webhook_url(webhook.url)
+    webhook_host = urlsplit(webhook.url).hostname or ""
+    # Resolve once and pin the TCP connection to the validated address.
+    # TLS SNI and certificate verification still use the allowlisted hostname.
+    pinned_addresses = _resolve_public_webhook_addresses(webhook_host)
 
     payload = {
         "event": "test",
@@ -232,17 +293,15 @@ def test_webhook(
     db.refresh(delivery)
 
     try:
-        with httpx.Client(
-            timeout=15.0,
-            follow_redirects=False,
-            trust_env=False,
-        ) as client:
-            response = client.post(webhook.url, content=payload_bytes, headers=headers)
-        delivery.response_status = response.status_code
-        delivery.response_body = response.text[:1000]
-        delivery.status = "delivered" if 200 <= response.status_code < 300 else "failed"
+        family, sockaddr = pinned_addresses[0]
+        response_status, response_body = _post_webhook_to_pinned_address(
+            webhook.url, family, sockaddr, payload_bytes, headers
+        )
+        delivery.response_status = response_status
+        delivery.response_body = response_body[:1000]
+        delivery.status = "delivered" if 200 <= response_status < 300 else "failed"
         webhook.last_triggered = datetime.now(UTC)
-    except httpx.RequestError as exc:
+    except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
         # Avoid persisting exception strings that can contain sensitive URL data.
         delivery.status = "failed"
         delivery.response_body = f"Request failed: {type(exc).__name__}"
