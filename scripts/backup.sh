@@ -63,6 +63,7 @@ read_env_value() {
             line=$0
             sub(/^[[:space:]]*/, "", line)
             split(line, pair, "=")
+            sub(/[[:space:]]*$/, "", pair[1])
             if (pair[1] == wanted) {
                 sub(/^[^=]*=/, "", line)
                 sub(/[[:space:]]+#.*/, "", line)
