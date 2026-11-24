@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
+from uuid import uuid4
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -163,7 +164,12 @@ def create_payment_intent(
     if not settings.STRIPE_SECRET_KEY:
         raise HTTPException(status_code=400, detail="Stripe not configured")
 
-    invoice = db.query(Invoice).filter(Invoice.id == data.invoice_id).first()
+    invoice = (
+        db.query(Invoice)
+        .filter(Invoice.id == data.invoice_id)
+        .with_for_update()
+        .first()
+    )
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
@@ -179,18 +185,51 @@ def create_payment_intent(
             detail="Payment amount exceeds the outstanding invoice balance",
         )
     amount_cents = int(amount * 100)
-    paid_cents = int(Decimal(invoice.amount_paid or 0) * 100)
-    idempotency_key = f"invoice-{invoice.id}-amount-{amount_cents}-paid-{paid_cents}"
+    attempt_intent_id = (
+        invoice.stripe_payment_attempt_intent_id or invoice.stripe_payment_intent_id
+    )
 
     try:
-        # Stripe caches canceled results too. Rotate deterministically per
-        # canceled intent so retries after a failed DB commit remain idempotent.
-        previous_intent_id = invoice.stripe_payment_intent_id
-        if previous_intent_id:
-            previous_intent = stripe.PaymentIntent.retrieve(previous_intent_id)
+        if attempt_intent_id:
+            previous_intent = stripe.PaymentIntent.retrieve(attempt_intent_id)
+            previous_amount = int(previous_intent.amount)
+            previous_currency = str(previous_intent.currency).lower()
             if previous_intent.status == "canceled":
-                idempotency_key = f"{idempotency_key}-retry-{previous_intent.id}"
+                # Persist a new attempt identity before contacting Stripe. A
+                # retry after a network/DB failure then reuses this same key.
+                invoice.stripe_payment_attempt_key = uuid4().hex
+                invoice.stripe_payment_attempt_intent_id = None
+                db.commit()
+            elif previous_intent.status == "succeeded":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Payment succeeded; invoice reconciliation is pending.",
+                )
+            else:
+                if previous_amount != amount_cents or previous_currency != "usd":
+                    raise HTTPException(
+                        status_code=409,
+                        detail="An existing payment attempt must be completed or canceled before changing its amount.",
+                    )
+                if not invoice.stripe_payment_attempt_key:
+                    invoice.stripe_payment_attempt_key = uuid4().hex
+                invoice.stripe_payment_attempt_intent_id = previous_intent.id
+                invoice.stripe_payment_intent_id = previous_intent.id
+                db.commit()
+                return {
+                    "client_secret": previous_intent.client_secret,
+                    "payment_intent_id": previous_intent.id,
+                    "amount": float(amount),
+                    "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
+                }
 
+        if not invoice.stripe_payment_attempt_key:
+            invoice.stripe_payment_attempt_key = uuid4().hex
+            db.commit()
+
+        idempotency_key = (
+            f"invoice-{invoice.id}-attempt-{invoice.stripe_payment_attempt_key}"
+        )
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
             currency="usd",
@@ -201,6 +240,7 @@ def create_payment_intent(
             },
         )
         invoice.stripe_payment_intent_id = intent.id
+        invoice.stripe_payment_attempt_intent_id = intent.id
         db.commit()
         return {
             "client_secret": intent.client_secret,
