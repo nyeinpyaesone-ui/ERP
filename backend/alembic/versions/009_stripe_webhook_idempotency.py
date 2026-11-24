@@ -39,7 +39,9 @@ def upgrade() -> None:
     payment_index_name = "uq_payments_stripe_payment_intent_id"
     if payment_index_name in payment_indexes:
         existing = payment_indexes[payment_index_name]
-        if existing.get("column_names") != ["stripe_payment_intent_id"] or not existing.get("unique"):
+        if existing.get("column_names") != [
+            "stripe_payment_intent_id"
+        ] or not existing.get("unique"):
             raise RuntimeError(
                 "Existing PaymentIntent index has an unexpected definition."
             )
@@ -67,15 +69,13 @@ def upgrade() -> None:
         )
     else:
         columns = {
-            column["name"]
-            for column in inspector.get_columns("stripe_webhook_events")
+            column["name"] for column in inspector.get_columns("stripe_webhook_events")
         }
         if not {"event_id", "event_type", "processed_at"}.issubset(columns):
             raise RuntimeError("Existing Stripe webhook event table is incomplete.")
 
     event_indexes = {
-        index["name"]
-        for index in sa.inspect(bind).get_indexes("stripe_webhook_events")
+        index["name"] for index in sa.inspect(bind).get_indexes("stripe_webhook_events")
     }
     if "ix_stripe_webhook_events_processed_at" not in event_indexes:
         op.create_index(
