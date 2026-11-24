@@ -46,30 +46,26 @@ def test_webhook_delivery_uses_allowlist_and_records_result(
         last_triggered=None,
     )
     db.query.return_value.first.return_value = webhook
-    response = SimpleNamespace(status_code=status, text="accepted")
-    client = Mock()
-    client.__enter__ = Mock(return_value=client)
-    client.__exit__ = Mock(return_value=False)
-    client.post.return_value = response
-    client_factory = Mock(return_value=client)
-    monkeypatch.setattr(integrations.httpx, "Client", client_factory)
+    post = Mock(return_value=(status, "accepted"))
+    monkeypatch.setattr(integrations, "_post_webhook_to_pinned_address", post)
 
     delivery = integrations.test_webhook(7, db, actor)
 
     assert delivery.status == expected
     assert delivery.response_status == status
     assert delivery.response_body == "accepted"
-    request = client.post.call_args
-    assert request.args == ("https://hooks.example.com/hook",)
+    request = post.call_args
+    assert request.args[:3] == (
+        "https://hooks.example.com/hook",
+        2,
+        ("93.184.216.34", 443),
+    )
     expected_signature = hmac.new(
-        b"synthetic-secret", request.kwargs["content"], hashlib.sha256
+        b"synthetic-secret", request.args[3], hashlib.sha256
     ).hexdigest()
     assert (
-        request.kwargs["headers"]["X-Webhook-Signature"]
-        == f"sha256={expected_signature}"
+        request.args[4]["X-Webhook-Signature"] == f"sha256={expected_signature}"
     )
-    assert client_factory.call_args.kwargs["follow_redirects"] is False
-    assert client_factory.call_args.kwargs["trust_env"] is False
     assert db.add.call_count == 1
     assert db.commit.call_count == 2
     assert webhook.last_triggered is not None
@@ -272,13 +268,10 @@ def test_webhook_request_error_is_recorded_without_url_details(
         last_triggered=None,
     )
     db.query.return_value.first.return_value = webhook
-    client = Mock()
-    client.__enter__ = Mock(return_value=client)
-    client.__exit__ = Mock(return_value=False)
-    client.post.side_effect = integrations.httpx.ConnectError(
+    post = Mock(side_effect=OSError(
         "connection failed for https://hooks.example.com/private-path"
-    )
-    monkeypatch.setattr(integrations.httpx, "Client", Mock(return_value=client))
+    ))
+    monkeypatch.setattr(integrations, "_post_webhook_to_pinned_address", post)
 
     delivery = integrations.test_webhook(9, db, actor)
 
@@ -468,4 +461,41 @@ def test_create_payment_intent_uses_stable_idempotency_key(
     )
     assert create.call_args.kwargs["currency"] == "usd"
     assert invoice.stripe_payment_intent_id == "pi_test"
+    db.commit.assert_called_once_with()
+
+
+
+def test_canceled_payment_intent_uses_new_stable_retry_key(
+    db: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    invoice = SimpleNamespace(
+        id=7,
+        invoice_number="INV-007",
+        total=Decimal("100.00"),
+        amount_paid=Decimal("25.00"),
+        stripe_payment_intent_id="pi_canceled",
+    )
+    db.query.return_value.first.return_value = invoice
+    monkeypatch.setattr(payments.settings, "STRIPE_SECRET_KEY", "test-secret")
+    monkeypatch.setattr(payments.settings, "STRIPE_PUBLISHABLE_KEY", "test-publishable")
+    monkeypatch.setattr(
+        payments.stripe.PaymentIntent,
+        "retrieve",
+        Mock(return_value=SimpleNamespace(id="pi_canceled", status="canceled")),
+    )
+    intent = SimpleNamespace(id="pi_replacement", client_secret="new-client-secret")
+    create = Mock(return_value=intent)
+    monkeypatch.setattr(payments.stripe.PaymentIntent, "create", create)
+
+    response = payments.create_payment_intent(
+        payments.PaymentIntentRequest(invoice_id=7, amount=Decimal("25.00")),
+        db,
+        SimpleNamespace(id=1),
+    )
+
+    assert response["payment_intent_id"] == "pi_replacement"
+    assert create.call_args.kwargs["idempotency_key"] == (
+        "invoice-7-amount-2500-paid-2500-retry-pi_canceled"
+    )
+    assert invoice.stripe_payment_intent_id == "pi_replacement"
     db.commit.assert_called_once_with()
