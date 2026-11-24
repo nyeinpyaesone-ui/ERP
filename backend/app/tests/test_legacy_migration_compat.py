@@ -107,7 +107,7 @@ def test_legacy_005_stamp_upgrades_without_losing_tenant_data(
 
         assert tenant_count == (1 if tenancy_already_applied else 0)
         assert permission_count == 1
-        assert version == "010"
+        assert version == "011"
     finally:
         if schema_engine is not None:
             schema_engine.dispose()
@@ -191,7 +191,7 @@ def test_later_legacy_stamps_reconcile_missing_tenancy_and_permissions(
         assert "vendors" in tables
         assert "purchase_orders" in tables
         assert permission_count == 1
-        assert version == "010"
+        assert version == "011"
     finally:
         if schema_engine is not None:
             schema_engine.dispose()
@@ -254,7 +254,7 @@ def test_stripe_idempotency_migration_survives_downgrade_and_reupgrade() -> None
         assert "stripe_webhook_events" in tables
         assert "uq_payments_stripe_payment_intent_id" in indexes
         assert "ix_stripe_webhook_events_processed_at" in indexes
-        assert version == "010"
+        assert version == "011"
     finally:
         if schema_engine is not None:
             schema_engine.dispose()
