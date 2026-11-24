@@ -277,7 +277,7 @@ def test_webhook_request_error_is_recorded_without_url_details(
 
     assert delivery.status == "failed"
     assert delivery.response_status is None
-    assert delivery.response_body == "Request failed: ConnectError"
+    assert delivery.response_body == "Request failed: OSError"
     assert "private-path" not in delivery.response_body
 
 
