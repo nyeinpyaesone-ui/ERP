@@ -186,7 +186,9 @@ def create_payment_intent(
         )
     amount_cents = int(amount * 100)
     attempt_intent_id = (
-        invoice.stripe_payment_attempt_intent_id or invoice.stripe_payment_intent_id
+        invoice.stripe_payment_attempt_intent_id
+        if invoice.stripe_payment_attempt_intent_id is not None
+        else invoice.stripe_payment_intent_id
     )
 
     try:
@@ -198,7 +200,7 @@ def create_payment_intent(
                 # Persist a new attempt identity before contacting Stripe. A
                 # retry after a network/DB failure then reuses this same key.
                 invoice.stripe_payment_attempt_key = uuid4().hex
-                invoice.stripe_payment_attempt_intent_id = None
+                invoice.stripe_payment_attempt_intent_id = ""
                 db.commit()
             elif previous_intent.status == "succeeded":
                 raise HTTPException(
