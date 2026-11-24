@@ -9,11 +9,9 @@ migrations when upgrading. Re-run the additive, idempotent repairs at the
 current head so these installations converge without dropping existing data.
 """
 
+import runpy
 from collections.abc import Sequence
 from pathlib import Path
-import runpy
-
-from alembic import op
 
 revision: str = "010"
 down_revision: str | None = "009"
