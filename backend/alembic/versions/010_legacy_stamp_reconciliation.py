@@ -22,9 +22,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     versions = Path(__file__).resolve().parent
     tenancy = runpy.run_path(str(versions / "005_add_tenancy_support.py"))
-    permissions = runpy.run_path(
-        str(versions / "005_permissions_reconcile_compat.py")
-    )
+    permissions = runpy.run_path(str(versions / "005_permissions_reconcile_compat.py"))
     tenancy["upgrade"]()
     permissions["upgrade"]()
 
