@@ -114,3 +114,87 @@ def test_legacy_005_stamp_upgrades_without_losing_tenant_data(
         with admin_engine.begin() as connection:
             connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
         admin_engine.dispose()
+
+
+@pytest.mark.parametrize("legacy_stamp", ["006", "007", "008"])
+def test_later_legacy_stamps_reconcile_missing_tenancy_and_permissions(
+    legacy_stamp: str,
+) -> None:
+    """Later historical stamps must not bypass the compatibility repair."""
+    raw_url = os.getenv("DATABASE_URL", "")
+    if not raw_url:
+        pytest.skip("DATABASE_URL is not configured")
+    base_url = make_url(raw_url)
+    if base_url.get_backend_name() != "postgresql":
+        pytest.skip("Legacy migration compatibility test requires PostgreSQL")
+    base_url = base_url.set(drivername="postgresql+psycopg2")
+
+    backend_dir = Path(__file__).resolve().parents[2]
+    schema = f"legacy_{legacy_stamp}_{uuid.uuid4().hex[:10]}"
+    admin_engine = create_engine(base_url)
+    schema_engine = None
+
+    try:
+        with admin_engine.begin() as connection:
+            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+
+        query = dict(base_url.query)
+        query["options"] = f"-csearch_path={schema}"
+        isolated_url = base_url.set(query=query).render_as_string(hide_password=False)
+        schema_engine = create_engine(isolated_url)
+
+        _run_alembic(backend_dir, isolated_url, "upgrade", legacy_stamp)
+        with schema_engine.begin() as connection:
+            # Model an installation stamped by a later historical revision
+            # before the duplicate-005 repair was introduced.
+            connection.execute(text("""
+                DROP TABLE IF EXISTS
+                    purchase_order_items,
+                    po_approvals,
+                    transaction_logs,
+                    purchase_orders,
+                    vendors,
+                    tenants
+                CASCADE
+            """))
+            connection.execute(
+                text("ALTER TABLE users DROP COLUMN IF EXISTS tenant_id CASCADE")
+            )
+            connection.execute(
+                text("DELETE FROM permissions WHERE name = 'webhooks:test'")
+            )
+            connection.execute(
+                text("UPDATE alembic_version SET version_num = :stamp"),
+                {"stamp": legacy_stamp},
+            )
+
+        _run_alembic(backend_dir, isolated_url, "upgrade", "head")
+        _run_alembic(backend_dir, isolated_url, "upgrade", "head")
+
+        with schema_engine.connect() as connection:
+            tables = set(
+                connection.execute(
+                    text(
+                        "SELECT tablename FROM pg_tables "
+                        "WHERE schemaname = current_schema()"
+                    )
+                ).scalars()
+            )
+            permission_count = connection.execute(
+                text("SELECT COUNT(*) FROM permissions WHERE name = 'webhooks:test'")
+            ).scalar_one()
+            version = connection.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar_one()
+
+        assert "tenants" in tables
+        assert "vendors" in tables
+        assert "purchase_orders" in tables
+        assert permission_count == 1
+        assert version == "010"
+    finally:
+        if schema_engine is not None:
+            schema_engine.dispose()
+        with admin_engine.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+        admin_engine.dispose()
