@@ -107,7 +107,7 @@ def test_legacy_005_stamp_upgrades_without_losing_tenant_data(
 
         assert tenant_count == (1 if tenancy_already_applied else 0)
         assert permission_count == 1
-        assert version == "009"
+        assert version == "010"
     finally:
         if schema_engine is not None:
             schema_engine.dispose()
