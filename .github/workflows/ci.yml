@@ -198,7 +198,10 @@ jobs:
           else
             diff_range="HEAD^...HEAD"
           fi
-          mapfile -t changed < <(git diff --name-only "${diff_range}" -- 'backend/*.py' 'backend/**/*.py')
+          diff_file="$(mktemp)"
+          trap 'rm -f "${diff_file}"' EXIT
+          git diff --name-only -z "${diff_range}" -- 'backend/*.py' 'backend/**/*.py' > "${diff_file}"
+          mapfile -d '' -t changed < "${diff_file}"
           if [ "${#changed[@]}" -eq 0 ]; then
             echo "No changed backend Python files."
             exit 0
@@ -221,7 +224,10 @@ jobs:
           else
             diff_range="HEAD^...HEAD"
           fi
-          mapfile -t changed < <(git diff --name-only "${diff_range}" -- 'backend/*.py' 'backend/**/*.py')
+          diff_file="$(mktemp)"
+          trap 'rm -f "${diff_file}"' EXIT
+          git diff --name-only -z "${diff_range}" -- 'backend/*.py' 'backend/**/*.py' > "${diff_file}"
+          mapfile -d '' -t changed < "${diff_file}"
           if [ "${#changed[@]}" -eq 0 ]; then
             echo "No changed backend Python files."
             exit 0
