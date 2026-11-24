@@ -15,8 +15,8 @@ DB_NAME=prod_database
 DB_PASSWORD=prod-secret
 EOF
 cat > "${TMP}/runtime/.env.staging" <<'EOF'
-DB_USER=stage_user
-DB_NAME=stage_database
+ DB_USER   =stage_user
+ DB_NAME   =stage_database
 DB_PASSWORD=stage-secret
 EOF
 
