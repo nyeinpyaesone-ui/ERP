@@ -198,3 +198,66 @@ def test_later_legacy_stamps_reconcile_missing_tenancy_and_permissions(
         with admin_engine.begin() as connection:
             connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
         admin_engine.dispose()
+
+
+def test_stripe_idempotency_migration_survives_downgrade_and_reupgrade() -> None:
+    """Retained Stripe safety objects must not break a later upgrade."""
+    raw_url = os.getenv("DATABASE_URL", "")
+    if not raw_url:
+        pytest.skip("DATABASE_URL is not configured")
+    base_url = make_url(raw_url)
+    if base_url.get_backend_name() != "postgresql":
+        pytest.skip("Migration downgrade regression requires PostgreSQL")
+    base_url = base_url.set(drivername="postgresql+psycopg2")
+
+    backend_dir = Path(__file__).resolve().parents[2]
+    schema = f"stripe_reupgrade_{uuid.uuid4().hex[:10]}"
+    admin_engine = create_engine(base_url)
+    schema_engine = None
+
+    try:
+        with admin_engine.begin() as connection:
+            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+
+        query = dict(base_url.query)
+        query["options"] = f"-csearch_path={schema}"
+        isolated_url = base_url.set(query=query).render_as_string(hide_password=False)
+        schema_engine = create_engine(isolated_url)
+
+        _run_alembic(backend_dir, isolated_url, "upgrade", "head")
+        _run_alembic(backend_dir, isolated_url, "downgrade", "008")
+        _run_alembic(backend_dir, isolated_url, "upgrade", "head")
+        _run_alembic(backend_dir, isolated_url, "upgrade", "head")
+
+        with schema_engine.connect() as connection:
+            tables = set(
+                connection.execute(
+                    text(
+                        "SELECT tablename FROM pg_tables "
+                        "WHERE schemaname = current_schema()"
+                    )
+                ).scalars()
+            )
+            indexes = {
+                row[0]
+                for row in connection.execute(
+                    text(
+                        "SELECT indexname FROM pg_indexes "
+                        "WHERE schemaname = current_schema()"
+                    )
+                )
+            }
+            version = connection.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar_one()
+
+        assert "stripe_webhook_events" in tables
+        assert "uq_payments_stripe_payment_intent_id" in indexes
+        assert "ix_stripe_webhook_events_processed_at" in indexes
+        assert version == "010"
+    finally:
+        if schema_engine is not None:
+            schema_engine.dispose()
+        with admin_engine.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+        admin_engine.dispose()
