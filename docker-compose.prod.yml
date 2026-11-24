@@ -51,13 +51,14 @@ services:
       ENVIRONMENT: prod
       OLLAMA_BASE_URL: http://ollama:11434
       CORS_ORIGINS: ${CORS_ORIGINS}
+      WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:-}
     volumes:
       - backend_logs:/app/logs
       - ./backend/uploads:/app/uploads
     networks:
       - erp-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5)"]
+      test: ["CMD", "python", "-c", "import json,urllib.request; response=urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5); data=json.load(response); raise SystemExit(0 if data.get('status') == 'ready' else 1)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -82,13 +83,14 @@ services:
       ENVIRONMENT: prod
       OLLAMA_BASE_URL: http://ollama:11434
       CORS_ORIGINS: ${CORS_ORIGINS}
+      WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:-}
     volumes:
       - backend_logs:/app/logs
       - ./backend/uploads:/app/uploads
     networks:
       - erp-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5)"]
+      test: ["CMD", "python", "-c", "import json,urllib.request; response=urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5); data=json.load(response); raise SystemExit(0 if data.get('status') == 'ready' else 1)"]
       interval: 30s
       timeout: 10s
       retries: 3
