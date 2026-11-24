@@ -1,6 +1,6 @@
 # API, Webhook, and Frontend Contract Alignment
 
-Status: repository CI verified on 2026-11-23 (CI run #520); restored-staging validation and deployment remain pending.
+Status: repository CI verification is pending for the latest review-branch head; restored-staging validation and deployment remain pending.
 
 ## Canonical source
 
@@ -22,7 +22,7 @@ The FastAPI router registry in `backend/app/main.py` is authoritative. Generate 
 - `AuthContext.jsx` exports `useAuth()`; this is the current auth hook.
 - Login uses OAuth2 form fields `username` and `password`.
 
-The staging frontend build must use `VITE_API_URL`; the backend `CORS_ORIGINS` allowlist must include the exact staging frontend origin. These values belong only in the isolated staging environment.
+The staging frontend build must use `VITE_API_URL`; the backend `CORS_ORIGINS` allowlist must include the exact staging frontend origin. Docker Compose passes `WEBHOOK_ALLOWED_HOSTS` into both backend color services; keep it empty unless destinations have been explicitly approved. These values belong only in the isolated staging environment.
 
 ## Webhook endpoint contract
 
@@ -39,7 +39,7 @@ All paths below are mounted beneath `/api/v1/integrations`.
 Implementation changes:
 - `WebhookPublic` and `WebhookDeliveryPublic` are explicit response schemas; the write-only webhook secret is not serialized.
 - Webhook create and delivery require HTTPS, port 443, no embedded credentials, and an exact host in `WEBHOOK_ALLOWED_HOSTS`.
-- Delivery re-validates DNS and rejects non-public IP answers.
+- Delivery resolves DNS once, rejects any non-public answer, and pins the HTTPS socket to a validated address while preserving hostname SNI and certificate verification.
 - HTTP redirects are disabled, environment proxies are not trusted, and only 2xx responses count as successful delivery.
 - Database operations for a test delivery remain on one synchronous request worker/session.
 - DELETE deactivates the webhook rather than deleting its record or delivery history.
@@ -88,9 +88,9 @@ The review branch now:
 - renames the tenancy migration revision to `005_tenancy`, parent `005`;
 - adds additive permission reconciliation revision `005_permissions_reconcile`;
 - links revision `006` to `005_permissions_reconcile`;
-- keeps the subsequent `007`, `008`, and new `009` chain intact.
+- keeps the subsequent `007`, `008`, and `009` chain intact, then adds `010_legacy_stamp_reconciliation`.
 
-The tenancy migration checks for existing tables, columns, indexes, and constraints before adding them; its downgrade is intentionally a no-op to preserve tenant and ERP records. Tests assert unique revision IDs and a single head revision (`009`). A PostgreSQL integration regression test also creates disposable schemas for both legacy `005` interpretations, upgrades to head twice, checks permission reconciliation, and confirms an existing synthetic tenant row survives.
+The tenancy migration checks for existing tables, columns, indexes, and constraints before adding them; its downgrade is intentionally a no-op to preserve tenant and ERP records. Tests assert unique revision IDs and a single head revision (`010`). PostgreSQL integration regressions create disposable schemas for both legacy `005` interpretations and for historical stamps `006`, `007`, and `008`; they upgrade to head twice, check tenancy and permission reconciliation, and confirm a synthetic tenant row survives. A separate regression test downgrades to `008` and upgrades again to verify retained Stripe idempotency objects are safe.
 
 Before running this on any existing database, take and verify a backup. The migration is designed to be additive/idempotent, but staging must validate it against a restored copy of the actual schema before production use.
 
