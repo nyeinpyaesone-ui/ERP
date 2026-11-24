@@ -5,6 +5,15 @@ from sqlalchemy.pool import NullPool
 from app.config import settings
 
 
+def normalize_database_url(url: str) -> str:
+    """Select the installed psycopg2 driver explicitly for SQLAlchemy 2.1."""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return url
+
+
 def build_engine(database_url: str | None = None):
     """Create an engine from Settings.
 
@@ -12,7 +21,7 @@ def build_engine(database_url: str | None = None):
     databases are not shared across connections; everything else uses a
     tuned pool (POOL_SIZE/POOL_MAX_OVERFLOW/POOL_RECYCLE from config.py).
     """
-    url = database_url or settings.DATABASE_URL
+    url = normalize_database_url(database_url or settings.DATABASE_URL)
     if settings.ENVIRONMENT == "test" or url.startswith("sqlite"):
         return create_engine(
             url, poolclass=NullPool, connect_args={"check_same_thread": False}

@@ -8,8 +8,8 @@ fastapi==0.162.7
 # via fastapi; 1.7.0 drops the anyio.abc testclient deprecation).
 starlette==1.10.0
 uvicorn[standard]==0.54.0
-# SQLAlchemy 2.1.x NOT yet: its postgresql:// default now imports psycopg3,
-# which we cannot verify without a live PostgreSQL (docker daemon down).
+# SQLAlchemy 2.1 selects psycopg3 for bare postgresql:// URLs. The application
+# normalizes those URLs to the explicitly installed psycopg2 dialect.
 SQLAlchemy==2.1.8
 psycopg2-binary==2.9.13
 alembic==1.20.1

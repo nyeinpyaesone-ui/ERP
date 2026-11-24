@@ -10,7 +10,7 @@ This guide covers backup procedures, scheduling, and disaster recovery for ERP S
 |-----------|--------|-----------|-----------|
 | PostgreSQL | `pg_dump` (custom format) | Daily (2 AM) | 30 days |
 | Redis | RDB snapshot + AOF | Daily | 7 days |
-| Application Config | File copy (`.env.production`) | On change | Indefinite |
+| Runtime secrets | External secret manager / host-local protected files (never included in archives) | On change | Per secret-manager policy |
 | User Uploads | Volume snapshot / rsync | Daily | 30 days |
 | SSL Certificates | File copy | On renewal | Indefinite |
 
@@ -28,38 +28,30 @@ The `scripts/backup.sh` script handles all backup operations.
 # Backup to custom directory
 ./scripts/backup.sh /mnt/backups/erp
 
-# Backup staging environment
+# Backup staging environment (uses .env.staging and staging-blue only)
 ./scripts/backup.sh /opt/erp-solution/backups staging
 ```
 
 ### What It Backs Up
+
+The script requires the selected environment file (`/opt/erp-solution/.env.production` or `/opt/erp-solution/.env.staging`) and uses the matching Compose project (`production-blue` or `staging-blue`). It passes the file to Docker Compose with `--env-file`; it never evaluates the file as shell. Missing environment configuration or an unavailable PostgreSQL service stops the backup rather than creating an incomplete archive.
+
 ```
 backup_<env>_<timestamp>/
-├── source_code.tar.gz        # Full repo (excludes .git, node_modules, venv)
-├── database.sql              # PostgreSQL dump (if DB running)
-├── env.production            # Production environment config
-└── manifest.txt              # Metadata: date, git commit, version
+├── source_code.tar.gz        # Repository source; .env files and secrets excluded
+├── database.sql              # PostgreSQL SQL dump
+└── manifest.txt              # Environment, DB metadata, source revision
 ```
 
+Runtime env files are deliberately not copied. Restore them from the approved secret manager; never copy production credentials into staging.
+
 ### Example Output
+
+The header, manifest, selected env file, and Compose project must all identify the same environment.
+
 ```
-==========================================
-  ERP SOLUTION Backup (production)
-==========================================
-  Destination: /opt/erp-solution/backups/erp_backup_production_20240115_020000
-==========================================
-[1/4] Backing up source code...
-  ✓ Source code backed up
-[2/4] Backing up database...
-  ✓ Database backed up
-[3/4] Backing up environment files...
-  ✓ Environment files backed up
-[4/4] Creating backup manifest...
-  ✓ Manifest created
-==========================================
-  Backup Complete!
-  Location: /opt/erp-solution/backups/erp_backup_production_20240115_020000
-==========================================
+Backing up staging into /opt/erp-solution/backups/erp_backup_staging_<timestamp>
+Backup complete: /opt/erp-solution/backups/erp_backup_staging_<timestamp>
 ```
 
 ---
@@ -145,11 +137,11 @@ docker cp erp-redis:/data/dump.rdb ./redis_backup_$(date +%Y%m%d).rdb
 ```
 
 ### Configuration Backup
-```bash
-# Backup .env.production
-cp /opt/erp-solution/.env.production /opt/erp-solution/backups/env.production.$(date +%Y%m%d)
 
-# Backup nginx configs
+Runtime environment files (`.env.staging` and `.env.production`) contain credentials and are deliberately excluded from backup archives. Keep them on their respective hosts with mode `0600`, or restore them from the approved secret manager. Never copy production secrets into staging or place runtime env files in source-code/database backup bundles.
+
+Back up non-secret Nginx configuration separately:
+```bash
 tar -czf nginx_configs_$(date +%Y%m%d).tar.gz /opt/erp-solution/ERP/nginx/
 ```
 

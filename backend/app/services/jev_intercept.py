@@ -31,6 +31,7 @@ from collections.abc import Mapping
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlencode
 
 REDACT_KEYS = frozenset(
     {
@@ -41,6 +42,11 @@ REDACT_KEYS = frozenset(
         "authorization",
         "ssn",
         "credit_card",
+        "access_token",
+        "refresh_token",
+        "api_key",
+        "client_secret",
+        "signature",
     }
 )
 
@@ -78,8 +84,23 @@ def events_file() -> Path:
 
 
 def enabled() -> bool:
-    """Return ``True`` when interception is switched on for this process."""
-    return os.getenv("JEV_INTERCEPT") == "1"
+    """Return True only when explicitly enabled and storage is safe.
+
+    Production requires JEV_INTERCEPT_DURABLE=1 and an absolute event-file
+    path supplied by the operator. This is an explicit deployment assertion:
+    the path must be backed by a persistent mounted volume, not the container
+    filesystem. The feature remains disabled by default.
+    """
+    if os.getenv("JEV_INTERCEPT") != "1":
+        return False
+    if os.getenv("ENVIRONMENT", "dev").lower() == "prod":
+        configured_path = os.getenv("JEV_INTERCEPT_EVENTS_FILE", "")
+        return (
+            os.getenv("JEV_INTERCEPT_DURABLE") == "1"
+            and bool(configured_path)
+            and Path(configured_path).is_absolute()
+        )
+    return True
 
 
 def redact(value: Any) -> Any:
@@ -120,6 +141,14 @@ def event_count() -> int:
 
 def _decode(chunk: bytes) -> str:
     return chunk.decode("utf-8", errors="replace")
+
+
+def _redact_query_string(query_string: bytes) -> str:
+    """Mask credential-like query parameters before writing request traces."""
+    pairs = parse_qsl(_decode(query_string), keep_blank_values=True)
+    return urlencode(
+        [(key, "***" if key.lower() in REDACT_KEYS else value) for key, value in pairs]
+    )
 
 
 _FORM_SECRET = re.compile(r"(?i)\b(" + "|".join(sorted(REDACT_KEYS)) + r")=([^&\s\"]+)")
@@ -211,7 +240,9 @@ class InterceptMiddleware:
                     "type": "http_request",
                     "method": scope.get("method"),
                     "path": scope.get("path"),
-                    "query_string": _decode(scope.get("query_string", b"")),
+                    "query_string": _redact_query_string(
+                        scope.get("query_string", b"")
+                    ),
                     "request_body": summarize_body(bytes(request_body)),
                     "response_status": response_status,
                     "response_body": summarize_body(bytes(response_body)),

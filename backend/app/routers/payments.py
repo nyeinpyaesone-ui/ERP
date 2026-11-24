@@ -1,15 +1,20 @@
 import asyncio
 from datetime import UTC, datetime
+from decimal import Decimal
+from typing import Any
+from uuid import uuid4
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.config import settings
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.models import Invoice, Payment
+from app.models_stripe import StripeWebhookEvent
 
 router = APIRouter()
 
@@ -19,7 +24,135 @@ if settings.STRIPE_SECRET_KEY:
 
 class PaymentIntentRequest(BaseModel):
     invoice_id: int
-    amount: float | None = None
+    amount: Decimal | None = Field(default=None, gt=0)
+
+
+def _amount_from_intent(intent: dict[str, Any]) -> Decimal:
+    """Validate the settled amount and currency before recording payment.
+
+    Invoice has no currency field today, so this payment integration is USD-only.
+    The PaymentIntent must settle exactly the amount it was created for.
+    """
+    currency = str(intent.get("currency") or "").lower()
+    amount_received = intent.get("amount_received")
+    amount_expected = intent.get("amount")
+
+    if currency != "usd":
+        raise ValueError("Unexpected Stripe payment currency")
+    if not isinstance(amount_received, int) or amount_received <= 0:
+        raise ValueError("Invalid Stripe amount received")
+    if not isinstance(amount_expected, int) or amount_expected <= 0:
+        raise ValueError("Invalid Stripe payment amount")
+    if amount_received != amount_expected:
+        raise ValueError("Settled amount does not match PaymentIntent amount")
+
+    return Decimal(amount_received) / Decimal(100)
+
+
+def _process_stripe_event(event: Any) -> str:
+    """Process an event atomically; a unique event ID prevents duplicate effects."""
+    event_id = str(event.get("id") or "")
+    event_type = str(event.get("type") or "")
+    if not event_id:
+        raise ValueError("Stripe event ID is missing")
+
+    db: Session = SessionLocal()
+    try:
+        if (
+            db.query(StripeWebhookEvent)
+            .filter(StripeWebhookEvent.event_id == event_id)
+            .first()
+        ):
+            return "duplicate"
+
+        intent = None
+        invoice = None
+        amount = None
+        payment_intent_id = None
+
+        if event_type == "payment_intent.succeeded":
+            intent = event.get("data", {}).get("object", {})
+            payment_intent_id = str(intent.get("id") or "")
+            invoice_id = (intent.get("metadata") or {}).get("invoice_id")
+            if not payment_intent_id or not invoice_id:
+                raise ValueError("PaymentIntent is missing required identifiers")
+            try:
+                parsed_invoice_id = int(invoice_id)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Invalid invoice metadata") from exc
+
+            invoice = (
+                db.query(Invoice)
+                .filter(Invoice.id == parsed_invoice_id)
+                .with_for_update()
+                .first()
+            )
+            if not invoice:
+                raise ValueError("Invoice referenced by PaymentIntent was not found")
+
+            existing_payment = (
+                db.query(Payment)
+                .filter(Payment.stripe_payment_intent_id == payment_intent_id)
+                .first()
+            )
+            if existing_payment:
+                db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
+                db.commit()
+                return "duplicate"
+
+            amount = _amount_from_intent(intent)
+            outstanding = Decimal(invoice.total) - Decimal(invoice.amount_paid or 0)
+            if amount > outstanding:
+                raise ValueError("Stripe payment exceeds invoice outstanding balance")
+
+        db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
+
+        if event_type == "payment_intent.succeeded":
+            charge_data = (intent.get("charges") or {}).get("data") or []
+            payment = Payment(
+                invoice_id=invoice.id,
+                amount=amount,
+                payment_method="stripe",
+                payment_date=datetime.now(UTC).date(),
+                stripe_payment_intent_id=payment_intent_id,
+                stripe_charge_id=charge_data[0].get("id") if charge_data else None,
+                status="completed",
+            )
+            db.add(payment)
+            invoice.amount_paid = (invoice.amount_paid or Decimal(0)) + amount
+            if invoice.amount_paid >= invoice.total:
+                invoice.status = "paid"
+            else:
+                invoice.status = "partial"
+
+        db.commit()
+        return "processed"
+    except IntegrityError:
+        db.rollback()
+        if (
+            db.query(StripeWebhookEvent)
+            .filter(StripeWebhookEvent.event_id == event_id)
+            .first()
+        ):
+            return "duplicate"
+
+        # Concurrent distinct events can still reference an already-recorded
+        # PaymentIntent. Acknowledge safely after confirming the unique payment.
+        intent = event.get("data", {}).get("object", {})
+        payment_intent_id = str(intent.get("id") or "")
+        if (
+            event_type == "payment_intent.succeeded"
+            and payment_intent_id
+            and db.query(Payment)
+            .filter(Payment.stripe_payment_intent_id == payment_intent_id)
+            .first()
+        ):
+            db.add(StripeWebhookEvent(event_id=event_id, event_type=event_type))
+            db.commit()
+            return "duplicate"
+        raise
+    finally:
+        db.close()
 
 
 @router.post("/create-intent")
@@ -31,50 +164,103 @@ def create_payment_intent(
     if not settings.STRIPE_SECRET_KEY:
         raise HTTPException(status_code=400, detail="Stripe not configured")
 
-    invoice = db.query(Invoice).filter(Invoice.id == data.invoice_id).first()
+    invoice = (
+        db.query(Invoice)
+        .filter(Invoice.id == data.invoice_id)
+        .with_for_update()
+        .first()
+    )
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    amount = data.amount or float(invoice.total - (invoice.amount_paid or 0))
+    outstanding = Decimal(invoice.total) - Decimal(invoice.amount_paid or 0)
+    amount = data.amount if data.amount is not None else outstanding
+    if amount != amount.quantize(Decimal("0.01")):
+        raise HTTPException(
+            status_code=422, detail="Payment amount must use at most two decimal places"
+        )
+    if amount <= 0 or amount > outstanding:
+        raise HTTPException(
+            status_code=422,
+            detail="Payment amount exceeds the outstanding invoice balance",
+        )
     amount_cents = int(amount * 100)
+    attempt_intent_id = (
+        invoice.stripe_payment_attempt_intent_id
+        if invoice.stripe_payment_attempt_intent_id is not None
+        else invoice.stripe_payment_intent_id
+    )
 
     try:
+        if attempt_intent_id:
+            previous_intent = stripe.PaymentIntent.retrieve(attempt_intent_id)
+            previous_amount = int(previous_intent.amount)
+            previous_currency = str(previous_intent.currency).lower()
+            if previous_intent.status == "canceled":
+                # Persist a new attempt identity before contacting Stripe. A
+                # retry after a network/DB failure then reuses this same key.
+                invoice.stripe_payment_attempt_key = uuid4().hex
+                invoice.stripe_payment_attempt_intent_id = ""
+                db.commit()
+            elif previous_intent.status == "succeeded":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Payment succeeded; invoice reconciliation is pending.",
+                )
+            else:
+                if previous_amount != amount_cents or previous_currency != "usd":
+                    raise HTTPException(
+                        status_code=409,
+                        detail="An existing payment attempt must be completed or canceled before changing its amount.",
+                    )
+                if not invoice.stripe_payment_attempt_key:
+                    invoice.stripe_payment_attempt_key = uuid4().hex
+                invoice.stripe_payment_attempt_intent_id = previous_intent.id
+                invoice.stripe_payment_intent_id = previous_intent.id
+                db.commit()
+                return {
+                    "client_secret": previous_intent.client_secret,
+                    "payment_intent_id": previous_intent.id,
+                    "amount": float(amount),
+                    "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
+                }
+
+        if not invoice.stripe_payment_attempt_key:
+            invoice.stripe_payment_attempt_key = uuid4().hex
+            db.commit()
+
+        idempotency_key = (
+            f"invoice-{invoice.id}-attempt-{invoice.stripe_payment_attempt_key}"
+        )
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
             currency="usd",
+            idempotency_key=idempotency_key,
             metadata={
                 "invoice_id": invoice.id,
                 "invoice_number": invoice.invoice_number,
             },
         )
-
         invoice.stripe_payment_intent_id = intent.id
+        invoice.stripe_payment_attempt_intent_id = intent.id
         db.commit()
-
         return {
             "client_secret": intent.client_secret,
             "payment_intent_id": intent.id,
-            "amount": amount,
+            "amount": float(amount),
             "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
         }
-    except stripe.StripeError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except stripe.StripeError as exc:
+        raise HTTPException(
+            status_code=400, detail="Payment provider request failed"
+        ) from exc
 
 
 @router.post("/webhook")
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
-    """Verify a Stripe event and return a success acknowledgment.
-
-    For a successful payment intent with a matching invoice, commit a payment
-    using ``amount_received / 100`` and increase the invoice's paid amount.
-    Mark fully covered invoices paid. Other events and missing invoices are
-    acknowledged without changes; repeated events are not deduplicated.
-    Raise HTTP 400 for a missing secret or invalid payload/signature. Payload
-    shape, invoice-ID conversion, arithmetic, and database errors propagate.
-    """
+async def stripe_webhook(request: Request):
+    """Verify Stripe signature then process in a worker-owned DB session."""
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
-
     if not settings.STRIPE_WEBHOOK_SECRET:
         raise HTTPException(status_code=400, detail="Webhook secret not configured")
 
@@ -85,33 +271,11 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     except (ValueError, stripe.SignatureVerificationError) as err:
         raise HTTPException(status_code=400, detail="Invalid signature") from err
 
-    if event["type"] == "payment_intent.succeeded":
-        intent = event["data"]["object"]
-        invoice_id = intent["metadata"].get("invoice_id")
+    try:
+        result = await asyncio.to_thread(_process_stripe_event, event)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400, detail="Invalid Stripe event payload"
+        ) from exc
 
-        if invoice_id:
-            invoice = await asyncio.to_thread(
-                lambda: db.query(Invoice).filter(Invoice.id == int(invoice_id)).first()
-            )
-            if invoice:
-                amount = intent["amount_received"] / 100
-                payment = Payment(
-                    invoice_id=invoice.id,
-                    amount=amount,
-                    payment_method="stripe",
-                    payment_date=datetime.now(UTC).date(),
-                    stripe_payment_intent_id=intent["id"],
-                    stripe_charge_id=(
-                        intent["charges"]["data"][0]["id"]
-                        if intent.get("charges")
-                        else None
-                    ),
-                    status="completed",
-                )
-                await asyncio.to_thread(db.add, payment)
-                invoice.amount_paid = (invoice.amount_paid or 0) + amount
-                if invoice.amount_paid >= invoice.total:
-                    invoice.status = "paid"
-                await asyncio.to_thread(db.commit)
-
-    return {"status": "success"}
+    return {"status": result}

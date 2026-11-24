@@ -162,6 +162,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Validate workflow YAML syntax
+        run: |
+          ruby -e 'require "yaml"; Dir.glob(".github/workflows/*.{yml,yaml}").each { |path| YAML.load_file(path); puts "Valid YAML: #{path}" }'
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -178,13 +184,59 @@ jobs:
           pip install -r requirements-dev.txt
           pip install mypy
 
-      - name: Run Ruff
+      - name: Run Ruff on changed backend files
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          EVENT_BEFORE: ${{ github.event.before }}
         run: |
-          cd backend && ruff check .
+          set -euo pipefail
+          if [ -n "${BASE_REF}" ]; then
+            git fetch origin "${BASE_REF}" --depth=1
+            diff_range="origin/${BASE_REF}...HEAD"
+          elif [ -n "${EVENT_BEFORE}" ] && [ "${EVENT_BEFORE}" != "0000000000000000000000000000000000000000" ]; then
+            diff_range="${EVENT_BEFORE}...HEAD"
+          else
+            diff_range="HEAD^...HEAD"
+          fi
+          diff_file="$(mktemp)"
+          trap 'rm -f "${diff_file}"' EXIT
+          git diff --diff-filter=d --name-only -z "${diff_range}" -- 'backend/*.py' 'backend/**/*.py' > "${diff_file}"
+          mapfile -d '' -t changed < "${diff_file}"
+          if [ "${#changed[@]}" -eq 0 ]; then
+            echo "No changed backend Python files."
+            exit 0
+          fi
+          python_files=()
+          for path in "${changed[@]}"; do python_files+=("${path#backend/}"); done
+          cd backend
+          ruff check "${python_files[@]}"
 
-      - name: Run Black
+      - name: Enforce Black formatting on changed backend files
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          EVENT_BEFORE: ${{ github.event.before }}
         run: |
-          cd backend && black --check .
+          set -euo pipefail
+          if [ -n "${BASE_REF}" ]; then
+            diff_range="origin/${BASE_REF}...HEAD"
+          elif [ -n "${EVENT_BEFORE}" ] && [ "${EVENT_BEFORE}" != "0000000000000000000000000000000000000000" ]; then
+            diff_range="${EVENT_BEFORE}...HEAD"
+          else
+            diff_range="HEAD^...HEAD"
+          fi
+          diff_file="$(mktemp)"
+          trap 'rm -f "${diff_file}"' EXIT
+          git diff --diff-filter=d --name-only -z "${diff_range}" -- 'backend/*.py' 'backend/**/*.py' > "${diff_file}"
+          mapfile -d '' -t changed < "${diff_file}"
+          if [ "${#changed[@]}" -eq 0 ]; then
+            echo "No changed backend Python files."
+            exit 0
+          fi
+          python_files=()
+          for path in "${changed[@]}"; do python_files+=("${path#backend/}"); done
+          cd backend
+          black --diff "${python_files[@]}"
+          black --check "${python_files[@]}"
 
       - name: Run MyPy (advisory — does not gate the pipeline)
         continue-on-error: true
@@ -195,8 +247,11 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/lib.sh
+          bash -n scripts/backup.sh
+          bash -n scripts/tests/test_backup.sh
           bash -n scripts/deploy-blue-green.sh
           bash -n scripts/configure-github-actions.sh
+          bash scripts/tests/test_backup.sh
           DOCKER_USER=ci-validation docker compose --env-file .env.production.template -f docker-compose.prod.yml config --quiet
           DOCKER_USER=ci-validation docker compose --env-file .env.staging.template -f docker-compose.prod.yml config --quiet
 
@@ -268,7 +323,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: backend/frontend-react/package-lock.json
 
@@ -469,6 +524,14 @@ jobs:
           tags: ${{ needs.docker-frontend.outputs.image_sha_ref }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Verify backend runtime packaging baseline
+        if: github.event_name == 'merge_group' || github.event_name == 'pull_request'
+        env:
+          BACKEND_IMAGE: ${{ needs.docker-backend.outputs.image_sha_ref }}
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint python "${BACKEND_IMAGE}" -c 'from importlib.metadata import distributions; forbidden={"pip", "setuptools", "wheel"}; found=sorted({(item.metadata.get("Name") or "").lower() for item in distributions()} & forbidden); assert not found, f"Build tools leaked into runtime: {found}"; print("Verified runtime image contains no pip, setuptools, or wheel distributions")'
 
       - name: Log in to Docker Hub for backend scan
         if: needs.config.outputs.can_push == 'true'

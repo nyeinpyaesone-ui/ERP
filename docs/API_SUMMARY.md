@@ -1,6 +1,6 @@
 # API Documentation Summary
 
-> Generated from live OpenAPI (`GET /openapi.json`). **102 paths** total.
+> Generated from live OpenAPI (`GET /openapi.json`). **103 paths** total.
 > Source of truth: `backend/app/main.py` router registration + `TestClient(app).get('/openapi.json')`.
 > All API routes are versioned under `/api/v1`. There is no unversioned `/auth/*` tree.
 
@@ -38,7 +38,7 @@
 | `reports` | `/api/v1/reports` | Reports | 4 |
 | `workflows` | `/api/v1/workflows` | Workflows | 5 |
 | `payments` | `/api/v1/payments` | Payments | 2 |
-| `integrations` | `/api/v1/integrations` | Integrations | 4 |
+| `integrations` | `/api/v1/integrations` | Integrations | 5 |
 | `analytics` | `/api/v1/analytics` | Analytics | 2 |
 | `admin` | `/api/v1/admin` | Admin | 6 |
 | `websocket` | `/api/v1/ws` | WebSocket | 1 (`POST /api/v1/ws/broadcast`) |
@@ -160,11 +160,12 @@ Root `GET /` returns service info (`name`, `version`, `status`, `features`).
 | POST | `/api/v1/payments/create-intent` | Create Stripe payment intent |
 | POST | `/api/v1/payments/webhook` | Stripe webhook receiver |
 
-### Integrations — `/api/v1/integrations` (4 paths)
+### Integrations — `/api/v1/integrations` (5 paths)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET/POST | `/api/v1/integrations/integrations` | List / create integrations |
 | GET/POST | `/api/v1/integrations/webhooks` | List / create webhooks |
+| DELETE | `/api/v1/integrations/webhooks/{webhook_id}` | Disable webhook while preserving delivery history |
 | GET | `/api/v1/integrations/webhooks/{webhook_id}/deliveries` | Webhook deliveries |
 | POST | `/api/v1/integrations/webhooks/{webhook_id}/test` | Test webhook |
 

@@ -16,6 +16,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
+from app.models_tenancy import Tenant  # noqa: F401
 
 
 class User(Base):
@@ -267,6 +268,8 @@ class Invoice(Base):
     notes = Column(Text, nullable=True)
     terms = Column(Text, nullable=True)
     stripe_payment_intent_id = Column(String(255), nullable=True)
+    stripe_payment_attempt_key = Column(String(64), nullable=True)
+    stripe_payment_attempt_intent_id = Column(String(255), nullable=True)
     created_by = Column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
