@@ -464,7 +464,6 @@ def test_create_payment_intent_uses_stable_idempotency_key(
     db.commit.assert_called_once_with()
 
 
-
 def test_canceled_payment_intent_uses_new_stable_retry_key(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
