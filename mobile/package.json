@@ -16,7 +16,7 @@
     "expo-notifications": "~58.1.8",
     "expo-camera": "~56.0.8",
     "expo-image-picker": "~57.0.20",
-    "react": "18.2.0",
+    "react": "19.3.1",
     "react-native": "0.88.1",
     "@react-navigation/native": "^7.5.1",
     "@react-navigation/bottom-tabs": "^7.18.3",
