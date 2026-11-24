@@ -507,6 +507,8 @@ def test_active_payment_intent_is_reused_for_same_amount(
     retrieve.assert_called_once_with("pi_existing")
     create.assert_not_called()
     db.commit.assert_called_once_with()
+
+
 def test_canceled_payment_intent_uses_new_stable_retry_key(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
