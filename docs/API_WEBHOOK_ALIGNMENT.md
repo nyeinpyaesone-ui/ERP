@@ -55,7 +55,7 @@ Security boundary: exact host allowlisting and DNS checks reduce SSRF exposure, 
 - Repeated event IDs are acknowledged as duplicates without repeating side effects.
 - A second event ID for an already processed PaymentIntent does not add a second payment.
 - The worker creates and closes its own SQLAlchemy session, avoiding cross-thread use of a request-scoped session.
-- Migration `009` adds the idempotency table.
+- Migration `009` adds the idempotency table; migration `011` persists the PaymentIntent attempt key and its associated intent ID.
 
 ## WebSocket contract
 
@@ -90,7 +90,7 @@ The review branch now:
 - links revision `006` to `005_permissions_reconcile`;
 - keeps the subsequent `007`, `008`, and `009` chain intact, then adds `010_legacy_stamp_reconciliation`.
 
-The tenancy migration checks for existing tables, columns, indexes, and constraints before adding them; its downgrade is intentionally a no-op to preserve tenant and ERP records. Tests assert unique revision IDs and a single head revision (`010`). PostgreSQL integration regressions create disposable schemas for both legacy `005` interpretations and for historical stamps `006`, `007`, and `008`; they upgrade to head twice, check tenancy and permission reconciliation, and confirm a synthetic tenant row survives. A separate regression test downgrades to `008` and upgrades again to verify retained Stripe idempotency objects are safe.
+The tenancy migration checks for existing tables, columns, indexes, and constraints before adding them; its downgrade is intentionally a no-op to preserve tenant and ERP records. Tests assert unique revision IDs and a single head revision (`011`). PostgreSQL integration regressions create disposable schemas for both legacy `005` interpretations and for historical stamps `006`, `007`, and `008`; they upgrade to head twice, check tenancy and permission reconciliation, and confirm a synthetic tenant row survives. A separate regression test downgrades to `008` and upgrades again to verify retained Stripe idempotency objects are safe. Stripe PaymentIntent creation persists an attempt key before the network call, reuses it across retries, and rotates it only after confirming cancellation.
 
 Before running this on any existing database, take and verify a backup. The migration is designed to be additive/idempotent, but staging must validate it against a restored copy of the actual schema before production use.
 
