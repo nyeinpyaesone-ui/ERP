@@ -447,7 +447,9 @@ def test_create_payment_intent_uses_stable_idempotency_key(
     db.query.return_value.first.return_value = invoice
     monkeypatch.setattr(payments.settings, "STRIPE_SECRET_KEY", "test-secret")
     monkeypatch.setattr(payments.settings, "STRIPE_PUBLISHABLE_KEY", "test-publishable")
-    monkeypatch.setattr(payments, "uuid4", Mock(return_value=SimpleNamespace(hex="attempt-123")))
+    monkeypatch.setattr(
+        payments, "uuid4", Mock(return_value=SimpleNamespace(hex="attempt-123"))
+    )
     intent = SimpleNamespace(id="pi_test", client_secret="client-secret")
     create = Mock(return_value=intent)
     monkeypatch.setattr(payments.stripe.PaymentIntent, "create", create)
@@ -459,9 +461,7 @@ def test_create_payment_intent_uses_stable_idempotency_key(
     )
 
     assert response["payment_intent_id"] == "pi_test"
-    assert (
-        create.call_args.kwargs["idempotency_key"] == "invoice-7-attempt-attempt-123"
-    )
+    assert create.call_args.kwargs["idempotency_key"] == "invoice-7-attempt-attempt-123"
     assert create.call_args.kwargs["currency"] == "usd"
     assert invoice.stripe_payment_intent_id == "pi_test"
     assert invoice.stripe_payment_attempt_key == "attempt-123"
@@ -508,7 +508,6 @@ def test_active_payment_intent_is_reused_for_same_amount(
     retrieve.assert_called_once_with("pi_existing")
     create.assert_not_called()
     db.commit.assert_called_once_with()
-
 def test_canceled_payment_intent_uses_new_stable_retry_key(
     db: Mock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -527,9 +526,15 @@ def test_canceled_payment_intent_uses_new_stable_retry_key(
     monkeypatch.setattr(
         payments.stripe.PaymentIntent,
         "retrieve",
-        Mock(return_value=SimpleNamespace(id="pi_canceled", status="canceled", amount=2500, currency="usd")),
+        Mock(
+            return_value=SimpleNamespace(
+                id="pi_canceled", status="canceled", amount=2500, currency="usd"
+            )
+        ),
     )
-    monkeypatch.setattr(payments, "uuid4", Mock(return_value=SimpleNamespace(hex="attempt-new")))
+    monkeypatch.setattr(
+        payments, "uuid4", Mock(return_value=SimpleNamespace(hex="attempt-new"))
+    )
     intent = SimpleNamespace(id="pi_replacement", client_secret="new-client-secret")
     create = Mock(return_value=intent)
     monkeypatch.setattr(payments.stripe.PaymentIntent, "create", create)
