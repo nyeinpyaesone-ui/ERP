@@ -1,12 +1,9 @@
 name: CI/CD Pipeline
 
+# Legacy pipeline retained for reference. Automatic triggers are disabled;
+# .github/workflows/ci.yml is the canonical CI/CD workflow.
 on:
-  push:
-    branches: ["main", "develop"]
-  pull_request:
-    branches: ["main", "develop"]
-  schedule:
-    - cron: '0 2 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
