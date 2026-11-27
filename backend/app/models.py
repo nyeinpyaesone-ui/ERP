@@ -926,9 +926,7 @@ class Tenant(Base):
 
 class TransactionLog(Base):
     __tablename__ = "transaction_logs"
-    __table_args__ = (
-        Index("ix_transaction_logs_entity", "entity_type", "entity_id"),
-    )
+    __table_args__ = (Index("ix_transaction_logs_entity", "entity_type", "entity_id"),)
 
     id = Column(Integer, primary_key=True)
     transaction_id = Column(String(100), nullable=False, unique=True, index=True)
