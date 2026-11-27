@@ -1,9 +1,11 @@
-from contextlib import asynccontextmanager
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import SQLAlchemyError, OperationalError
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
+
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models import TransactionLog
 
 logger = logging.getLogger(__name__)
@@ -11,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class TransactionService:
     """Manage database transactions with proper error handling and audit logging"""
-    
+
     @staticmethod
     @asynccontextmanager
     async def transaction(db: AsyncSession):
@@ -27,7 +29,7 @@ class TransactionService:
             logger.error(f"Unexpected error in transaction: {str(e)}")
             await db.rollback()
             raise
-    
+
     @staticmethod
     async def execute_atomic(db: AsyncSession, operations: list):
         """Execute multiple operations atomically"""
@@ -42,7 +44,7 @@ class TransactionService:
                 await db.rollback()
                 logger.error(f"Atomic operation failed: {str(e)}")
                 raise
-    
+
     @staticmethod
     async def retry_on_deadlock(db: AsyncSession, func, max_retries: int = 3):
         """Retry operation on deadlock detection"""
@@ -56,7 +58,7 @@ class TransactionService:
                     await db.rollback()
                     continue
                 raise
-    
+
     @staticmethod
     async def log_transaction(
         db: AsyncSession,
@@ -72,7 +74,7 @@ class TransactionService:
     ):
         """Log a transaction for audit purposes"""
         transaction_id = f"{entity_type}_{entity_id}_{datetime.utcnow().isoformat()}_{uuid.uuid4().hex[:8]}"
-        
+
         log_entry = TransactionLog(
             transaction_id=transaction_id,
             entity_type=entity_type,
@@ -85,30 +87,30 @@ class TransactionService:
             status=status,
             error_message=error_message
         )
-        
+
         db.add(log_entry)
         await db.flush()
-        
+
         return transaction_id
 
 
 class CompensationTransaction:
     """Handle distributed transactions with compensation pattern"""
-    
+
     def __init__(self, db: AsyncSession):
         self.db = db
         self.compensations = []
         self.logger = logging.getLogger(__name__)
-    
+
     async def add_operation(self, operation, compensation):
         """Add operation and its compensation function"""
         try:
             await operation()
             self.compensations.append(compensation)
-        except Exception as e:
+        except Exception:
             await self.rollback()
             raise
-    
+
     async def rollback(self):
         """Execute compensations in reverse order"""
         for compensation in reversed(self.compensations):
