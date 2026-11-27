@@ -6,7 +6,16 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models import Base, Permission, Role, RolePermission, Setting, Tenant, User, UserRole
+from app.models import (
+    Base,
+    Permission,
+    Role,
+    RolePermission,
+    Setting,
+    Tenant,
+    User,
+    UserRole,
+)
 from app.permissions_catalogue import ALL_PERMISSIONS
 from app.scripts import seed_defaults
 
