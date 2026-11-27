@@ -10,7 +10,7 @@ starlette==1.10.0
 uvicorn[standard]==0.54.0
 # SQLAlchemy 2.1.x NOT yet: its postgresql:// default now imports psycopg3,
 # which we cannot verify without a live PostgreSQL (docker daemon down).
-SQLAlchemy==2.1.8
+SQLAlchemy[asyncio]==2.1.8
 psycopg2-binary==2.9.13
 alembic==1.20.1
 
