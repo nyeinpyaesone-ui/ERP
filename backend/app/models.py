@@ -6,6 +6,8 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Index,
+    JSON,
     LargeBinary,
     Numeric,
     String,
@@ -920,3 +922,23 @@ class Tenant(Base):
     )
 
     users = relationship("User", back_populates="tenant")
+
+
+class TransactionLog(Base):
+    __tablename__ = "transaction_logs"
+    __table_args__ = (
+        Index("ix_transaction_logs_entity", "entity_type", "entity_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    transaction_id = Column(String(100), nullable=False, unique=True, index=True)
+    entity_type = Column(String(50), nullable=False)
+    entity_id = Column(Integer, nullable=False)
+    action = Column(String(50), nullable=False)
+    old_values = Column(JSON, nullable=True)
+    new_values = Column(JSON, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True, index=True)
+    status = Column(String(50), nullable=False, server_default="completed")
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
