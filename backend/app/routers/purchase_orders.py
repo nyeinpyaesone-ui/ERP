@@ -1,13 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from typing import List, Optional
 from datetime import date
 
-from app.database import get_db
-from app.models import PurchaseOrder, PurchaseOrderItem, POApproval, Vendor, User, Product
-from app.services.transaction_service import TransactionService
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.models import POApproval, PurchaseOrder, PurchaseOrderItem, User
+from app.services.transaction_service import TransactionService
 
 
 router = APIRouter(prefix="/api/v1/purchase-orders", tags=["Purchase Orders"])
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/v1/purchase-orders", tags=["Purchase Orders"])
 # ============== SCHEMAS ==============
 
 class PurchaseOrderItemCreate(BaseModel):
-    product_id: Optional[int] = None
+    product_id: int | None = None
     description: str
     quantity: float = Field(gt=0)
     unit_price: float = Field(gt=0)
@@ -24,14 +24,14 @@ class PurchaseOrderItemCreate(BaseModel):
 
 class PurchaseOrderCreate(BaseModel):
     vendor_id: int
-    items: List[PurchaseOrderItemCreate]
-    expected_delivery_date: Optional[date] = None
-    shipping_address: Optional[str] = None
+    items: list[PurchaseOrderItemCreate]
+    expected_delivery_date: date | None = None
+    shipping_address: str | None = None
 
 
 class PurchaseOrderApprove(BaseModel):
     approved: bool
-    comments: Optional[str] = None
+    comments: str | None = None
 
 
 # ============== HELPERS ==============
@@ -46,9 +46,9 @@ async def generate_po_number(db: AsyncSession) -> str:
 
 
 async def check_segregation_of_duties(
-    db: AsyncSession, 
-    requester_id: int, 
-    approver_id: Optional[int]
+    db: AsyncSession,
+    requester_id: int,
+    approver_id: int | None
 ) -> bool:
     """Ensure requester cannot approve their own PO"""
     if approver_id and requester_id == approver_id:
@@ -75,19 +75,19 @@ async def create_purchase_order(
     current_user: User = Depends(lambda: User(id=1, email="test@example.com"))  # Replace with actual auth
 ):
     """Create a new purchase order with transactional integrity"""
-    
+
     async with TransactionService.transaction(db):
         # Generate PO number
         po_number = await generate_po_number(db)
-        
+
         # Calculate totals
         subtotal = sum(item.quantity * item.unit_price for item in po_data.items)
         tax_amount = subtotal * 0.1  # 10% tax example
         total_amount = subtotal + tax_amount
-        
+
         # Determine approval level
         approval_level = get_approval_level(total_amount)
-        
+
         # Create PO
         po = PurchaseOrder(
             tenant_id=current_user.tenant_id if hasattr(current_user, 'tenant_id') else 1,
@@ -102,10 +102,10 @@ async def create_purchase_order(
             expected_delivery_date=po_data.expected_delivery_date,
             shipping_address=po_data.shipping_address
         )
-        
+
         db.add(po)
         await db.flush()
-        
+
         # Create PO items
         for item_data in po_data.items:
             item = PurchaseOrderItem(
@@ -117,7 +117,7 @@ async def create_purchase_order(
                 total_price=item_data.quantity * item_data.unit_price
             )
             db.add(item)
-        
+
         # Log transaction
         await TransactionService.log_transaction(
             db=db,
@@ -128,7 +128,7 @@ async def create_purchase_order(
             user_id=current_user.id,
             tenant_id=po.tenant_id
         )
-        
+
         return {"id": po.id, "po_number": po_number, "status": po.status}
 
 
@@ -139,19 +139,19 @@ async def get_purchase_order(
     current_user: User = Depends(lambda: User(id=1, email="test@example.com"))
 ):
     """Get a specific purchase order"""
-    
+
     result = await db.execute(
         select(PurchaseOrder).where(PurchaseOrder.id == po_id)
     )
     po = result.scalar_one_or_none()
-    
+
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
-    
+
     # Check tenant isolation
     if hasattr(current_user, 'tenant_id') and po.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     return {
         "id": po.id,
         "po_number": po.po_number,
@@ -171,23 +171,23 @@ async def approve_purchase_order(
     current_user: User = Depends(lambda: User(id=1, email="test@example.com"))
 ):
     """Approve or reject a purchase order"""
-    
+
     async with TransactionService.transaction(db):
         result = await db.execute(
             select(PurchaseOrder).where(PurchaseOrder.id == po_id)
         )
         po = result.scalar_one_or_none()
-        
+
         if not po:
             raise HTTPException(status_code=404, detail="Purchase order not found")
-        
+
         # Check segregation of duties
         if po.requester_id == current_user.id:
             raise HTTPException(
                 status_code=403,
                 detail="Requester cannot approve their own purchase order"
             )
-        
+
         # Create approval record
         approval = POApproval(
             po_id=po.id,
@@ -197,7 +197,7 @@ async def approve_purchase_order(
             comments=approval_data.comments
         )
         db.add(approval)
-        
+
         # Update PO status
         if approval_data.approved:
             if po.approval_level <= 1:
@@ -208,7 +208,7 @@ async def approve_purchase_order(
                 po.status = "pending_approval"
         else:
             po.status = "rejected"
-        
+
         # Log transaction
         await TransactionService.log_transaction(
             db=db,
@@ -219,7 +219,7 @@ async def approve_purchase_order(
             user_id=current_user.id,
             tenant_id=po.tenant_id
         )
-        
+
         return {"id": po.id, "status": po.status, "approval_level": po.approval_level}
 
 
@@ -227,24 +227,24 @@ async def approve_purchase_order(
 async def list_purchase_orders(
     skip: int = 0,
     limit: int = 100,
-    status_filter: Optional[str] = None,
+    status_filter: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(lambda: User(id=1, email="test@example.com", tenant_id=1))
 ):
     """List purchase orders with tenant isolation"""
-    
+
     tenant_id = getattr(current_user, 'tenant_id', 1)
-    
+
     query = select(PurchaseOrder).where(PurchaseOrder.tenant_id == tenant_id)
-    
+
     if status_filter:
         query = query.where(PurchaseOrder.status == status_filter)
-    
+
     query = query.offset(skip).limit(limit)
-    
+
     result = await db.execute(query)
     pos = result.scalars().all()
-    
+
     return [
         {
             "id": po.id,
