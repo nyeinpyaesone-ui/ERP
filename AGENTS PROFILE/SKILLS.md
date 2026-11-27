@@ -11,8 +11,11 @@ values → [SOUL.md](SOUL.md) · backlog → [IMPROVEMENTS.md](IMPROVEMENTS.md).
 1. Match the task row below → note the **approach** and **verify** commands.
 2. If the row says *load skill*, call the `skill` tool first (it injects its rules
    into the session), then act.
-3. Installed skills: **`customize-opencode`** (config edits only). Repo has no
-   `SKILL.md` yet — to add one: create file → add row here → mention in TOOLS §3.
+3. Load the matching repository skill before area-specific work: `@erp-backend`,
+   `@erp-frontend`, `@erp-ops`, `@jev-intercept`, `@jev-dynamic-detect`, or
+   `@pr-map-reduce`. Their `SKILL.md` files live under `.opencode/skills/`.
+   For OpenCode configuration edits, `customize-opencode` remains the required
+   runtime skill; verify it is available in that OpenCode session before editing.
 
 ## Matrix
 
