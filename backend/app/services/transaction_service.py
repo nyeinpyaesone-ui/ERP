@@ -1,6 +1,7 @@
 import logging
 import uuid
 from contextlib import asynccontextmanager
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
@@ -67,12 +68,12 @@ class TransactionService:
         entity_type: str,
         entity_id: int,
         action: str,
-        old_values: dict = None,
-        new_values: dict = None,
-        user_id: int = None,
-        tenant_id: int = None,
+        old_values: dict | None = None,
+        new_values: dict | None = None,
+        user_id: int | None = None,
+        tenant_id: int | None = None,
         status: str = "completed",
-        error_message: str = None,
+        error_message: str | None = None,
     ):
         """Log a transaction for audit purposes"""
         transaction_id = f"{entity_type}_{entity_id}_{datetime.utcnow().isoformat()}_{uuid.uuid4().hex[:8]}"
@@ -101,10 +102,14 @@ class CompensationTransaction:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.compensations = []
+        self.compensations: list[Callable[[], Awaitable[None]]] = []
         self.logger = logging.getLogger(__name__)
 
-    async def add_operation(self, operation, compensation):
+    async def add_operation(
+        self,
+        operation: Callable[[], Awaitable[object]],
+        compensation: Callable[[], Awaitable[None]],
+    ) -> None:
         """Add operation and its compensation function"""
         try:
             await operation()
@@ -113,7 +118,7 @@ class CompensationTransaction:
             await self.rollback()
             raise
 
-    async def rollback(self):
+    async def rollback(self) -> None:
         """Execute compensations in reverse order"""
         for compensation in reversed(self.compensations):
             try:
