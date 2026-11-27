@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # TABLE for the entire schema.
 import app.models  # noqa: E402,F401
 from app.config import settings  # noqa: E402
-from app.database import Base  # noqa: E402
+from app.database import Base, normalize_database_url  # noqa: E402
 
 config = context.config
 
@@ -24,7 +24,9 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url with the actual database URL from settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option(
+    "sqlalchemy.url", normalize_database_url(settings.DATABASE_URL).replace("%", "%%")
+)
 
 
 def run_migrations_offline() -> None:
