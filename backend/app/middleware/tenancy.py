@@ -88,9 +88,10 @@ class TenancyMiddleware(BaseHTTPMiddleware):
 
     async def get_tenant_by_subdomain(self, subdomain: str):
         """Get tenant by subdomain"""
+        from sqlalchemy import select
+
         from app.database import get_db
         from app.models import Tenant
-        from sqlalchemy import select
 
         async for db in get_db():
             result = await db.execute(
