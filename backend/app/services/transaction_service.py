@@ -54,7 +54,9 @@ class TransactionService:
                     return await func(db)
             except OperationalError as e:
                 if "deadlock" in str(e).lower() and attempt < max_retries - 1:
-                    logger.warning(f"Deadlock detected, retrying... ({attempt + 1}/{max_retries})")
+                    logger.warning(
+                        f"Deadlock detected, retrying... ({attempt + 1}/{max_retries})"
+                    )
                     await db.rollback()
                     continue
                 raise
@@ -70,7 +72,7 @@ class TransactionService:
         user_id: int = None,
         tenant_id: int = None,
         status: str = "completed",
-        error_message: str = None
+        error_message: str = None,
     ):
         """Log a transaction for audit purposes"""
         transaction_id = f"{entity_type}_{entity_id}_{datetime.utcnow().isoformat()}_{uuid.uuid4().hex[:8]}"
@@ -85,7 +87,7 @@ class TransactionService:
             user_id=user_id,
             tenant_id=tenant_id,
             status=status,
-            error_message=error_message
+            error_message=error_message,
         )
 
         db.add(log_entry)
