@@ -80,8 +80,7 @@ class TenancyMiddleware(BaseHTTPMiddleware):
                 return tenant.id
 
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid API key"
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key"
             )
 
     async def get_tenant_by_subdomain(self, subdomain: str):
