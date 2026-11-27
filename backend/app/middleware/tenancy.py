@@ -1,23 +1,23 @@
-from fastapi import Request, HTTPException, status
-from starlette.middleware.base import BaseHTTPMiddleware
-from typing import Optional
 import logging
+
+from fastapi import HTTPException, Request, status
+from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
 
 
 class TenancyMiddleware(BaseHTTPMiddleware):
     """Middleware to extract and validate tenant context from requests"""
-    
+
     async def dispatch(self, request: Request, call_next):
         # Extract tenant from subdomain or header
         host = request.headers.get("host", "")
         subdomain = host.split(".")[0] if "." in host else None
-        
+
         # Allow API key override for system services
         api_key = request.headers.get("X-API-Key")
         tenant_id_header = request.headers.get("X-Tenant-ID")
-        
+
         try:
             if api_key:
                 # Validate API key and extract tenant
@@ -46,16 +46,16 @@ class TenancyMiddleware(BaseHTTPMiddleware):
                     "/docs",
                     "/openapi.json"
                 ]
-                
+
                 if not any(request.url.path.startswith(path) for path in public_paths):
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Tenant context required. Provide X-Tenant-ID header or use tenant subdomain."
                     )
-            
+
             response = await call_next(request)
             return response
-            
+
         except HTTPException:
             raise
         except Exception as e:
@@ -63,38 +63,38 @@ class TenancyMiddleware(BaseHTTPMiddleware):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to establish tenant context"
-            )
-    
-    async def validate_api_key(self, api_key: str) -> Optional[int]:
+            ) from e
+
+    async def validate_api_key(self, api_key: str) -> int | None:
         """Validate API key and return tenant ID"""
         from app.database import get_db
-        from sqlalchemy import select
         from app.models import Tenant
-        
+        from sqlalchemy import select
+
         async for db in get_db():
             result = await db.execute(
                 select(Tenant).where(Tenant.subdomain == api_key)
             )
             tenant = result.scalar_one_or_none()
-            
+
             if tenant and tenant.is_active:
                 return tenant.id
-            
+
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid API key"
             )
-    
+
     async def get_tenant_by_subdomain(self, subdomain: str):
         """Get tenant by subdomain"""
         from app.database import get_db
-        from sqlalchemy import select
         from app.models import Tenant
-        
+        from sqlalchemy import select
+
         async for db in get_db():
             result = await db.execute(
                 select(Tenant).where(Tenant.subdomain == subdomain)
             )
             return result.scalar_one_or_none()
-        
+
         return None
