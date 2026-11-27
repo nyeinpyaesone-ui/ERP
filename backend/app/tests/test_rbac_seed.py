@@ -6,7 +6,16 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models import Base, Permission, Role, RolePermission, Setting, User, UserRole
+from app.models import (
+    Base,
+    Permission,
+    Role,
+    RolePermission,
+    Setting,
+    Tenant,
+    User,
+    UserRole,
+)
 from app.permissions_catalogue import ALL_PERMISSIONS
 from app.scripts import seed_defaults
 
@@ -18,7 +27,7 @@ def rbac_db() -> Iterator[Session]:
     engine = create_engine("sqlite:///:memory:")
     tables = [
         model.__table__
-        for model in (User, Role, Permission, RolePermission, UserRole, Setting)
+        for model in (Tenant, User, Role, Permission, RolePermission, UserRole, Setting)
     ]
     Base.metadata.create_all(engine, tables=tables)
     with Session(engine) as db:

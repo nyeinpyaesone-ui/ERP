@@ -5,9 +5,9 @@ Revises: 004
 Create Date: 2024-01-15
 
 """
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = '005'
@@ -39,12 +39,12 @@ def upgrade():
     )
     op.create_index(op.f('ix_tenants_subdomain'), 'tenants', ['subdomain'], unique=True)
     op.create_index(op.f('ix_tenants_schema_name'), 'tenants', ['schema_name'], unique=True)
-    
+
     # Add tenant_id to users table
     op.add_column('users', sa.Column('tenant_id', sa.Integer(), nullable=True))
     op.create_foreign_key('fk_users_tenant', 'users', 'tenants', ['tenant_id'], ['id'])
     op.create_index('ix_users_tenant_id', 'users', ['tenant_id'])
-    
+
     # Create vendors table
     op.create_table('vendors',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -63,7 +63,7 @@ def upgrade():
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_vendors_tenant_id', 'vendors', ['tenant_id'])
-    
+
     # Create purchase_orders table
     op.create_table('purchase_orders',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -96,7 +96,7 @@ def upgrade():
     op.create_index('ix_purchase_orders_status', 'purchase_orders', ['status'])
     op.create_index('ix_purchase_orders_vendor_id', 'purchase_orders', ['vendor_id'])
     op.create_index('ix_purchase_orders_tenant_id', 'purchase_orders', ['tenant_id'])
-    
+
     # Create purchase_order_items table
     op.create_table('purchase_order_items',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -111,7 +111,7 @@ def upgrade():
         sa.ForeignKeyConstraint(['product_id'], ['products.id']),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Create po_approvals table
     op.create_table('po_approvals',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -126,7 +126,7 @@ def upgrade():
         sa.ForeignKeyConstraint(['approver_id'], ['users.id']),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Create transaction_logs table
     op.create_table('transaction_logs',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -156,11 +156,11 @@ def downgrade():
     op.drop_table('purchase_order_items')
     op.drop_table('purchase_orders')
     op.drop_table('vendors')
-    
+
     op.drop_index('ix_users_tenant_id', table_name='users')
     op.drop_constraint('fk_users_tenant', 'users', type_='foreignkey')
     op.drop_column('users', 'tenant_id')
-    
+
     op.drop_index('ix_tenants_schema_name', table_name='tenants')
     op.drop_index('ix_tenants_subdomain', table_name='tenants')
     op.drop_table('tenants')

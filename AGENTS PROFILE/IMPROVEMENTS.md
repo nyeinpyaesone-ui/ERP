@@ -9,7 +9,7 @@ Scope: **what to improve next, in order**. IDs are referenced from
 | ID | Item | Files | Verify |
 |----|------|-------|--------|
 | ✅ **IMP-P0-1** | Finish & land dirty worktree (MEMORY T-001): `ci.yml`, `permissions_catalogue.py`, 6 test files, `App.jsx`, `pytest.ini`, `pyproject.toml`, lockfile | `.github/workflows/ci.yml`, `backend/app/**`, `backend/frontend-react/src/App.jsx` | **Done 2026-10-04/08:** `bc2e0224` + `b2df79fd`…`80bf5c4a`; worktree clean |
-| ⬜ **IMP-P0-2** | Apply migrations **001–008 to live PostgreSQL** (never run; MEMORY T-003) — *blocked: docker daemon needs interactive sudo* | `backend/alembic/versions/` | `docker compose up -d postgres redis` → `alembic upgrade head` → `alembic current` = 008 |
+| ⬜ **IMP-P0-2** | Apply migrations **001–008 to the persistent/live PostgreSQL target**; CI PostgreSQL migration coverage is verified, but it does not prove the target database is migrated — *blocked: persistent DB access/runtime unavailable on the proot host* | `backend/alembic/versions/` | CI evidence: run `38116547621` applied 001→008 to ephemeral `postgres:15`; target remains open until authorized persistent-DB `alembic upgrade head` + `alembic current` confirms 008 |
 | ✅ **IMP-P0-3** | Fix **AGENTS.md drift** (MEMORY T-002): npm/npx on PATH, Alembic count, test counts, compose v2 | `AGENTS.md` | **Done 2026-10-08:** `80bf5c4a` — no stale claims remain |
 | ✅ **IMP-P0-4** | **CI truthfulness**: frontend `lint`/`tsc` steps were `\|\| true` no-ops — removed; real eslint tracked as IMP-P2-5 | `.github/workflows/ci.yml` | **Done 2026-10-08:** `22b44f08` — quality job has only real gates |
 

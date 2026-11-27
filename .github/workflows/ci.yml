@@ -184,7 +184,7 @@ jobs:
 
       - name: Run Black
         run: |
-          cd backend && black --check .
+          cd backend && black --check --diff .
 
       - name: Run MyPy (advisory — does not gate the pipeline)
         continue-on-error: true
@@ -248,7 +248,7 @@ jobs:
       - name: Run backend tests
         run: |
           cd backend
-          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/erp_test pytest --cov=app --cov-report=xml
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/erp_test pytest --cov=app --cov-report=xml --cov-report=term-missing:skip-covered
 
       - name: Upload coverage
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
@@ -268,7 +268,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: backend/frontend-react/package-lock.json
 

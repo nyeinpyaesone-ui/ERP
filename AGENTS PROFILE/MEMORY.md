@@ -4,7 +4,7 @@ Durable cross-session state. Companion to [`AGENTS.md`](../AGENTS.md)
 (AGENTS.md = **how the repo works**; this file = **what is true right now**).
 Append-only ledger; never store secrets (env var *names* only).
 
-**Last verified:** 2026-11-01 (session: Jev-Intercept repo-native — 295 passed, 58.96%, guard OK)
+**Last verified:** 2026-11-01 (session: Jev-Intercept repo-native — 295 passed, 58.85%, guard OK)
 
 ---
 
@@ -468,3 +468,14 @@ secrets are preserved by default and can be explicitly replaced from files.
 Do not mark this setup complete until the bootstrapper is run and its output
 and GitHub settings are verified. Do not merge/deploy based on this ledger
 entry alone; check the latest PR checks and environment state.
+
+
+---
+
+## 9. Agent profile consistency audit — 2026-11-27
+
+- Inspected the repository profile at main commit `23ef15d6c72eba78e7467bf9a1d8200d48a93b24`.
+- Confirmed repository-local skills exist: `erp-backend`, `erp-frontend`, `erp-ops`, `jev-intercept`, `jev-dynamic-detect`, and `pr-map-reduce`; corrected the stale statements in `SKILLS.md` and `TOOLS.md`.
+- Clarified `IMPROVEMENTS.md` IMP-P0-2: CI run `38116547621` applied migrations 001→008 to ephemeral PostgreSQL 15; persistent/live target migration remains open and unverified.
+- Made the model identity in `SOUL.md` runtime-neutral and corrected the top coverage snapshot to match the dated verification ledger (58.85%).
+- Scope: remote source inspection and documentation consistency only. No test suite, local runtime, persistent database, or deployment was executed in this audit. The runtime verification snapshot in §1 remains dated 2026-11-01 until re-run in its target environment.

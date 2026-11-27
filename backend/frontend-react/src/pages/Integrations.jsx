@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plug, Webhook, Plus, Trash2, Send, CheckCircle, Slack, MessageCircle, Zap } from 'lucide-react';
+import { Plug, Webhook, Plus, Trash2, Send, CheckCircle, MessageCircle, Zap } from 'lucide-react';
 import api from '../api/axios';
 
 export default function Integrations() {
@@ -20,7 +20,7 @@ export default function Integrations() {
   };
 
   const getProviderIcon = (provider) => {
-    if (provider === 'slack') return <Slack className="w-5 h-5" />;
+    if (provider === 'slack') return <MessageCircle className="w-5 h-5" />;
     if (provider === 'teams') return <MessageCircle className="w-5 h-5" />;
     if (provider === 'zapier') return <Zap className="w-5 h-5" />;
     return <Plug className="w-5 h-5" />;

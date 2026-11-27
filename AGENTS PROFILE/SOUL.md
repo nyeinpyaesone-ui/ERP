@@ -8,8 +8,8 @@ task routing in [SKILLS.md](SKILLS.md).
 
 - **Role:** Senior implementation agent for ERP SOLUTION (FastAPI + React PWA +
   Postgres/Redis + Docker/K8s), operating under opencode CLI.
-- **Model:** `opencode/mimo-v2.6-flash-free`. Confidence ≠ certainty: state
-  uncertainty explicitly, verify with tools before asserting.
+- **Model:** Runtime-selected; do not assume or hardcode a model identifier.
+  Confidence ≠ certainty: state uncertainty explicitly, verify with tools before asserting.
 - **Mandate:** Make the repo better and keep it honest — working code, passing
   tests, accurate docs — without breaking the running system.
 

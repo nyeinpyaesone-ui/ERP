@@ -22,18 +22,20 @@ Source of permission truth: [`../opencode.json`](../opencode.json).
 
 | Server | Command | Gate / gotcha |
 |--------|---------|---------------|
-| `postgres` | `bash scripts/mcp-postgres.sh` | Requires `export POSTGRES_MCP_URL=...` **and** Postgres running (`docker-compose up -d postgres`); wrapper exits 1 otherwise |
+| `postgres` | `bash scripts/mcp-postgres.sh` | Requires `export POSTGRES_MCP_URL=...` **and** Postgres running (`docker compose up -d postgres`); wrapper exits 1 otherwise |
 | `filesystem` | `npx -y @modelcontextprotocol/server-filesystem /home/admin/ERP/backend` | **Scoped to `backend/`** — root/other dirs need normal tools |
 | `playwright` | `npx -y @playwright/mcp` | Browser automation |
 | `sequential-thinking` | `npx -y @modelcontextprotocol/server-sequential-thinking` | Reasoning aid |
 
 ## 3. Skills
 
-- Loadable via `skill` tool; **installed: `customize-opencode` only** — mandatory
-  before editing `opencode.json`, `.opencode/`, `~/.config/opencode/*`, agents,
-  or skills.
-- No repo-specific skills exist yet (no `SKILL.md` in repo). Adding one = new file
-  + row in this table + routing rule in [SKILLS.md](SKILLS.md).
+- **OpenCode runtime skill:** `customize-opencode` is required before editing
+  `opencode.json`, `.opencode/`, `~/.config/opencode/*`, agents, or skills. Verify
+  that it is available in the active OpenCode session; do not assume availability.
+- **Repository-local skills verified in `.opencode/skills/`:** `erp-backend`,
+  `erp-frontend`, `erp-ops`, `jev-intercept`, `jev-dynamic-detect`, and
+  `pr-map-reduce`. Load the matching `SKILL.md` before area-specific work.
+  When adding a skill, update this inventory and the routing matrix in [SKILLS.md](SKILLS.md).
 
 ## 4. Permission gates (`opencode.json → permission`)
 
@@ -49,7 +51,7 @@ Source of permission truth: [`../opencode.json`](../opencode.json).
 
 ```bash
 # Services first — backend/MCP fail without them
-docker-compose up -d postgres redis
+docker compose up -d postgres redis
 
 # Backend
 cd backend && source venv/bin/activate && uvicorn app.main:app --reload
@@ -62,8 +64,8 @@ cd backend/frontend-react && npm run build
 cd backend/frontend-react && npm run test     # vitest
 
 # Stack / deploy
-docker-compose up -d backend frontend
-docker-compose -f docker-compose.prod.yml up -d
+docker compose up -d backend frontend
+docker compose -f docker-compose.prod.yml up -d
 ./scripts/deploy-blue-green.sh production v1.2.3 [--rollback]
 make test   # backend + frontend steps (see HEARTBEATS gates)
 ```

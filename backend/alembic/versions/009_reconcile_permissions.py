@@ -1,8 +1,8 @@
 """Reconcile permissions to catalogue v1
 
-Revision ID: 005
-Revises: 004
-Create Date: 2024-XX-XX XX:XX:XX.XXXXXX
+Revision ID: 009
+Revises: 008
+Create Date: 2026-11-27
 
 """
 
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "005"
-down_revision: str | None = "004"
+revision: str = "009"
+down_revision: str | None = "008"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

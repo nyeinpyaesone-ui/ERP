@@ -1,10 +1,12 @@
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     Date,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     Numeric,
@@ -59,6 +61,7 @@ class User(Base):
         primaryjoin="User.id==UserRole.user_id",
         secondaryjoin="UserRole.role_id==Role.id",
     )
+    tenant = relationship("Tenant", back_populates="users")
 
 
 class Company(Base):
@@ -894,3 +897,46 @@ class AIPromptTemplate(Base):
     )
 
     creator = relationship("User", foreign_keys=[created_by])
+
+
+class Tenant(Base):
+    __tablename__ = "tenants"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    subdomain = Column(String(100), nullable=False, unique=True, index=True)
+    schema_name = Column(String(100), nullable=False, unique=True, index=True)
+    plan = Column(String(50), nullable=False, server_default="starter")
+    max_users = Column(Integer, nullable=False, server_default="5")
+    max_storage_gb = Column(Integer, nullable=False, server_default="10")
+    subscription_start = Column(Date, nullable=False)
+    subscription_end = Column(Date, nullable=False)
+    timezone = Column(String(50), nullable=False, server_default="UTC")
+    currency = Column(String(3), nullable=False, server_default="USD")
+    locale = Column(String(10), nullable=False, server_default="en_US")
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    users = relationship("User", back_populates="tenant")
+
+
+class TransactionLog(Base):
+    __tablename__ = "transaction_logs"
+    __table_args__ = (Index("ix_transaction_logs_entity", "entity_type", "entity_id"),)
+
+    id = Column(Integer, primary_key=True)
+    transaction_id = Column(String(100), nullable=False, unique=True, index=True)
+    entity_type = Column(String(50), nullable=False)
+    entity_id = Column(Integer, nullable=False)
+    action = Column(String(50), nullable=False)
+    old_values = Column(JSON, nullable=True)
+    new_values = Column(JSON, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True, index=True)
+    status = Column(String(50), nullable=False, server_default="completed")
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
