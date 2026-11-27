@@ -168,7 +168,7 @@ async def approve_purchase_order(
     po_id: int,
     approval_data: PurchaseOrderApprove,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(lambda: User(id=1, email="test@example.com"))
+    current_user: User = Depends(lambda: User(id=1, email="test@example.com")),
 ):
     """Approve or reject a purchase order"""
 
@@ -217,7 +217,7 @@ async def approve_purchase_order(
             action="approve",
             new_values={"status": po.status, "approved_by": current_user.id},
             user_id=current_user.id,
-            tenant_id=po.tenant_id
+            tenant_id=po.tenant_id,
         )
 
         return {"id": po.id, "status": po.status, "approval_level": po.approval_level}
@@ -235,7 +235,7 @@ async def list_purchase_orders(
 ):
     """List purchase orders with tenant isolation"""
 
-    tenant_id = getattr(current_user, 'tenant_id', 1)
+    tenant_id = getattr(current_user, "tenant_id", 1)
 
     query = select(PurchaseOrder).where(PurchaseOrder.tenant_id == tenant_id)
 
@@ -254,7 +254,7 @@ async def list_purchase_orders(
             "vendor_id": po.vendor_id,
             "status": po.status,
             "total_amount": float(po.total_amount),
-            "created_at": po.created_at
+            "created_at": po.created_at,
         }
         for po in pos
     ]
