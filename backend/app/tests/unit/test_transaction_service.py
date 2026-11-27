@@ -36,7 +36,9 @@ async def test_transaction_yields_session_on_success():
     db.rollback.assert_not_awaited()
 
 
-@pytest.mark.parametrize("error", [SQLAlchemyError("database error"), ValueError("invalid")])
+@pytest.mark.parametrize(
+    "error", [SQLAlchemyError("database error"), ValueError("invalid")]
+)
 async def test_transaction_rolls_back_and_reraises(error):
     db = FakeAsyncSession()
 
