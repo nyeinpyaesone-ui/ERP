@@ -902,7 +902,7 @@ class AIPromptTemplate(Base):
 class Tenant(Base):
     __tablename__ = "tenants"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
     subdomain = Column(String(100), nullable=False, unique=True, index=True)
     schema_name = Column(String(100), nullable=False, unique=True, index=True)
@@ -930,7 +930,7 @@ class TransactionLog(Base):
         Index("ix_transaction_logs_entity", "entity_type", "entity_id"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     transaction_id = Column(String(100), nullable=False, unique=True, index=True)
     entity_type = Column(String(50), nullable=False)
     entity_id = Column(Integer, nullable=False)
