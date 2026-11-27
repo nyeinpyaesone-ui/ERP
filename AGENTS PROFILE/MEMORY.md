@@ -476,6 +476,6 @@ entry alone; check the latest PR checks and environment state.
 
 - Inspected the repository profile at main commit `23ef15d6c72eba78e7467bf9a1d8200d48a93b24`.
 - Confirmed repository-local skills exist: `erp-backend`, `erp-frontend`, `erp-ops`, `jev-intercept`, `jev-dynamic-detect`, and `pr-map-reduce`; corrected the stale statements in `SKILLS.md` and `TOOLS.md`.
-- Corrected `IMPROVEMENTS.md` IMP-P0-2: migrations 001→008 were applied to the ephemeral PostgreSQL 15 CI service in run `38116547621`; this does **not** prove migration against a persistent production database.
+- Clarified `IMPROVEMENTS.md` IMP-P0-2: CI run `38116547621` applied migrations 001→008 to ephemeral PostgreSQL 15; persistent/live target migration remains open and unverified.
 - Made the model identity in `SOUL.md` runtime-neutral and corrected the top coverage snapshot to match the dated verification ledger (58.85%).
 - Scope: remote source inspection and documentation consistency only. No test suite, local runtime, persistent database, or deployment was executed in this audit. The runtime verification snapshot in §1 remains dated 2026-11-01 until re-run in its target environment.
