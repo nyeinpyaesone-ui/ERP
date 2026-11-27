@@ -67,9 +67,10 @@ class TenancyMiddleware(BaseHTTPMiddleware):
 
     async def validate_api_key(self, api_key: str) -> int | None:
         """Validate API key and return tenant ID"""
+        from sqlalchemy import select
+
         from app.database import get_db
         from app.models import Tenant
-        from sqlalchemy import select
 
         async for db in get_db():
             result = await db.execute(
