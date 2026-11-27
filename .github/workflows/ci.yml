@@ -184,7 +184,7 @@ jobs:
 
       - name: Run Black
         run: |
-          cd backend && black --check .
+          cd backend && black --check --diff .
 
       - name: Run MyPy (advisory — does not gate the pipeline)
         continue-on-error: true
