@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/v1/purchase-orders", tags=["Purchase Orders"])
 
 # ============== SCHEMAS ==============
 
+
 class PurchaseOrderItemCreate(BaseModel):
     product_id: int | None = None
     description: str
@@ -35,19 +36,16 @@ class PurchaseOrderApprove(BaseModel):
 
 # ============== HELPERS ==============
 
+
 async def generate_po_number(db: AsyncSession) -> str:
     """Generate unique PO number"""
-    result = await db.execute(
-        select(func.count(PurchaseOrder.id))
-    )
+    result = await db.execute(select(func.count(PurchaseOrder.id)))
     count = result.scalar() or 0
     return f"PO-{date.today().strftime('%Y%m')}-{count + 1:05d}"
 
 
 async def check_segregation_of_duties(
-    db: AsyncSession,
-    requester_id: int,
-    approver_id: int | None
+    db: AsyncSession, requester_id: int, approver_id: int | None
 ) -> bool:
     """Ensure requester cannot approve their own PO"""
     if approver_id and requester_id == approver_id:
@@ -67,11 +65,14 @@ def get_approval_level(total_amount: float) -> int:
 
 # ============== ENDPOINTS ==============
 
+
 @router.post("/", response_model=dict)
 async def create_purchase_order(
     po_data: PurchaseOrderCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(lambda: User(id=1, email="test@example.com"))  # Replace with actual auth
+    current_user: User = Depends(
+        lambda: User(id=1, email="test@example.com")
+    ),  # Replace with actual auth
 ):
     """Create a new purchase order with transactional integrity"""
 
@@ -89,7 +90,9 @@ async def create_purchase_order(
 
         # Create PO
         po = PurchaseOrder(
-            tenant_id=current_user.tenant_id if hasattr(current_user, 'tenant_id') else 1,
+            tenant_id=(
+                current_user.tenant_id if hasattr(current_user, "tenant_id") else 1
+            ),
             po_number=po_number,
             vendor_id=po_data.vendor_id,
             requester_id=current_user.id,
@@ -99,7 +102,7 @@ async def create_purchase_order(
             status="pending_approval",
             approval_level=approval_level,
             expected_delivery_date=po_data.expected_delivery_date,
-            shipping_address=po_data.shipping_address
+            shipping_address=po_data.shipping_address,
         )
 
         db.add(po)
@@ -113,7 +116,7 @@ async def create_purchase_order(
                 description=item_data.description,
                 quantity=item_data.quantity,
                 unit_price=item_data.unit_price,
-                total_price=item_data.quantity * item_data.unit_price
+                total_price=item_data.quantity * item_data.unit_price,
             )
             db.add(item)
 
@@ -125,7 +128,7 @@ async def create_purchase_order(
             action="create",
             new_values={"po_number": po_number, "total_amount": float(total_amount)},
             user_id=current_user.id,
-            tenant_id=po.tenant_id
+            tenant_id=po.tenant_id,
         )
 
         return {"id": po.id, "po_number": po_number, "status": po.status}
@@ -135,20 +138,18 @@ async def create_purchase_order(
 async def get_purchase_order(
     po_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(lambda: User(id=1, email="test@example.com"))
+    current_user: User = Depends(lambda: User(id=1, email="test@example.com")),
 ):
     """Get a specific purchase order"""
 
-    result = await db.execute(
-        select(PurchaseOrder).where(PurchaseOrder.id == po_id)
-    )
+    result = await db.execute(select(PurchaseOrder).where(PurchaseOrder.id == po_id))
     po = result.scalar_one_or_none()
 
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
 
     # Check tenant isolation
-    if hasattr(current_user, 'tenant_id') and po.tenant_id != current_user.tenant_id:
+    if hasattr(current_user, "tenant_id") and po.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
     return {
@@ -158,7 +159,7 @@ async def get_purchase_order(
         "status": po.status,
         "total_amount": float(po.total_amount),
         "approval_level": po.approval_level,
-        "created_at": po.created_at
+        "created_at": po.created_at,
     }
 
 
@@ -184,7 +185,7 @@ async def approve_purchase_order(
         if po.requester_id == current_user.id:
             raise HTTPException(
                 status_code=403,
-                detail="Requester cannot approve their own purchase order"
+                detail="Requester cannot approve their own purchase order",
             )
 
         # Create approval record
@@ -193,7 +194,7 @@ async def approve_purchase_order(
             approver_id=current_user.id,
             level=po.approval_level,
             status="approved" if approval_data.approved else "rejected",
-            comments=approval_data.comments
+            comments=approval_data.comments,
         )
         db.add(approval)
 
@@ -228,7 +229,9 @@ async def list_purchase_orders(
     limit: int = 100,
     status_filter: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(lambda: User(id=1, email="test@example.com", tenant_id=1))
+    current_user: User = Depends(
+        lambda: User(id=1, email="test@example.com", tenant_id=1)
+    ),
 ):
     """List purchase orders with tenant isolation"""
 
