@@ -32,7 +32,7 @@ class TenancyMiddleware(BaseHTTPMiddleware):
                 if not tenant or not tenant.is_active:
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Invalid or inactive tenant"
+                        detail="Invalid or inactive tenant",
                     )
                 request.state.tenant_id = tenant.id
                 request.state.tenant_schema = tenant.schema_name
@@ -44,13 +44,13 @@ class TenancyMiddleware(BaseHTTPMiddleware):
                     "/api/v1/auth/forgot-password",
                     "/api/v1/health",
                     "/docs",
-                    "/openapi.json"
+                    "/openapi.json",
                 ]
 
                 if not any(request.url.path.startswith(path) for path in public_paths):
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Tenant context required. Provide X-Tenant-ID header or use tenant subdomain."
+                        detail="Tenant context required. Provide X-Tenant-ID header or use tenant subdomain.",
                     )
 
             response = await call_next(request)
@@ -62,7 +62,7 @@ class TenancyMiddleware(BaseHTTPMiddleware):
             logger.error(f"Tenancy middleware error: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to establish tenant context"
+                detail="Failed to establish tenant context",
             ) from e
 
     async def validate_api_key(self, api_key: str) -> int | None:
@@ -73,9 +73,7 @@ class TenancyMiddleware(BaseHTTPMiddleware):
         from app.models import Tenant
 
         async for db in get_db():
-            result = await db.execute(
-                select(Tenant).where(Tenant.subdomain == api_key)
-            )
+            result = await db.execute(select(Tenant).where(Tenant.subdomain == api_key))
             tenant = result.scalar_one_or_none()
 
             if tenant and tenant.is_active:
