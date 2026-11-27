@@ -13,10 +13,12 @@ from app.database import normalize_database_url
 def check_disk_space(min_gb: float = 1.0) -> bool:
     """Ensure sufficient disk space for migration"""
     total, used, free = shutil.disk_usage("/")
-    free_gb = free / (1024 ** 3)
+    free_gb = free / (1024**3)
 
     if free_gb < min_gb:
-        print(f"ERROR: Insufficient disk space. Required: {min_gb}GB, Available: {free_gb:.2f}GB")
+        print(
+            f"ERROR: Insufficient disk space. Required: {min_gb}GB, Available: {free_gb:.2f}GB"
+        )
         return False
 
     print(f"✓ Disk space check passed: {free_gb:.2f}GB available")
@@ -28,13 +30,17 @@ def check_database_connections() -> bool:
     try:
         engine = create_engine(normalize_database_url(settings.DATABASE_URL))
         with engine.connect() as conn:
-            result = conn.execute(text("SELECT count(*) FROM pg_stat_activity WHERE state = 'active'"))
+            result = conn.execute(
+                text("SELECT count(*) FROM pg_stat_activity WHERE state = 'active'")
+            )
             active_connections = result.scalar()
 
             result = conn.execute(text("SHOW max_connections"))
             max_connections = result.scalar()
 
-            print(f"✓ Database connections: {active_connections}/{max_connections} active")
+            print(
+                f"✓ Database connections: {active_connections}/{max_connections} active"
+            )
 
             if active_connections > int(max_connections) * 0.8:
                 print("WARNING: High number of active connections")
@@ -63,7 +69,11 @@ def validate_schema() -> bool:
                 return False
 
             # Get current version
-            result = conn.execute(text("SELECT version_num FROM alembic_version ORDER BY version_num DESC LIMIT 1"))
+            result = conn.execute(
+                text(
+                    "SELECT version_num FROM alembic_version ORDER BY version_num DESC LIMIT 1"
+                )
+            )
             current_version = result.scalar()
             print(f"✓ Current schema version: {current_version}")
 
